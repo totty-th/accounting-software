@@ -28,6 +28,11 @@ create table sales_docs (
   total       numeric(18,2) not null default 0,
   ref_doc_id  uuid references sales_docs(id),     -- CN/DN → INV, INV → QT
   reason      text,                                -- เหตุผลใบลดหนี้
+  wht_rate    numeric(5,2) not null default 0,         -- อัตราหัก ณ ที่จ่ายที่ลูกค้าหักเรา (แก้ที่ INV)
+  is_deposit  boolean not null default false,          -- INV มัดจำ
+  deposit_net numeric(18,2) not null default 0,        -- INV ฉบับสุดท้าย: มัดจำที่หักออก (ก่อน VAT)
+  deposit_vat numeric(18,2) not null default 0,
+  collect_voucher_id uuid references journal_vouchers(id),  -- CA: รายการเก็บเงิน
   voucher_id  uuid references journal_vouchers(id),
   created_at  timestamptz not null default now()
 );
@@ -70,7 +75,8 @@ end $$;
 create function create_sales_doc(
   p_type text, p_date date, p_contact uuid, p_lines jsonb,
   p_price_mode text default 'exclusive', p_vat_rate numeric default 7,
-  p_ref uuid default null, p_reason text default null
+  p_ref uuid default null, p_reason text default null,
+  p_deposit_net numeric default 0, p_deposit_vat numeric default 0
 ) returns uuid language plpgsql as $$
 declare
   v_id uuid := gen_random_uuid(); v_contact uuid := p_contact; v_status text;
@@ -120,6 +126,12 @@ begin
     v_net_goods := round(v_goods * 100 / (100 + p_vat_rate), 2); v_net_serv := v_net - v_net_goods;
   end if;
 
+  if p_deposit_net > 0 then   -- INV ฉบับสุดท้ายหลังมัดจำ (DEP-02)
+    if p_type <> 'INV' then raise exception 'หักมัดจำได้เฉพาะใบแจ้งหนี้'; end if;
+    v_vat := v_vat - p_deposit_vat;
+    v_total := v_net + v_vat - p_deposit_net;
+  end if;
+
   if p_type = 'CN' and v_total > v_ref.total - coalesce((
        select sum(total) from sales_docs where ref_doc_id = p_ref and doc_type = 'CN' and status <> 'cancelled'), 0) then
     raise exception 'ยอดใบลดหนี้เกินยอดใบแจ้งหนี้ที่เหลือ';  -- สันนิษฐาน: ป้องกันลดหนี้เกิน
@@ -128,9 +140,9 @@ begin
   v_status := case p_type when 'QT' then 'pending_approval' when 'INV' then 'awaiting_payment'
                           when 'CA' then 'pending_collect'  when 'CN' then 'approved' else 'active' end;
   insert into sales_docs(id, doc_type, doc_no, doc_date, contact_id, status, price_mode, vat_rate,
-                         subtotal, vat, total, ref_doc_id, reason)
+                         subtotal, vat, total, ref_doc_id, reason, deposit_net, deposit_vat)
   values (v_id, p_type, next_doc_no(p_type, p_date, true), p_date, v_contact, v_status, p_price_mode, p_vat_rate,
-          v_net, v_vat, v_total, p_ref, p_reason);
+          v_net, v_vat, v_total, p_ref, p_reason, p_deposit_net, p_deposit_vat);
   for l in select * from jsonb_array_elements(p_lines) loop
     n := n + 1;
     insert into sales_doc_lines(doc_id, line_no, description, item_kind, qty, unit_price, amount)
@@ -149,7 +161,11 @@ begin
     end if;
     if v_vat > 0 then v_rev_cr := v_rev_cr || jsonb_build_object('account','27111','credit',v_vat); end if;
     v_lines := jsonb_build_array(jsonb_build_object('account', case p_type when 'CA' then '11319' else '11311' end,
-                                                    'debit', v_total)) || v_rev_cr;
+                                                    'debit', v_total))
+               || (case when p_deposit_net > 0
+                        then jsonb_build_array(jsonb_build_object('account','21921','debit',p_deposit_net))
+                        else '[]'::jsonb end)
+               || v_rev_cr;
     v_vtype := case p_type when 'CA' then 'RV' else 'SV' end;
   elsif p_type = 'CN' then
     v_lines := jsonb_build_array(jsonb_build_object('account','41400','debit',v_net));
@@ -205,11 +221,14 @@ end $$;
 
 -- ยกเลิกเอกสารขาย
 create function cancel_sales_doc(p_id uuid) returns void language plpgsql as $$
-declare d sales_docs;
+declare d sales_docs; q sales_docs;
 begin
   select * into d from sales_docs where id = p_id for update;
   if not found then raise exception 'ไม่พบเอกสาร'; end if;
   if d.status = 'cancelled' then raise exception 'เอกสารถูกยกเลิกแล้ว'; end if;
+  if sales_doc_has_active_receipt(d.id) then
+    raise exception 'เอกสารมีใบเสร็จผูกอยู่ ต้องยกเลิกใบเสร็จก่อน';  -- สันนิษฐาน (ต้นแบบทดสอบเฉพาะบางกรณี)
+  end if;
   if d.doc_type = 'INV' then
     if exists (select 1 from sales_docs where ref_doc_id = d.id and doc_type = 'DN' and status <> 'cancelled') then
       raise exception 'ใบแจ้งหนี้มีใบเพิ่มหนี้ผูกอยู่ ต้องยกเลิกใบเพิ่มหนี้ก่อน';
@@ -217,10 +236,20 @@ begin
     if exists (select 1 from sales_docs where ref_doc_id = d.id and doc_type = 'CN' and status <> 'cancelled') then
       raise exception 'ใบแจ้งหนี้มีใบลดหนี้ผูกอยู่ ต้องยกเลิกใบลดหนี้ก่อน';  -- สันนิษฐาน
     end if;
-    if sales_doc_has_active_receipt(d.id) then
-      raise exception 'ใบแจ้งหนี้มีใบเสร็จผูกอยู่ ต้องยกเลิกใบเสร็จก่อน';  -- สันนิษฐาน (M3 ยืนยันกฎ)
+    if d.is_deposit and exists (select 1 from sales_docs where ref_doc_id = d.ref_doc_id and deposit_net > 0 and status <> 'cancelled') then
+      raise exception 'ต้องยกเลิกใบแจ้งหนี้ฉบับสุดท้ายก่อน';  -- สันนิษฐาน
     end if;
   end if;
+  if d.collect_voucher_id is not null then perform reverse_voucher(d.collect_voucher_id); end if;
   if d.voucher_id is not null then perform reverse_voucher(d.voucher_id); end if;
   update sales_docs set status = 'cancelled' where id = d.id;
+  -- สถานะใบเสนอราคาย้อนกลับ (สันนิษฐาน: ต้นแบบไม่ได้ทดสอบ)
+  if d.doc_type = 'INV' and d.ref_doc_id is not null then
+    select * into q from sales_docs where id = d.ref_doc_id and doc_type = 'QT';
+    if found then
+      if d.is_deposit then update sales_docs set status = 'approved' where id = q.id;
+      elsif d.deposit_net > 0 then update sales_docs set status = 'deposit_paid' where id = q.id;
+      end if;
+    end if;
+  end if;
 end $$;
