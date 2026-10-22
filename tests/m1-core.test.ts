@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
-const sql = readFileSync(new URL('../supabase/migrations/0001_core_ledger.sql', import.meta.url), 'utf8');
+const sql = readdirSync(new URL('../supabase/migrations/', import.meta.url)).sort().filter(f => f.startsWith('0001')).map(f => readFileSync(new URL('../supabase/migrations/' + f, import.meta.url), 'utf8')).join('\n');
 let db: PGlite;
 
 const ACCOUNTS: [string, string, string][] = [
