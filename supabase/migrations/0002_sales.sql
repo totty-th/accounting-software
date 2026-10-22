@@ -112,7 +112,7 @@ begin
 
   -- คำนวณยอด (ACC-07): exclusive = ราคาไม่รวม VAT, inclusive = ราคารวม VAT
   for l in select * from jsonb_array_elements(p_lines) loop
-    v_kind := coalesce(l->>'kind','service');
+    v_kind := line_kind(l);
     v_amt := round((l->>'qty')::numeric * (l->>'unit_price')::numeric, 2);
     if v_kind = 'goods' then v_goods := v_goods + v_amt; else v_serv := v_serv + v_amt; end if;
   end loop;
@@ -145,9 +145,10 @@ begin
           v_net, v_vat, v_total, p_ref, p_reason, p_deposit_net, p_deposit_vat);
   for l in select * from jsonb_array_elements(p_lines) loop
     n := n + 1;
-    insert into sales_doc_lines(doc_id, line_no, description, item_kind, qty, unit_price, amount)
-    values (v_id, n, l->>'description', coalesce(l->>'kind','service'), (l->>'qty')::numeric,
-            (l->>'unit_price')::numeric, round((l->>'qty')::numeric * (l->>'unit_price')::numeric, 2));
+    insert into sales_doc_lines(doc_id, line_no, description, item_kind, qty, unit_price, amount, product_id, warehouse_id)
+    values (v_id, n, l->>'description', line_kind(l), (l->>'qty')::numeric,
+            (l->>'unit_price')::numeric, round((l->>'qty')::numeric * (l->>'unit_price')::numeric, 2),
+            nullif(l->>'product_id','')::uuid, nullif(l->>'warehouse_id','')::uuid);
   end loop;
 
   -- รายการบัญชี
@@ -177,6 +178,8 @@ begin
     v_voucher := post_voucher(v_vtype, p_date, null, p_type, v_id::text, v_lines);
     update sales_docs set voucher_id = v_voucher where id = v_id;
   end if;
+  -- ตัดสต็อกตอนบันทึก INV/CA และลงต้นทุนขาย (STK-03, STK-13)
+  if p_type in ('INV','CA') then perform stock_issue_for_doc(v_id); end if;
 
   -- ผลต่อเอกสารอ้างอิง
   if p_type = 'DN' then update sales_docs set status = 'awaiting_payment' where id = p_ref; end if;
@@ -195,7 +198,7 @@ declare q sales_docs; v_inv uuid; v_lines jsonb;
 begin
   select * into q from sales_docs where id = p_qt and doc_type = 'QT';
   if not found or q.status <> 'approved' then raise exception 'ต้องเป็นใบเสนอราคาที่อนุมัติแล้ว'; end if;
-  select jsonb_agg(jsonb_build_object('description',description,'kind',item_kind,'qty',qty,'unit_price',unit_price) order by line_no)
+  select jsonb_agg(jsonb_build_object('description',description,'kind',item_kind,'qty',qty,'unit_price',unit_price,'product_id',product_id,'warehouse_id',warehouse_id) order by line_no)
     into v_lines from sales_doc_lines where doc_id = p_qt;
   v_inv := create_sales_doc('INV', p_date, q.contact_id, v_lines, q.price_mode, q.vat_rate, p_qt);
   update sales_docs set status = 'converted' where id = p_qt;
@@ -240,6 +243,7 @@ begin
       raise exception 'ต้องยกเลิกใบแจ้งหนี้ฉบับสุดท้ายก่อน';  -- สันนิษฐาน
     end if;
   end if;
+  if d.doc_type in ('INV','CA') then perform stock_return_for_doc(d.id); end if;
   if d.collect_voucher_id is not null then perform reverse_voucher(d.collect_voucher_id); end if;
   if d.voucher_id is not null then perform reverse_voucher(d.voucher_id); end if;
   update sales_docs set status = 'cancelled' where id = d.id;

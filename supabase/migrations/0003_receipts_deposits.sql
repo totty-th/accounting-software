@@ -279,7 +279,7 @@ begin
   if not found or q.status <> 'deposit_paid' then raise exception 'ใบเสนอราคานี้ยังไม่มีมัดจำ'; end if;
   select * into dep from sales_docs where ref_doc_id = p_qt and is_deposit and status <> 'cancelled';
   if not found then raise exception 'ไม่พบใบแจ้งหนี้มัดจำที่ใช้งานอยู่'; end if;
-  select jsonb_agg(jsonb_build_object('description',description,'kind',item_kind,'qty',qty,'unit_price',unit_price) order by line_no)
+  select jsonb_agg(jsonb_build_object('description',description,'kind',item_kind,'qty',qty,'unit_price',unit_price,'product_id',product_id,'warehouse_id',warehouse_id) order by line_no)
     into v_lines from sales_doc_lines where doc_id = p_qt;
   v_inv := create_sales_doc('INV', p_date, q.contact_id, v_lines, q.price_mode, q.vat_rate, p_qt, null,
                             dep.subtotal, dep.vat);
