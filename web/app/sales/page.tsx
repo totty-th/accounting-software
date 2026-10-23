@@ -3,29 +3,13 @@ import { getDb } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
 import { Group } from '@/components/Board';
-import { ActionButton } from '@/components/ActionButton';
+import { SalesActions } from '@/components/SalesActions';
 import { DOC_TYPE, STATUS } from '@/lib/status';
-import * as A from '@/lib/actions';
 
 const ORDER = ['pending_approval', 'approved', 'awaiting_payment', 'pending_collect', 'split_paid', 'deposit_paid', 'receipt_opened',
   'billed', 'active', 'collected', 'converted', 'cancelled'];
 const COLOR: Record<string, string> = { green: 'var(--green)', orange: 'var(--orange)', blue: 'var(--blue)', purple: 'var(--purple)',
   red: 'var(--red)', grey: 'var(--grey)', teal: 'var(--teal)' };
-
-function Actions({ d }: { d: any }) {
-  const b = (label: string, fn: () => Promise<any>, v: '' | 'ghost' | 'danger' = 'ghost', confirmText?: string) =>
-    <ActionButton key={label} label={label} variant={v} confirmText={confirmText} action={fn} />;
-  const cancel = b('ยกเลิก', A.cancelSalesDoc.bind(null, d.id), 'danger', 'c');
-  const s = d.status as string;
-  const out: React.ReactNode[] = [];
-  if (d.doc_type === 'INV' && (s === 'awaiting_payment' || s === 'split_paid')) out.push(b('สร้างใบเสร็จ', A.createReceipt.bind(null, d.id), ''));
-  if (d.doc_type === 'QT' && s === 'pending_approval') out.push(b('อนุมัติ', A.approveQuote.bind(null, d.id), ''));
-  if (d.doc_type === 'QT' && s === 'approved') out.push(b('สร้างใบแจ้งหนี้', A.quoteToInvoice.bind(null, d.id), ''));
-  if (d.doc_type === 'CA' && s === 'pending_collect') out.push(b('เก็บเงิน', A.collectCash.bind(null, d.id), ''));
-  if (d.doc_type === 'CA' && s === 'collected') out.push(b('รีเซ็ต', A.resetCash.bind(null, d.id)));
-  if (s !== 'cancelled' && s !== 'converted') out.push(cancel);
-  return <div className="acts">{out}</div>;
-}
 
 export default async function Sales({ searchParams }: { searchParams: { type?: string } }) {
   const type = searchParams.type && DOC_TYPE[searchParams.type] ? searchParams.type : '';
@@ -47,8 +31,8 @@ export default async function Sales({ searchParams }: { searchParams: { type?: s
         <Group key={s} title={STATUS[s][0]} color={COLOR[STATUS[s][1]]} count={rs.length}>
           <table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>ลูกค้า</th><th>วันที่</th><th className="num">ยอดรวม</th><th>สถานะ</th><th /></tr></thead>
             <tbody>{rs.map(r => (
-              <tr key={r.id}><td className="no">{r.doc_no}</td><td>{DOC_TYPE[r.doc_type]}{r.is_deposit ? ' (มัดจำ)' : ''}</td><td>{partyName(r)}</td>
-                <td>{dateTh(r.doc_date)}</td><td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td><td><Actions d={r} /></td></tr>))}</tbody></table>
+              <tr key={r.id}><td className="no"><Link href={`/sales/${r.id}`}>{r.doc_no}</Link></td><td>{DOC_TYPE[r.doc_type]}{r.is_deposit ? ' (มัดจำ)' : ''}</td><td>{partyName(r)}</td>
+                <td>{dateTh(r.doc_date)}</td><td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td><td><SalesActions d={r} /></td></tr>))}</tbody></table>
         </Group>))}
     </>
   );

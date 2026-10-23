@@ -66,3 +66,11 @@ export async function saveContactTax(f: FormData): Promise<void> {
   await run(call('update contacts set tax_id=$2, address=$3, person_kind=$4 where id=$1',
     str(f, 'id'), str(f, 'tax_id') ?? null, str(f, 'address') ?? null, str(f, 'person_kind') ?? null), ['/wht', '/contacts']);
 }
+
+// ---- ลิงก์แชร์เอกสารขาย ----
+export async function createShareLink(id: string): Promise<Result> {
+  return run(call('select ensure_share_token($1)', id), [`/sales/${id}`]);
+}
+export async function revokeShareLink(id: string): Promise<Result> {
+  return run(call('select revoke_share_token($1)', id), [`/sales/${id}`]);
+}

@@ -1,5 +1,5 @@
 import './globals.css';
-import { Nav } from '@/components/Nav';
+import { Shell } from '@/components/Shell';
 
 export const metadata = { title: 'ระบบบัญชี', description: 'ระบบบัญชีสำหรับธุรกิจไทย' };
 export const dynamic = 'force-dynamic';
@@ -12,13 +12,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" />
       </head>
       <body>
-        <div className="shell">
-          <aside className="side">
-            <div className="brand"><span className="logo">฿</span>ระบบบัญชี</div>
-            <Nav />
-          </aside>
-          <main className="main">{children}</main>
-        </div>
+        <Shell>{children}</Shell>
       </body>
     </html>
   );
