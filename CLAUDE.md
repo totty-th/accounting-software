@@ -13,8 +13,8 @@
 ## คำสั่ง
 - `npm test` รันเทสต์ (ใช้ PGlite รัน migration จริง ไม่ต้องมี Postgres)
 
-- เว็บ: `cd web && npm install && npm run build && npx next start -p 3000` (ไม่ตั้ง `DATABASE_URL` = ใช้ PGlite ในเครื่อง พร้อมข้อมูลตัวอย่าง · ตั้ง `DATABASE_URL` = ต่อ Postgres/Supabase จริง)
+- เว็บ: `cd web && npm install && npm run build && npx next start -p 3000` (หลังเพิ่ม migration ใหม่ให้ลบโฟลเดอร์ `web/.data` เพื่อสร้างฐานตัวอย่างใหม่ · ไม่ตั้ง `DATABASE_URL` = ใช้ PGlite ในเครื่อง พร้อมข้อมูลตัวอย่าง · ตั้ง `DATABASE_URL` = ต่อ Postgres/Supabase จริง)
 
 ## ลำดับงาน
-M1 แกนบัญชี ✅ → M2 ขาย ✅ → M3 รับเงิน/มัดจำ ✅ → M4 ซื้อ+หัก ณ ที่จ่าย ✅ → M5 สต็อก ✅ → M6 ภาษีและรายงาน ✅ → M5.5 การผลิต (รอ D-06)
+M1 แกนบัญชี ✅ → M2 ขาย ✅ → M3 รับเงิน/มัดจำ ✅ → M4 ซื้อ+หัก ณ ที่จ่าย ✅ → M5 สต็อก ✅ → M6 ภาษีและรายงาน ✅ → M7 หนังสือรับรอง 50 ทวิ ✅ → M5.5 การผลิต (รอ D-06)
 ทุกขั้นต้องผ่านเคสทดสอบ AT-xx ของหมวดนั้นก่อนไปต่อ

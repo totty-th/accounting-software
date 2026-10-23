@@ -20,7 +20,8 @@ export async function seed(db: Db) {
   const d = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   const c1 = (await db.q(`insert into contacts(business_name,tax_id) values ('บริษัท สยามก่อสร้าง จำกัด','0105500000001') returning id`))[0].id;
   await db.q(`insert into contacts(business_name,tax_id) values ('ห้างหุ้นส่วน ไทยเหล็กกล้า','0103500000002')`);
-  const v1 = (await db.q(`insert into contacts(business_name,tax_id) values ('บริษัท เหล็กไทย ซัพพลาย จำกัด','0105500000003') returning id`))[0].id;
+  const v1 = (await db.q(`insert into contacts(business_name,tax_id,address,person_kind) values ('บริษัท เหล็กไทย ซัพพลาย จำกัด','0105500000003','99 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110','juristic') returning id`))[0].id;
+  await db.q(`insert into company_profile(name,address,tax_id) values ('บริษัท ผลิตภัณฑ์ตะแกรงเหล็กแผ่นไทย จำกัด (สำนักงานใหญ่)','100/12 ถนนช่องนนทรี แขวงบางโพงพาง เขตยานนาวา กรุงเทพฯ 10120','0105522005334')`);
   const p1 = (await db.q(`insert into products(code,name,kind,base_unit,sale_price,purchase_price) values ('MESH-01','ตะแกรงเหล็กสำเร็จรูป 1x2 ม.','goods_stock','แผ่น',1000,600) returning id`))[0].id;
   await db.q(`insert into products(code,name,kind,base_unit,sale_price) values ('SVC-01','ค่าติดตั้ง','service','งาน',2000)`);
   await db.q(`select create_goods_receipt($1::date,$2,$3::jsonb)`, [d, v1, JSON.stringify([{ product_id: p1, qty: 50, unit_price: 600 }])]);
@@ -31,4 +32,8 @@ export async function seed(db: Db) {
     { description: 'ตะแกรงยืดสั่งทำ', kind: 'goods', qty: 20, unit_price: 1500 }])]);
   await db.q(`select create_expense($1::date,$2,$3::jsonb)`, [d, v1, JSON.stringify([
     { description: 'ค่าเช่าโกดัง', account: '53102', qty: 1, unit_price: 15000, wht_rate: 5 }])]);
+  // ตัวอย่างค่าใช้จ่ายที่จ่ายแล้ว (มีหนังสือรับรอง 50 ทวิ ให้ทดลองพิมพ์)
+  const e2 = (await db.q(`select create_expense($1::date,$2,$3::jsonb) as id`, [d, v1, JSON.stringify([
+    { description: 'ค่าขนส่งสินค้า', account: '53101', qty: 1, unit_price: 10000, wht_rate: 1 }])]))[0].id;
+  await db.q(`select pay_expense($1,$2::date)`, [e2, d]);
 }

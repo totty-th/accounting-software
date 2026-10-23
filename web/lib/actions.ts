@@ -47,3 +47,22 @@ export async function createProduct(p: { code: string; name: string; kind: strin
   return run(call('insert into products(code,name,kind,base_unit,sale_price,purchase_price) values ($1,$2,$3,$4,$5,$6)',
     p.code, p.name, p.kind, p.unit || 'ชิ้น', p.sale || 0, p.buy || 0), ['/products', '/sales', '/stock']);
 }
+
+// ---- หนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ) ----
+const str = (f: FormData, k: string) => { const v = String(f.get(k) ?? '').trim(); return v === '' ? undefined : v; };
+export async function saveCertDetails(f: FormData): Promise<void> {
+  const num = (k: string) => { const v = str(f, k); return v === undefined ? undefined : Number(v); };
+  const d = { book_no: str(f, 'book_no'), run_no: str(f, 'run_no'), seq_in_form: num('seq_in_form'),
+    income_category: str(f, 'income_category'), payer_condition: str(f, 'payer_condition'),
+    payer_condition_note: str(f, 'payer_condition_note'), fund_gpf: num('fund_gpf'), fund_sso: num('fund_sso'), fund_pvd: num('fund_pvd') };
+  await run(call('select set_cert_details($1,$2::jsonb)', str(f, 'id'), JSON.stringify(d)), ['/wht']);
+}
+export async function saveCompany(f: FormData): Promise<void> {
+  await run(call(`insert into company_profile(name,address,tax_id) values ($1,$2,$3)
+    on conflict (singleton) do update set name=excluded.name, address=excluded.address, tax_id=excluded.tax_id`,
+    str(f, 'name'), str(f, 'address'), str(f, 'tax_id')), ['/wht', '/settings/company']);
+}
+export async function saveContactTax(f: FormData): Promise<void> {
+  await run(call('update contacts set tax_id=$2, address=$3, person_kind=$4 where id=$1',
+    str(f, 'id'), str(f, 'tax_id') ?? null, str(f, 'address') ?? null, str(f, 'person_kind') ?? null), ['/wht', '/contacts']);
+}

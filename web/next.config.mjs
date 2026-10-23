@@ -4,7 +4,10 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('next').NextConfig} */
 export default {
-  experimental: { serverComponentsExternalPackages: ['@electric-sql/pglite', 'pg'] },
+  experimental: {
+    serverComponentsExternalPackages: ['@electric-sql/pglite', 'pg'],
+    outputFileTracingIncludes: { '/wht/[id]/pdf': ['./assets/**/*'] },
+  },
   webpack: (config) => {
     config.resolve.alias['@'] = root;
     return config;
