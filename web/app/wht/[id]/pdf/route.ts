@@ -17,7 +17,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const draft = new URL(req.url).searchParams.get('draft') === '1';
   if (data.missing.length && !draft)
     return Response.json({ error: 'ข้อมูลยังไม่ครบสำหรับออก 50 ทวิ', missing: data.missing }, { status: 422 });
-  const pdf = await buildCertPdf(data);
+  let pdf: Uint8Array;
+  try { pdf = await buildCertPdf(data); }
+  catch { return Response.json({ error: 'สร้าง PDF ไม่ได้ (ไฟล์แบบฟอร์มไม่ได้ถูกติดตั้งในสภาพแวดล้อมนี้)' }, { status: 503 }); }
   return new Response(pdf, { headers: {
     'content-type': 'application/pdf',
     'content-disposition': `inline; filename="${data.cert_no}.pdf"`,

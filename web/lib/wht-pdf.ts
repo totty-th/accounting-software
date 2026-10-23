@@ -16,7 +16,7 @@ export interface CertData {
 }
 interface Party { name: string | null; address: string | null; tax_id: string | null; person_kind: string | null }
 
-const ASSETS = () => path.join(process.cwd(), process.cwd().endsWith('web') ? 'assets' : 'web/assets');
+const ASSETS = () => { const a = path.join(process.cwd(), 'assets'); return fs.existsSync(a) ? a : path.join(process.cwd(), 'web/assets'); };
 
 // ---------- ข้อความไทย ----------
 const NUM = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
