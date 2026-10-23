@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { getDb, today } from './db';
 import { dateTh } from './format';
+import { splitByAccount, AR_ACCOUNTS, AP_ACCOUNTS } from './aging-accounts';
 
 export type Kind = 'ar' | 'ap';
 export const BUCKETS = ['not_due', 'd1_30', 'd31_60', 'd61_90', 'over90'] as const;
@@ -8,15 +9,20 @@ export const BUCKET_LABEL = ['ยังไม่ถึงกำหนด', '1-30
 
 export interface Group { contact_id: string; name: string; rows: any[]; tot: Record<string, number> }
 
-export async function loadAging(kind: Kind, sp: { asof?: string; contact?: string }) {
+export type Sp = { asof?: string; contact?: string; coa?: string };
+export const accountsOf = (k: Kind) => (k === 'ar' ? AR_ACCOUNTS : AP_ACCOUNTS);
+
+export async function loadAging(kind: Kind, sp: Sp) {
   const asof = sp.asof || today(), contact = sp.contact || null;
   const db = await getDb();
   const rows = await db.q(`select * from ${kind}_aging($1::date,$2::uuid) order by contact_name, due_date, doc_no`, [asof, contact]);
   const contacts = await db.q(`select id, contact_label(id) as label from contacts order by 2`).catch(() => [] as any[]);
-  const keys = ['outstanding', ...BUCKETS];
+  const accs = accountsOf(kind).map(a => a[0]);
+  const keys = ['outstanding', ...BUCKETS, ...accs];
   const zero = () => Object.fromEntries(keys.map(k => [k, 0])) as Record<string, number>;
   const groups: Group[] = [], grand = zero();
   for (const r of rows) {
+    Object.assign(r, splitByAccount(kind, r));
     let g = groups[groups.length - 1];
     if (!g || g.contact_id !== r.contact_id) groups.push(g = { contact_id: r.contact_id, name: r.contact_name, rows: [], tot: zero() });
     g.rows.push(r);
@@ -25,15 +31,15 @@ export async function loadAging(kind: Kind, sp: { asof?: string; contact?: strin
   return { asof, contact, groups, grand, contacts, count: rows.length };
 }
 
-export async function buildXlsx(kind: Kind, sp: { asof?: string; contact?: string }) {
+export async function buildXlsx(kind: Kind, sp: Sp) {
   const { asof, groups, grand } = await loadAging(kind, sp);
   const db = await getDb();
   const co = (await db.q('select name, tax_id from company_profile limit 1'))[0] ?? {};
-  const ar = kind === 'ar';
+  const ar = kind === 'ar', coa = sp.coa === '1', accs = coa ? accountsOf(kind) : [];
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(ar ? 'ลูกหนี้ตามเอกสาร' : 'เจ้าหนี้ตามเอกสาร');
-  const head = ['เลขที่เอกสาร', 'วันที่เอกสาร', 'วันครบกำหนด', ...(ar ? ['ยอดรวม', 'รับชำระแล้ว'] : ['ยอดรวม']), 'ยอดค้างชำระ', ...BUCKET_LABEL];
+  const head = ['เลขที่เอกสาร', 'วันที่เอกสาร', 'วันครบกำหนด', ...(ar ? ['ยอดรวม', 'รับชำระแล้ว'] : ['ยอดรวม']), 'ยอดค้างชำระ', ...BUCKET_LABEL, ...accs.map(a => `${a[0]} ${a[1]}`)];
   const n = head.length, numFrom = 4;
-  const title = ar ? 'รายงานลูกหนี้ตามเอกสาร' : 'รายงานเจ้าหนี้ตามเอกสาร';
+  const title = (ar ? 'รายงานลูกหนี้ตามเอกสาร' : 'รายงานเจ้าหนี้ตามเอกสาร') + (coa ? 'และผังบัญชี' : '');
   [title, co.name ?? '', co.tax_id ? `เลขประจำตัวผู้เสียภาษี ${co.tax_id}` : '', `ณ วันที่ ${dateTh(asof)}`].forEach((t, i) => {
     ws.mergeCells(i + 1, 1, i + 1, n); const c = ws.getCell(i + 1, 1); c.value = t; c.font = { bold: i === 0, size: i === 0 ? 14 : 11 };
   });
@@ -48,10 +54,10 @@ export async function buildXlsx(kind: Kind, sp: { asof?: string; contact?: strin
   for (const g of groups) {
     const r = ws.addRow([g.name]); r.font = { bold: true };
     for (const x of g.rows) put([x.doc_no, dateTh(x.doc_date), dateTh(x.due_date),
-      ...(ar ? [Number(x.doc_total), Number(x.receipted)] : [Number(x.doc_total)]), Number(x.outstanding), ...BUCKETS.map(b => Number(x[b]))]);
-    put([`รวม ${g.name}`, '', '', ...(ar ? ['', ''] : ['']), g.tot.outstanding, ...BUCKETS.map(b => g.tot[b])], true);
+      ...(ar ? [Number(x.doc_total), Number(x.receipted)] : [Number(x.doc_total)]), Number(x.outstanding), ...BUCKETS.map(b => Number(x[b])), ...accs.map(a => Number(x[a[0]]))]);
+    put([`รวม ${g.name}`, '', '', ...(ar ? ['', ''] : ['']), g.tot.outstanding, ...BUCKETS.map(b => g.tot[b]), ...accs.map(a => g.tot[a[0]])], true);
   }
-  put(['รวมทั้งสิ้น', '', '', ...(ar ? ['', ''] : ['']), grand.outstanding, ...BUCKETS.map(b => grand[b])], true);
+  put(['รวมทั้งสิ้น', '', '', ...(ar ? ['', ''] : ['']), grand.outstanding, ...BUCKETS.map(b => grand[b]), ...accs.map(a => grand[a[0]])], true);
   ws.columns.forEach((c, i) => { c.width = i === 0 ? 24 : 16; });
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

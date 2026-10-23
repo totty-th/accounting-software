@@ -1,12 +1,13 @@
-import { loadAging, BUCKETS, BUCKET_LABEL, type Kind } from '@/lib/aging';
+import { loadAging, accountsOf, BUCKETS, BUCKET_LABEL, type Kind, type Sp } from '@/lib/aging';
 import { money, dateTh } from '@/lib/format';
 import { Fragment } from 'react';
 import { Group } from '@/components/Board';
 
-export async function AgingReport({ kind, sp }: { kind: Kind; sp: { asof?: string; contact?: string } }) {
+export async function AgingReport({ kind, sp }: { kind: Kind; sp: Sp }) {
   const { asof, contact, groups, grand, contacts, count } = await loadAging(kind, sp);
+  const coa = sp.coa === '1', accs = coa ? accountsOf(kind) : [];
   const ar = kind === 'ar', base = ar ? '/reports/ar' : '/reports/ap';
-  const qs = new URLSearchParams({ asof, ...(contact ? { contact } : {}) }).toString();
+  const qs = new URLSearchParams({ asof, ...(contact ? { contact } : {}), ...(coa ? { coa: '1' } : {}) }).toString();
   return (
     <>
       <div className="top"><div><h1>{ar ? 'ลูกหนี้ตามเอกสาร' : 'เจ้าหนี้ตามเอกสาร'}</h1>
@@ -16,25 +17,27 @@ export async function AgingReport({ kind, sp }: { kind: Kind; sp: { asof?: strin
         <label className="f">{ar ? 'ลูกค้า' : 'ผู้ขาย'}
           <select name="contact" defaultValue={contact ?? ''}><option value="">ทั้งหมด</option>
             {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
+        <label className="f" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, flexDirection: 'row' }}>
+          <input type="checkbox" name="coa" value="1" defaultChecked={coa} style={{ width: 'auto' }} /> แยกตามบัญชี</label>
         <button className="btn">ดูรายงาน</button>
         <a className="btn" href={`${base}/xlsx?${qs}`}>ส่งออก Excel</a>
       </form>
       <Group title={`${ar ? 'ลูกหนี้' : 'เจ้าหนี้'} ณ ${dateTh(asof)}`} color={ar ? 'var(--green)' : 'var(--purple)'} count={count}>
         <table><thead><tr><th>เลขที่</th><th>วันที่</th><th>ครบกำหนด</th><th className="num">ยอดรวม</th>{ar && <th className="num">รับแล้ว</th>}
-          <th className="num">ค้างชำระ</th>{BUCKET_LABEL.map(l => <th key={l} className="num">{l}</th>)}</tr></thead>
+          <th className="num">ค้างชำระ</th>{BUCKET_LABEL.map(l => <th key={l} className="num">{l}</th>)}{accs.map(a => <th key={a[0]} className="num">{a[0]} {a[1]}</th>)}</tr></thead>
           <tbody>
             {groups.map(g => (
               <Fragment key={g.contact_id}>
-                <tr style={{ fontWeight: 700 }}><td colSpan={ar ? 11 : 10}>{g.name}</td></tr>
+                <tr style={{ fontWeight: 700 }}><td colSpan={(ar ? 11 : 10) + accs.length}>{g.name}</td></tr>
                 {g.rows.map(r => (
                   <tr key={r.doc_id}><td className="no">{r.doc_no}</td><td>{dateTh(r.doc_date)}</td><td>{dateTh(r.due_date)}</td>
                     <td className="num">{money(r.doc_total)}</td>{ar && <td className="num">{money(r.receipted)}</td>}
-                    <td className="num">{money(r.outstanding)}</td>{BUCKETS.map(b => <td key={b} className="num">{Number(r[b]) ? money(r[b]) : ''}</td>)}</tr>))}
+                    <td className="num">{money(r.outstanding)}</td>{BUCKETS.map(b => <td key={b} className="num">{Number(r[b]) ? money(r[b]) : ''}</td>)}{accs.map(a => <td key={a[0]} className="num">{Number(r[a[0]]) ? money(r[a[0]]) : ''}</td>)}</tr>))}
                 <tr style={{ fontWeight: 600 }}><td colSpan={ar ? 5 : 4}>รวม {g.name}</td><td className="num">{money(g.tot.outstanding)}</td>
-                  {BUCKETS.map(b => <td key={b} className="num">{money(g.tot[b])}</td>)}</tr>
+                  {BUCKETS.map(b => <td key={b} className="num">{money(g.tot[b])}</td>)}{accs.map(a => <td key={a[0]} className="num">{money(g.tot[a[0]])}</td>)}</tr>
               </Fragment>))}
             <tr style={{ fontWeight: 700 }}><td colSpan={ar ? 5 : 4}>รวมทั้งสิ้น</td><td className="num">{money(grand.outstanding)}</td>
-              {BUCKETS.map(b => <td key={b} className="num">{money(grand[b])}</td>)}</tr>
+              {BUCKETS.map(b => <td key={b} className="num">{money(grand[b])}</td>)}{accs.map(a => <td key={a[0]} className="num">{money(grand[a[0]])}</td>)}</tr>
           </tbody></table>
       </Group>
     </>
