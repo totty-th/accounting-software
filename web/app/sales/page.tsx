@@ -20,12 +20,13 @@ export default async function Sales({ searchParams }: { searchParams: { type?: s
   return (
     <>
       <div className="top"><div><h1>เอกสารขาย</h1><p className="sub">สร้างเอกสารแล้วลงบัญชีอัตโนมัติ</p></div>
-        <Link className="btn" href={`/sales/new?type=${type || 'INV'}`}>+ {DOC_TYPE[type || 'INV']}ใหม่</Link></div>
+        {type === 'CN' || type === 'DN' || type === 'BL' ? null : <Link className="btn" href={`/sales/new?type=${type || 'INV'}`}>+ {DOC_TYPE[type || 'INV']}ใหม่</Link>}</div>
       <div className="tabs">
         <Link href="/sales" className={!type ? 'on' : ''}>ทั้งหมด</Link>
         {Object.entries(DOC_TYPE).map(([k, v]) => <Link key={k} href={`/sales?type=${k}`} className={type === k ? 'on' : ''}>{v}</Link>)}
       </div>
-      {type === 'CN' || type === 'DN' || type === 'BL' ? <div className="notice">ใบ{DOC_TYPE[type].replace('ใบ', '')}สร้างจากใบแจ้งหนี้ (กำลังเพิ่มปุ่มในหน้านี้)</div> : null}
+      {type === 'CN' || type === 'DN' ? <div className="notice">{DOC_TYPE[type]}สร้างจากใบแจ้งหนี้: เปิดใบแจ้งหนี้ที่รอเก็บเงินแล้วกด "ออก{DOC_TYPE[type]}"</div> : null}
+      {type === 'BL' ? <div className="notice">ใบวางบิลสร้างจากใบแจ้งหนี้ (กำลังเพิ่มปุ่มในหน้านี้)</div> : null}
       {groups.length === 0 && <div className="panel empty">ยังไม่มีเอกสาร กด “+ เอกสารใหม่” ด้านบน</div>}
       {groups.map(([s, rs]) => (
         <Group key={s} title={STATUS[s][0]} color={COLOR[STATUS[s][1]]} count={rs.length}>

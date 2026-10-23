@@ -9,6 +9,10 @@ export function SalesActions({ d }: { d: any }) {
   const s = d.status as string;
   const out: React.ReactNode[] = [];
   if (d.doc_type === 'INV' && (s === 'awaiting_payment' || s === 'split_paid')) out.push(b('สร้างใบเสร็จ', A.createReceipt.bind(null, d.id), ''));
+  if (d.doc_type === 'INV' && s === 'awaiting_payment' && d.doc_no) {
+    out.push(<a key="dn" className="btn sm ghost" href={`/sales/adjust?type=DN&ref=${d.doc_no}`}>ออกใบเพิ่มหนี้</a>);
+    out.push(<a key="cn" className="btn sm ghost" href={`/sales/adjust?type=CN&ref=${d.doc_no}`}>ออกใบลดหนี้</a>);
+  }
   if (d.doc_type === 'QT' && s === 'pending_approval') out.push(b('อนุมัติ', A.approveQuote.bind(null, d.id), ''));
   if (d.doc_type === 'QT' && s === 'approved') out.push(b('สร้างใบแจ้งหนี้', A.quoteToInvoice.bind(null, d.id), ''));
   if (d.doc_type === 'CA' && s === 'pending_collect') out.push(b('เก็บเงิน', A.collectCash.bind(null, d.id), ''));
