@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 
 // 0013 ต้องการแค่แกนบัญชี (0001) จึงรันสองไฟล์นี้ ไม่ต้องพึ่งโมดูลขาย
 const sql = readdirSync(new URL('../supabase/migrations/', import.meta.url)).sort()
-  .filter(f => f.startsWith('0001') || f.startsWith('0013'))
+  .filter(f => f.startsWith('0001') || f.startsWith('0013') || f.startsWith('0014'))
   .map(f => readFileSync(new URL('../supabase/migrations/' + f, import.meta.url), 'utf8')).join('\n');
 let db: PGlite;
 
@@ -62,6 +62,40 @@ describe('M13 บัญชีธนาคารและ statement', () => {
     const bad2 = await err(db.query(`select bank_statement_import($1,'x',$2::jsonb)`,
       [bank, JSON.stringify([{ date: '2026-10-24', deposit: 0, withdrawal: 0 }])]));
     expect(bad2).toContain('แถว 1');
+  });
+});
+
+describe('M13.1 statement ซ้ำ', () => {
+  const same = [
+    { date: '2026-10-21', description: 'ดอกเบี้ยรับ', deposit: 500, withdrawal: 0, balance: 500 },
+    { date: '2026-10-24', description: 'ใหม่', deposit: 100, withdrawal: 0, balance: 3775 },
+  ];
+  it('ตรวจพบแถวที่ซ้ำ และแถวใหม่ไม่ถูกนับ', async () => {
+    const r = await rows(`select row_no, is_dup from bank_statement_dups($1,$2::jsonb) order by row_no`, [bank, JSON.stringify(same)]);
+    expect(r.map((x: any) => [x.row_no, x.is_dup])).toEqual([[1, true], [2, false]]);
+  });
+  it('นำเข้าปกติยังนำเข้าทั้งหมด (เตือนอย่างเดียว ไม่บล็อก)', async () => {
+    await db.query(`select bank_statement_import($1,'again.csv',$2::jsonb)`, [bank, JSON.stringify(same)]);
+    expect(+(await one(`select count(*) c from bank_statement_lines`)).c).toBe(5);
+  });
+  it('ข้ามรายการซ้ำเมื่อสั่ง skip และเลขบรรทัดต่อเนื่อง', async () => {
+    await db.query(`select bank_statement_import($1,'again.csv',$2::jsonb,true)`, [bank, JSON.stringify(same)]);
+    expect(+(await one(`select count(*) c from bank_statement_lines`)).c).toBe(4);
+    const n = await one(`select line_no from bank_statement_lines where description='ใหม่'`);
+    expect(+n.line_no).toBe(1);
+  });
+  it('ไฟล์ซ้ำทั้งไฟล์ + skip = ปฏิเสธ', async () => {
+    const e = await err(db.query(`select bank_statement_import($1,'again.csv',$2::jsonb,true)`, [bank, JSON.stringify([same[0]])]));
+    expect(e).toContain('ซ้ำ');
+  });
+  it('นับตามจำนวนครั้ง: ในระบบมี 1 ไฟล์ใหม่มี 2 เหมือนกัน = ซ้ำ 1 ใหม่ 1', async () => {
+    const r = await rows(`select is_dup from bank_statement_dups($1,$2::jsonb) order by row_no`, [bank, JSON.stringify([same[0], same[0]])]);
+    expect(r.map((x: any) => x.is_dup)).toEqual([true, false]);
+  });
+  it('บัญชีธนาคารอื่นไม่ถือว่าซ้ำ', async () => {
+    const b2 = (await one<{ id: string }>(`select bank_account_create('กรุงไทย','111-1') as id`)).id;
+    const r = await rows(`select is_dup from bank_statement_dups($1,$2::jsonb)`, [b2, JSON.stringify([same[0]])]);
+    expect(r[0].is_dup).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBankAccount, importStatement } from '@/lib/actions';
+import { createBankAccount, importStatement, checkStatementDups } from '@/lib/actions';
 import { parseStatementCsv } from '@/lib/bank-csv';
 
 // ตั้งบัญชีธนาคาร + นำเข้ารายการเดินบัญชีจากไฟล์ CSV
@@ -12,6 +12,7 @@ export function BankTools({ banks }: { banks: { id: string; label: string }[] })
   const [nb, setNb] = useState({ bank: '', no: '', name: '' });
   const [target, setTarget] = useState(banks[0]?.id ?? '');
   const [file, setFile] = useState<{ name: string; rows: any[] } | null>(null);
+  const [dups, setDups] = useState<number[] | null>(null);   // แถวที่ซ้ำ (เริ่มที่ 1) — null = ยังไม่ตรวจ/ไม่มี
 
   const addBank = () => start(async () => {
     const r = await createBankAccount(nb);
@@ -20,14 +21,23 @@ export function BankTools({ banks }: { banks: { id: string; label: string }[] })
   });
   const pick = async (f: File | undefined) => {
     if (!f) return setFile(null);
-    try { setFile({ name: f.name, rows: parseStatementCsv(await f.text()) }); setMsg(null); }
+    try { setFile({ name: f.name, rows: parseStatementCsv(await f.text()) }); setMsg(null); setDups(null); }
     catch (e: any) { setFile(null); setMsg({ t: e.message, ok: false }); }
   };
+  const finish = async (skipDups: boolean) => {
+    if (!file || !target) return;
+    const r = await importStatement({ bank: target, file: file.name, rows: file.rows, skipDups });
+    if (r.error) return setMsg({ t: r.error, ok: false });
+    const n = skipDups ? file.rows.length - (dups?.length ?? 0) : file.rows.length;
+    setMsg({ t: `นำเข้า ${n} รายการแล้ว`, ok: true }); setFile(null); setDups(null); router.refresh();
+  };
+  // ตรวจก่อน: ถ้ามีรายการซ้ำให้เตือนและถามก่อน (ไม่บล็อก) ถ้าไม่ซ้ำนำเข้าเลย
   const doImport = () => start(async () => {
     if (!file || !target) return;
-    const r = await importStatement({ bank: target, file: file.name, rows: file.rows });
-    if (r.error) return setMsg({ t: r.error, ok: false });
-    setMsg({ t: `นำเข้า ${file.rows.length} รายการแล้ว`, ok: true }); setFile(null); router.refresh();
+    const c = await checkStatementDups({ bank: target, rows: file.rows });
+    if (c.error) return setMsg({ t: c.error, ok: false });
+    if (c.dups && c.dups.length > 0) { setDups(c.dups); setMsg(null); return; }
+    await finish(false);
   });
 
   return (
@@ -50,7 +60,18 @@ export function BankTools({ banks }: { banks: { id: string; label: string }[] })
         <label className="f">ไฟล์ CSV<input type="file" accept=".csv,text/csv" onChange={e => pick(e.target.files?.[0])} /></label>
       </div>
       {file && <p className="sub">พร้อมนำเข้า {file.rows.length} รายการจาก {file.name}</p>}
-      <button className="btn" disabled={pending || !file || !target} onClick={doImport}>นำเข้า</button>
+      {dups && file && (
+        <div className="notice" role="alert" style={{ borderLeftColor: 'var(--red)', marginBottom: 12 }}>
+          <strong>พบรายการที่เคยนำเข้าแล้ว {dups.length} จาก {file.rows.length} รายการ</strong>
+          <div className="sub" style={{ margin: '4px 0 8px' }}>ซ้ำ = วันที่ ยอดเงิน รายละเอียด และยอดคงเหลือตรงกับที่มีในบัญชีนี้ (แถวที่ {dups.slice(0, 12).join(', ')}{dups.length > 12 ? ' …' : ''})</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {dups.length < file.rows.length && <button className="btn" disabled={pending} onClick={() => start(() => finish(true))}>นำเข้าเฉพาะรายการใหม่ ({file.rows.length - dups.length})</button>}
+            <button className="btn" disabled={pending} onClick={() => start(() => finish(false))}>นำเข้าทั้งหมด (รวมที่ซ้ำ)</button>
+            <button className="btn" disabled={pending} onClick={() => setDups(null)}>ยกเลิก</button>
+          </div>
+        </div>
+      )}
+      <button className="btn" disabled={pending || !file || !target || !!dups} onClick={doImport}>นำเข้า</button>
       {msg && <div className="notice" role="alert" style={{ borderLeftColor: msg.ok ? 'var(--green)' : 'var(--red)', marginTop: 12 }}>{msg.t}</div>}
     </div>
   );

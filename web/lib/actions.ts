@@ -80,8 +80,15 @@ const BANK = ['/bank'];
 export async function createBankAccount(p: { bank: string; no: string; name: string }) {
   return run(call('select bank_account_create($1,$2,nullif($3,\'\'))', p.bank, p.no, p.name), BANK);
 }
-export async function importStatement(p: { bank: string; file: string; rows: any[] }) {
-  return run(call('select bank_statement_import($1,$2,$3::jsonb)', p.bank, p.file, JSON.stringify(p.rows)), BANK);
+export async function importStatement(p: { bank: string; file: string; rows: any[]; skipDups?: boolean }) {
+  return run(call('select bank_statement_import($1,$2,$3::jsonb,$4)', p.bank, p.file, JSON.stringify(p.rows), !!p.skipDups), BANK);
+}
+// ตรวจรายการที่เคยนำเข้าแล้ว ก่อนกดนำเข้าจริง (คืนเลขแถวที่ซ้ำ เริ่มที่ 1)
+export async function checkStatementDups(p: { bank: string; rows: any[] }): Promise<{ error?: string; dups?: number[] }> {
+  try {
+    const r = await (await getDb()).q('select row_no from bank_statement_dups($1,$2::jsonb) where is_dup order by row_no', [p.bank, JSON.stringify(p.rows)]);
+    return { dups: (r as any[]).map(x => Number(x.row_no)) };
+  } catch (e: any) { return { error: String(e?.message ?? e).replace(/^error:\s*/i, '') }; }
 }
 export async function bankMatch(lines: string[], items: string[]) {
   return run(call('select bank_match($1::uuid[],$2::uuid[])', lines, items), BANK);
