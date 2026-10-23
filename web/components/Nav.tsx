@@ -11,6 +11,8 @@ const ITEMS: [string, string, string, string][] = [
   ['/stock', 'สต็อก', 'var(--blue)', ''],
   ['/reports/trial-balance', 'งบทดลอง', 'var(--red)', 'รายงาน'],
   ['/reports/pnl', 'กำไรขาดทุน', 'var(--red)', ''],
+  ['/reports/ar', 'ลูกหนี้ตามเอกสาร', 'var(--red)', ''],
+  ['/reports/ap', 'เจ้าหนี้ตามเอกสาร', 'var(--red)', ''],
   ['/contacts', 'ลูกค้า/ผู้ขาย', 'var(--grey)', 'ข้อมูลหลัก'],
   ['/products', 'สินค้า', 'var(--grey)', ''],
 ];
