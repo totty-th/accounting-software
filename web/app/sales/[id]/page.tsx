@@ -18,7 +18,7 @@ export default async function SalesDetail({ params }: { params: { id: string } }
   const v = await loadView(params.id);
   if (!v) notFound();
   const db = await getDb();
-  const tok = (await db.q<{ t: string | null }>('select share_token as t from sales_docs where id=$1', [params.id]))[0]?.t;
+  const tok = (await db.q<{ t: string | null }>('select share_token as t from sales_docs where id=$1', [v.doc.id]))[0]?.t;
   const h = headers(), host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
   const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
   const link = tok ? `${proto}://${host}/s/${tok}` : null;
@@ -33,8 +33,8 @@ export default async function SalesDetail({ params }: { params: { id: string } }
           <p className="sub"><Link href={`/sales?type=${v.doc.doc_type}`}>← {DOC_TYPE[v.doc.doc_type]}</Link></p></div>
         <div className="acts">
           <PrintButton />
-          <a className="btn ghost" href={`/sales/${params.id}/pdf`}>ดาวน์โหลด PDF</a>
-          <a className="btn ghost" href={`/sales/${params.id}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a>
+          <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf`}>ดาวน์โหลด PDF</a>
+          <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a>
           <SalesActions d={v.doc} />
         </div>
       </div>
@@ -49,13 +49,13 @@ export default async function SalesDetail({ params }: { params: { id: string } }
                 <CopyBox text={link} />
                 <div className="acts" style={{ justifyContent: 'flex-start', marginTop: 8 }}>
                   <a className="btn sm ghost" href={link} target="_blank" rel="noreferrer">เปิดหน้าที่ลูกค้าเห็น</a>
-                  <ActionButton label="ยกเลิกลิงก์" variant="danger" confirmText="c" action={revokeShareLink.bind(null, params.id)} />
+                  <ActionButton label="ยกเลิกลิงก์" variant="danger" confirmText="c" action={revokeShareLink.bind(null, v.doc.id)} />
                 </div>
               </>
             ) : (
               <>
                 <p className="sub">ยังไม่มีลิงก์ สร้างเพื่อส่งให้ลูกค้าเปิดดูเอกสารออนไลน์</p>
-                <ActionButton label="สร้างลิงก์แชร์" action={createShareLink.bind(null, params.id)} />
+                <ActionButton label="สร้างลิงก์แชร์" action={createShareLink.bind(null, v.doc.id)} />
               </>
             )}
           </section>
@@ -72,8 +72,8 @@ export default async function SalesDetail({ params }: { params: { id: string } }
           <section className="panel">
             <h3>เอกสารที่เกี่ยวข้อง</h3>
             <ul className="rel">
-              {v.ref && <li>มาจาก <Link href={`/sales/${v.ref.id}`}>{v.ref.doc_no}</Link> ({DOC_TYPE[v.ref.doc_type]})</li>}
-              {v.children.map(c => <li key={c.id}>สร้างต่อเป็น <Link href={`/sales/${c.id}`}>{c.doc_no}</Link> ({DOC_TYPE[c.doc_type]}) <Pill s={c.status} /></li>)}
+              {v.ref && <li>มาจาก <Link href={`/sales/${v.ref.doc_no}`}>{v.ref.doc_no}</Link> ({DOC_TYPE[v.ref.doc_type]})</li>}
+              {v.children.map(c => <li key={c.id}>สร้างต่อเป็น <Link href={`/sales/${c.doc_no}`}>{c.doc_no}</Link> ({DOC_TYPE[c.doc_type]}) <Pill s={c.status} /></li>)}
               {v.receipts.map(r => <li key={r.id}>ใบเสร็จ {r.receipt_no} {money(r.amount)} <Pill s={r.status} />{r.collected_date ? ` เก็บเงิน ${dateTh(r.collected_date)}` : ''}</li>)}
               {!v.ref && !v.children.length && !v.receipts.length && <li className="sub">ยังไม่มี</li>}
             </ul>

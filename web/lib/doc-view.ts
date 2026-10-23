@@ -13,7 +13,15 @@ export interface DocView {
   vouchers: { id: string; voucher_no: string }[];
 }
 
-export async function loadView(id: string): Promise<DocView | null> {
+// รับได้ทั้ง uuid และเลขที่เอกสาร (เดโมบน Vercel มีหลาย instance ที่ uuid ไม่ตรงกัน เลขที่เอกสารจึงเสถียรกว่า)
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export async function loadView(key: string): Promise<DocView | null> {
+  let id = key;
+  if (!UUID.test(key)) {
+    const r = (await (await getDb()).q<{ id: string }>('select id from sales_docs where doc_no=$1', [decodeURIComponent(key)]))[0];
+    if (!r) return null;
+    id = r.id;
+  }
   try { return (await (await getDb()).q<{ v: DocView }>('select sales_doc_view($1) as v', [id]))[0].v; }
   catch { return null; }
 }
