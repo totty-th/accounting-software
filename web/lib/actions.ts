@@ -74,3 +74,25 @@ export async function createShareLink(id: string): Promise<Result> {
 export async function revokeShareLink(id: string): Promise<Result> {
   return run(call('select revoke_share_token($1)', id), [`/sales/${id}`]);
 }
+
+// ---- บัญชีธนาคาร / กระทบยอด ----
+const BANK = ['/bank'];
+export async function createBankAccount(p: { bank: string; no: string; name: string }) {
+  return run(call('select bank_account_create($1,$2,nullif($3,\'\'))', p.bank, p.no, p.name), BANK);
+}
+export async function importStatement(p: { bank: string; file: string; rows: any[] }) {
+  return run(call('select bank_statement_import($1,$2,$3::jsonb)', p.bank, p.file, JSON.stringify(p.rows)), BANK);
+}
+export async function bankMatch(lines: string[], items: string[]) {
+  return run(call('select bank_match($1::uuid[],$2::uuid[])', lines, items), BANK);
+}
+export async function bankMatchDiff(p: { lines: string[]; items: string[]; account: string; memo: string; date?: string }) {
+  return run(call('select bank_match_with_diff($1::uuid[],$2::uuid[],$3,$4,$5::date)',
+    p.lines, p.items, p.account, p.memo, p.date || null), [...BANK, ...ALL]);
+}
+export async function bankUnmatch(line: string, diffAction?: 'cancel' | 'keep') {
+  return run(call('select bank_unmatch($1,$2)', line, diffAction ?? null), [...BANK, ...ALL]);
+}
+export async function bankTransfer(p: { from: string; to: string; date: string; amount: number; fee: number }) {
+  return run(call('select bank_transfer($1,$2,$3::date,$4,$5)', p.from, p.to, p.date || today(), p.amount, p.fee || 0), [...BANK, ...ALL]);
+}

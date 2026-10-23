@@ -9,6 +9,7 @@ const ITEMS: [string, string, string, string][] = [
   ['/expenses', 'ซื้อ/ค่าใช้จ่าย', 'var(--purple)', ''],
   ['/wht', 'หัก ณ ที่จ่าย (50 ทวิ)', 'var(--purple)', ''],
   ['/stock', 'สต็อก', 'var(--blue)', ''],
+  ['/bank', 'ธนาคาร/กระทบยอด', 'var(--teal)', ''],
   ['/reports/trial-balance', 'งบทดลอง', 'var(--red)', 'รายงาน'],
   ['/reports/pnl', 'กำไรขาดทุน', 'var(--red)', ''],
   ['/reports/ar', 'ลูกหนี้ตามเอกสาร', 'var(--red)', ''],

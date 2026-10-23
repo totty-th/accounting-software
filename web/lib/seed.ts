@@ -10,9 +10,9 @@ const COA: [string, string, string][] = [
   ['21921', 'เงินมัดจำรับ', 'liability'], ['27111', 'ภาษีขาย', 'liability'], ['27124', 'ภาษีหัก ณ ที่จ่าย ภ.ง.ด.53', 'liability'],
   ['27140', 'เจ้าหนี้สรรพากร', 'liability'], ['31000', 'ทุนเรือนหุ้น', 'equity'], ['32000', 'กำไรสะสม (ชั่วคราว)', 'equity'],
   ['41110', 'รายได้จากการขายสินค้า', 'revenue'], ['41210', 'รายได้จากการให้บริการ', 'revenue'], ['41400', 'รับคืนและส่วนลดจ่าย', 'revenue'],
-  ['49910', 'เงินบริจาค/สนับสนุน', 'revenue'], ['49990', 'รายได้อื่น', 'revenue'],
+  ['49010', 'ดอกเบี้ยรับ (ชั่วคราว)', 'revenue'], ['49910', 'เงินบริจาค/สนับสนุน', 'revenue'], ['49990', 'รายได้อื่น', 'revenue'],
   ['51100', 'ต้นทุนขาย (ชั่วคราว)', 'expense'], ['53101', 'ค่าบริการ', 'expense'], ['53102', 'ค่าเช่า', 'expense'],
-  ['53103', 'ค่าขนส่ง', 'expense'], ['53104', 'ค่าการตลาด', 'expense'],
+  ['53103', 'ค่าขนส่ง', 'expense'], ['53104', 'ค่าการตลาด', 'expense'], ['53211', 'ค่าธรรมเนียมธนาคาร (ชั่วคราว)', 'expense'], ['59910', 'ค่าใช้จ่ายเบ็ดเตล็ด (ชั่วคราว)', 'expense'],
 ];
 
 export async function seed(db: Db) {
@@ -45,4 +45,14 @@ export async function seed(db: Db) {
   const exp = (amt: number) => JSON.stringify([{ description: 'ค่าบริการรายเดือน', account: '53101', qty: 1, unit_price: amt }]);
   for (const [back, amt] of [[10, 5000], [45, 12000], [100, 9000]] as [number, number][])
     await db.q(`select create_expense($1::date - $2::int,$3,$4::jsonb)`, [d, back, v1, exp(amt)]);
+  // ตัวอย่างบัญชีธนาคาร + รายการเดินบัญชี + รายการสมุดบัญชีบางส่วน (ให้ลองกระทบยอดที่ /bank)
+  const bk = (await db.q(`select bank_account_create('กสิกรไทย','748-2-31004-9','บริษัท ผลิตภัณฑ์ตะแกรงเหล็กแผ่นไทย จำกัด') as id`))[0].id;
+  await db.q(`select bank_statement_import($1,'ตัวอย่าง.csv',$2::jsonb)`, [bk, JSON.stringify([
+    { date: d, description: 'ดอกเบี้ยรับ', deposit: 500, withdrawal: 0, balance: 500 },
+    { date: d, description: 'ค่าธรรมเนียมโอน', deposit: 0, withdrawal: 35, balance: 465 },
+    { date: d, description: 'รับโอนจากลูกค้า', deposit: 3210, withdrawal: 0, balance: 3675 }])]);
+  await db.q(`select post_voucher('JV',$1::date,'รับชำระจากลูกค้า','demo',null,$2::jsonb)`, [d, JSON.stringify([
+    { account: '11122.01', debit: 3210 }, { account: '41210', credit: 3210 }])]);
+  await db.q(`select post_voucher('JV',$1::date,'ค่าธรรมเนียมโอน','demo',null,$2::jsonb)`, [d, JSON.stringify([
+    { account: '53211', debit: 35 }, { account: '11122.01', credit: 35 }])]);
 }
