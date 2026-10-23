@@ -76,3 +76,25 @@ describe('M9 ลิงก์แชร์และข้อมูลเอกส�
     await expect(db.query(`select ensure_share_token('00000000-0000-0000-0000-000000000000')`)).rejects.toThrow('ไม่พบเอกสาร');
   });
 });
+
+describe('M10 ข้อมูลเอกสาร A4 เพิ่มเติม', () => {
+  it('ใบลดหนี้: เอกสารอ้างอิงมีวันที่และมูลค่าตามเอกสารเดิม', async () => {
+    const i = await inv();
+    const cn = (await one<{ id: string }>(`select create_sales_doc('CN','2026-10-02'::date,$1,$2::jsonb,'exclusive',7,$3,'ส่งคืนสินค้า') as id`,
+      [c30, JSON.stringify([{ description: 'ลดราคา', qty: 1, unit_price: 500 }]), i])).id;
+    const v = (await one<{ v: any }>('select sales_doc_view($1) as v', [cn])).v;
+    expect(v.ref.doc_date).toBe('2026-10-01');
+    expect([+v.ref.subtotal, +v.doc.subtotal]).toEqual([2000, 500]);
+    expect(v.contact.credit_days).toBe(30);
+  });
+  it('ใบเสร็จ: รายการเอกสาร ยอด และแยกภาษีจากยอดรวม', async () => {
+    const i = await inv();
+    const re = (await one<{ id: string }>(`select create_receipt_from_invoice($1,'2026-10-05'::date,1070) as id`, [i])).id;
+    const v = (await one<{ v: any }>('select receipt_view($1) as v', [re])).v;
+    expect(v.items).toHaveLength(1);
+    expect(v.items[0].doc_no).toMatch(/^INV/);
+    expect(+v.receipt.amount).toBe(1070);
+    expect([+v.receipt.base, +v.receipt.vat]).toEqual([1000, 70]);
+    expect(v.contact.name).toBe('ลูกค้าเครดิต 30');
+  });
+});

@@ -3,11 +3,11 @@ import { getDb } from './db';
 export interface DocView {
   doc: { id: string; doc_type: string; doc_no: string; doc_date: string; due_date: string | null; status: string; price_mode: string;
     vat_rate: string | number; subtotal: string | number; vat: string | number; total: string | number; reason: string | null;
-    is_deposit: boolean; deposit_net: string | number; deposit_vat: string | number };
+    is_deposit: boolean; deposit_net: string | number; deposit_vat: string | number; wht_rate?: string | number };
   contact: { id: string; name: string; address: string | null; tax_id: string | null; credit_days: number };
   company: { name: string; address: string | null; tax_id: string | null } | null;
   lines: { line_no: number; description: string; item_kind: string; qty: string | number; unit_price: string | number; amount: string | number }[];
-  ref: { id: string; doc_no: string; doc_type: string } | null;
+  ref: { id: string; doc_no: string; doc_type: string; doc_date: string; subtotal: string | number; total: string | number } | null;
   children: { id: string; doc_no: string; doc_type: string; status: string }[];
   receipts: { id: string; receipt_no: string; status: string; receipt_date: string; collected_date: string | null; amount: string | number }[];
   vouchers: { id: string; voucher_no: string }[];

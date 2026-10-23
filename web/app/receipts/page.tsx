@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getDb } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
@@ -20,7 +21,7 @@ export default async function Receipts() {
           <Group key={s} title={title} color={color} count={rs.length}>
             <table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>ลูกค้า</th><th>วันที่</th><th className="num">ยอดรับ</th><th className="num">หัก ณ ที่จ่าย</th><th>สถานะ</th><th /></tr></thead>
               <tbody>{rs.map(r => (
-                <tr key={r.id}><td className="no">{r.receipt_no}</td><td>{RECEIPT_KIND[r.kind]}</td><td>{partyName(r)}</td><td>{dateTh(r.receipt_date)}</td>
+                <tr key={r.id}><td className="no"><Link href={`/receipts/${r.receipt_no}`}>{r.receipt_no}</Link></td><td>{RECEIPT_KIND[r.kind]}</td><td>{partyName(r)}</td><td>{dateTh(r.receipt_date)}</td>
                   <td className="num">{money(r.amount)}</td><td className="num">{Number(r.wht) ? money(r.wht) : '-'}</td><td><Pill s={r.status} /></td>
                   <td><div className="acts">
                     {r.status === 'pending' && <ActionButton label="เก็บเงิน" action={A.collectReceipt.bind(null, r.id)} />}
