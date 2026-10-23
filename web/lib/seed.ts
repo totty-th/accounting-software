@@ -36,4 +36,13 @@ export async function seed(db: Db) {
   const e2 = (await db.q(`select create_expense($1::date,$2,$3::jsonb) as id`, [d, v1, JSON.stringify([
     { description: 'ค่าขนส่งสินค้า', account: '53101', qty: 1, unit_price: 10000, wht_rate: 1 }])]))[0].id;
   await db.q(`select pay_expense($1,$2::date)`, [e2, d]);
+  // ตัวอย่างลูกหนี้/เจ้าหนี้ค้างหลายช่วงอายุ (ให้ลองรายงาน /reports/ar และ /reports/ap)
+  await db.q(`update contacts set credit_days = 30 where id = $1`, [c1]);
+  const c2 = (await db.q(`insert into contacts(business_name,tax_id,credit_days) values ('บริษัท มั่นคงวัสดุ จำกัด','0105500000004',15) returning id`))[0].id;
+  const svc = (amt: number) => JSON.stringify([{ description: 'ค่าติดตั้งตะแกรง', kind: 'service', qty: 1, unit_price: amt }]);
+  for (const [back, who, amt] of [[20, c1, 10000], [50, c1, 20000], [80, c2, 15000], [130, c2, 8000]] as [number, string, number][])
+    await db.q(`select create_sales_doc('INV',$1::date - $2::int,$3,$4::jsonb)`, [d, back, who, svc(amt)]);
+  const exp = (amt: number) => JSON.stringify([{ description: 'ค่าบริการรายเดือน', account: '53101', qty: 1, unit_price: amt }]);
+  for (const [back, amt] of [[10, 5000], [45, 12000], [100, 9000]] as [number, number][])
+    await db.q(`select create_expense($1::date - $2::int,$3,$4::jsonb)`, [d, back, v1, exp(amt)]);
 }
