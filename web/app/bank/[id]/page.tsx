@@ -21,7 +21,7 @@ export default async function Reconcile({ params, searchParams }: { params: { id
     <>
       <div className="top"><div>
         <h1>กระทบยอด {b.bank_name} {b.account_no}</h1>
-        <p className="sub"><Link href="/bank">← ธนาคารทั้งหมด</Link> · บัญชี {b.code}</p></div></div>
+        <p className="sub"><Link href="/bank">← ธนาคารทั้งหมด</Link> · บัญชี {b.code} · <Link href={`/bank/${b.id}/report${batch ? `?batch=${batch}` : ''}`}>รายงานกระทบยอด (พิมพ์)</Link></p></div></div>
       <div className="cards">
         <div className="card" style={{ ['--c' as any]: 'var(--teal)' }}><span>ยอดบัญชีตาม statement</span><b>{money(st.bank_balance)}</b></div>
         <div className="card" style={{ ['--c' as any]: 'var(--blue)' }}><span>ยอดสมุดบัญชี (เฉพาะที่จับคู่แล้ว)</span><b>{money(st.book_matched)}</b></div>

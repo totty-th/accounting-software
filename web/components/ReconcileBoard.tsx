@@ -3,6 +3,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { bankMatch, bankMatchDiff, bankUnmatch } from '@/lib/actions';
 import { money, dateTh } from '@/lib/format';
+import { suggestMatches, type Suggestion } from '@/lib/bank-suggest';
 
 type Line = { id: string; date: string; description: string; amount: number; matched: boolean; hasDiff: boolean };
 type Item = { id: string; date: string; no: string; memo: string; amount: number; matched: boolean };
@@ -22,6 +23,7 @@ export function ReconcileBoard({ lines, items, accounts }: { lines: Line[]; item
   const [diffOpen, setDiffOpen] = useState(false);
   const [acc, setAcc] = useState(''); const [memo, setMemo] = useState(''); const [date, setDate] = useState('');
   const [askDiff, setAskDiff] = useState(false);
+  const [sug, setSug] = useState<Suggestion[] | null>(null);
 
   const selLines = lines.filter(l => sl.has(l.id));
   const selItems = items.filter(i => si.has(i.id));
@@ -48,11 +50,48 @@ export function ReconcileBoard({ lines, items, accounts }: { lines: Line[]; item
   });
   const onUnmatch = () => (selLines.find(l => l.matched)?.hasDiff ? setAskDiff(true) : doUnmatch());
 
+  const CONF = { high: ['มั่นใจสูง', 'var(--green)'], medium: ['น่าจะใช่', 'var(--orange)'], low: ['ตรวจสอบก่อน', 'var(--red)'] } as const;
+  const lineOf = (id: string) => lines.find(l => l.id === id)!;
+  const itemOf = (id: string) => items.find(i => i.id === id)!;
+  const pickSug = (g: Suggestion) => { setSl(new Set(g.lineIds)); setSi(new Set(g.itemIds)); setDiffOpen(false); setAskDiff(false); setErr(null); };
+  const acceptSug = (gs: Suggestion[]) => start(async () => {
+    for (const g of gs) { const r = await bankMatch(g.lineIds, g.itemIds); if (r.error) { setErr(r.error); break; } }
+    setSug(null); reset(); router.refresh();
+  });
+
   const tags = diff > 0 ? TAGS_UP : TAGS_DOWN;
   const accOpts = accounts.filter(a => (diff > 0 ? ['revenue', 'liability', 'equity'] : ['expense', 'asset', 'liability']).includes(a.type));
 
   return (
     <>
+      <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn ghost" disabled={pending} onClick={() => setSug(sug ? null : suggestMatches(lines, items))}>
+          {sug ? 'ซ่อนคำแนะนำ' : 'แนะนำจับคู่อัตโนมัติ'}</button>
+        <span className="sub" style={{ margin: 0 }}>เทียบยอดเงิน วันที่ และข้อความของรายการที่ยังไม่จับคู่ · ต้องกดยืนยันเองทุกครั้ง</span>
+      </div>
+      {sug && (
+        <div className="panel" style={{ maxWidth: 'none', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <h3 style={{ margin: 0 }}>คำแนะนำ {sug.length} ชุด</h3>
+            {sug.some(g => g.confidence === 'high') && (
+              <button className="btn" disabled={pending} onClick={() => acceptSug(sug.filter(g => g.confidence === 'high'))}>
+                จับคู่ที่มั่นใจสูงทั้งหมด ({sug.filter(g => g.confidence === 'high').length})</button>)}
+          </div>
+          {sug.length === 0 ? <div className="empty">ไม่พบรายการที่ยอดตรงกัน (รายการที่ผลต่างไม่เป็นศูนย์ ให้เลือกเองแล้วใช้ "จับคู่แบบมีผลต่าง")</div> : (
+            <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+              {sug.map((g, k) => (
+                <div key={k} style={{ border: '1px solid var(--line, #ddd)', borderRadius: 8, padding: '8px 12px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ color: CONF[g.confidence][1], fontWeight: 600, minWidth: 84 }}>{CONF[g.confidence][0]}</span>
+                  <div style={{ flex: 1, minWidth: 240 }}>
+                    {g.lineIds.map(id => <div key={id}>ธนาคาร: {dateTh(lineOf(id).date)} {lineOf(id).description} <b>{money(lineOf(id).amount)}</b></div>)}
+                    {g.itemIds.map(id => <div key={id}>สมุดบัญชี: {dateTh(itemOf(id).date)} {itemOf(id).no} {itemOf(id).memo} <b>{money(itemOf(id).amount)}</b></div>)}
+                    <small className="sub">{g.reason}</small>
+                  </div>
+                  <button className="btn sm ghost" disabled={pending} onClick={() => pickSug(g)}>เลือกดู</button>
+                  <button className="btn sm" disabled={pending} onClick={() => acceptSug([g])}>จับคู่</button>
+                </div>))}
+            </div>)}
+        </div>)}
       <div className="split" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(340px,1fr))', gap: 16, alignItems: 'start' }}>
         <div className="panel" style={{ maxWidth: 'none', minWidth: 0, overflowX: 'auto' }}>
           <h3 style={{ marginTop: 0 }}>รายการธนาคาร (statement)</h3>
