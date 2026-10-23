@@ -75,11 +75,11 @@ describe('PUR-07 ใบรับสินค้า (D-01 แบบ B)', () => {
 });
 
 describe('STK-03/13/14 ตัดสต็อกและต้นทุนขาย moving average (AT-09)', () => {
-  it('ขาย 3 ที่ต้นทุน 600: SV รายได้ + ใบต้นทุนขาย Dr 51100 1,800 / Cr 11500 1,800', async () => {
+  it('ขาย 3 ที่ต้นทุน 600: ตัดสต็อก มูลค่า 4,200 · ไม่ลงบัญชีต้นทุนขาย (ตามต้นแบบ)', async () => {
     await ri(10, 600);
     const inv = await sd(await sell(3));
     expect(await onHand()).toBe(7);
-    expect(await entries(inv.cogs_voucher_id)).toEqual([['51100', 1800, 0], ['11500', 0, 1800]]);
+    expect(inv.cogs_voucher_id).toBeNull();
     expect(await ps()).toMatchObject({ q: 7, v: 4200 });
   });
   it('รับ 10@800 หลังขาย 3 → ต้นทุนเฉลี่ย 717.6471 มูลค่า 12,200', async () => {
@@ -91,19 +91,18 @@ describe('STK-03/13/14 ตัดสต็อกและต้นทุนขา
     const inv = await sd(await sell(20));
     expect(await onHand()).toBe(-3);
     expect(+(await one<any>(`select shortfall s from stock_alerts where doc_id=$1`, [inv.id])).s).toBe(3);
-    expect(await entries(inv.cogs_voucher_id)).toEqual([['51100', 14352.94, 0], ['11500', 0, 14352.94]]);
     await call('select cancel_sales_doc($1)', [inv.id]);
     expect(await onHand()).toBe(17);
     expect(await ps()).toMatchObject({ q: 17, v: 12200 });
     const rev = await db.query<any>(`select voucher_no from journal_vouchers where voucher_no like '%-R'`);
-    expect(rev.rows).toHaveLength(2);   // SV-R และใบต้นทุนขาย -R
+    expect(rev.rows).toHaveLength(1);   // SV-R (ไม่มีใบต้นทุนขาย)
   });
   it('ขายหมดสต็อกพอดี ต้นทุน = มูลค่าที่เหลือทั้งหมด ไม่เหลือเศษสตางค์', async () => {
     await ri(3, 100);   // 300
     await ri(3, 100.01); // 300.03 รวม 600.03 / 6
     await sell(6);
     expect(await ps()).toMatchObject({ q: 0, v: 0 });
-    expect(await tb('11500')).toBe(0);
+    expect(await tb('11500')).toBe(600.03);   // บัญชีมีแต่ใบรับสินค้า ไม่มีการตัดต้นทุน
   });
   it('D-03 สินค้าตั้งบล็อก: ขายเกินไม่ได้ ไม่เหลือเอกสารหรือรายการค้าง', async () => {
     const p = await mkProduct('BLK', 'goods_stock', { block: true });
@@ -118,17 +117,17 @@ describe('STK-03/13/14 ตัดสต็อกและต้นทุนขา
     await ri(10, 600);
     const ca = await sd(await sell(2, 1000, prod, 'CA'));
     expect(await onHand()).toBe(8);
-    expect(ca.cogs_voucher_id).toBeTruthy();
+    expect(ca.cogs_voucher_id).toBeNull();
     const ns = await mkProduct('NS', 'goods_nostock');
     const sv = await mkProduct('SV', 'service');
     const a = await sd(await sell(5, 10, ns)); const b = await sd(await sell(1, 10, sv));
     expect([a.cogs_voucher_id, b.cogs_voucher_id]).toEqual([null, null]);
     expect(+(await one<any>('select count(*) c from stock_movements where product_id in ($1,$2)', [ns, sv])).c).toBe(0);
   });
-  it('บัญชีสินค้าคงเหลือในงบทดลอง = มูลค่าสต็อกย่อยเสมอ (กระทบยอด)', async () => {
+  it('การขาย/ยกเลิกไม่แตะบัญชีสินค้าคงเหลือ (ตามต้นแบบ ไม่ลงต้นทุน)', async () => {
     await ri(10, 600); const i1 = await sell(3); await ri(10, 800); await sell(5);
     await call('select cancel_sales_doc($1)', [i1]);
-    expect(await tb('11500')).toBe((await ps()).v);
+    expect(await tb('11500')).toBe(14000);   // ใบรับสินค้า 6,000 + 8,000 เท่านั้น
   });
 });
 
