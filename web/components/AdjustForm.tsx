@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { ADJUST_REASONS } from '@/lib/adjust-reasons';
 
 type Result = { error?: string; ok?: true };
-type Src = { description: string; item_kind: string; qty: number; unit_price: number };
+type Src = { description: string; item_kind: string; qty: number; unit_price: number; product_id: string | null; is_stock: boolean };
 const money = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const r2 = (x: number) => Math.round(x * 100) / 100;
 
@@ -17,7 +17,7 @@ export function AdjustForm({ type, refId, contactId, refNo, refTotal, refSubtota
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [date, setDate] = useState(today);
-  const [rows, setRows] = useState(lines.map(l => ({ on: false, qty: String(l.qty), price: String(l.unit_price) })));
+  const [rows, setRows] = useState(lines.map(l => ({ on: false, qty: String(l.qty), price: String(l.unit_price), stock: type === 'CN' ? 'return' : 'adjust' })));
   const hasGoods = lines.some(l => l.item_kind === 'goods');
   const [group, setGroup] = useState<'goods' | 'service'>(hasGoods ? 'goods' : 'service');
   const opts = ADJUST_REASONS[type][group];
@@ -39,7 +39,8 @@ export function AdjustForm({ type, refId, contactId, refNo, refTotal, refSubtota
   const submit = () => start(async () => {
     setErr(null);
     const ls = lines.flatMap((l, i) => rows[i].on && +rows[i].qty > 0
-      ? [{ description: l.description, kind: l.item_kind, qty: +rows[i].qty, unit_price: +rows[i].price || 0 }] : []);
+      ? [{ description: l.description, kind: l.item_kind, qty: +rows[i].qty, unit_price: +rows[i].price || 0,
+          product_id: l.product_id, stock_action: l.is_stock ? rows[i].stock : null }] : []);
     if (!ls.length) return setErr('ติ๊กเลือกรายการอย่างน้อย 1 บรรทัด');
     const text = isOther ? `${reason}: ${other.trim()}` : reason;
     if (isOther && !other.trim()) return setErr('ระบุสาเหตุเพิ่มเติม');
@@ -63,14 +64,19 @@ export function AdjustForm({ type, refId, contactId, refNo, refTotal, refSubtota
         {isOther && <label className="f">ระบุสาเหตุ<input value={other} onChange={e => setOther(e.target.value)} /></label>}
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <table className="lines" style={{ minWidth: 640 }}>
-          <thead><tr><th style={{ width: 40 }} /><th>รายการในใบแจ้งหนี้</th><th className="num" style={{ width: 100 }}>จำนวน</th><th className="num" style={{ width: 130 }}>ราคาต่อหน่วย</th><th className="num" style={{ width: 120 }}>รวม</th></tr></thead>
+        <table className="lines" style={{ minWidth: 780 }}>
+          <thead><tr><th style={{ width: 40 }} /><th>รายการในใบแจ้งหนี้</th><th className="num" style={{ width: 100 }}>จำนวน</th><th className="num" style={{ width: 130 }}>ราคาต่อหน่วย</th><th style={{ width: 150 }}>สต็อก</th><th className="num" style={{ width: 120 }}>รวม</th></tr></thead>
           <tbody>{lines.map((l, i) => (
             <tr key={i}>
               <td><input type="checkbox" checked={rows[i].on} onChange={e => set(i, { on: e.target.checked })} aria-label={`เลือก ${l.description}`} /></td>
               <td>{l.description}</td>
               <td><input className="num" inputMode="decimal" value={rows[i].qty} onChange={e => set(i, { qty: e.target.value })} disabled={!rows[i].on} /></td>
               <td><input className="num" inputMode="decimal" value={rows[i].price} onChange={e => set(i, { price: e.target.value })} disabled={!rows[i].on} /></td>
+              <td>{l.is_stock ? (
+                <select value={rows[i].stock} onChange={e => set(i, { stock: e.target.value })} disabled={!rows[i].on} aria-label="ตัวเลือกสต็อก">
+                  {type === 'CN' ? <><option value="return">คืนสินค้า</option><option value="no_return">ไม่คืน</option></>
+                                 : <><option value="adjust">ปรับราคา</option><option value="cut">ตัดสต็อก</option></>}
+                </select>) : <span className="sub">-</span>}</td>
               <td className="num">{rows[i].on ? money((+rows[i].qty || 0) * (+rows[i].price || 0)) : '-'}</td>
             </tr>))}</tbody>
         </table>
