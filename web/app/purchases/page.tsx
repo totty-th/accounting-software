@@ -6,7 +6,7 @@ import { Pill } from '@/components/Pill';
 import { Group } from '@/components/Board';
 import { ActionButton } from '@/components/ActionButton';
 import { PayForm } from '@/components/PayForm';
-import { CardForm } from '@/components/CardForm';
+import { CardForm, PettyForm } from '@/components/CardForm';
 import { RiForm } from '@/components/RiForm';
 import * as A from '@/lib/actions';
 
@@ -22,6 +22,8 @@ export default async function Purchases() {
     .map(b => ({ id: b.id as string, label: `${b.bank_name} ${b.account_no}` }));
   const cards = (await db.q(`select id, card_name, last4 from credit_cards where is_active order by card_name`))
     .map(c => ({ id: c.id as string, label: `${c.card_name} ****${c.last4}` }));
+  const petties = (await db.q(`select id, fund_name from petty_funds where is_active order by fund_name`))
+    .map(f => ({ id: f.id as string, label: f.fund_name as string }));
   const vendors = (await db.q(`select id, business_name, contact_name from contacts where not is_cash_default and is_vendor order by business_name nulls last`))
     .map(c => ({ id: c.id as string, label: partyName(c) }));
   const products = (await db.q(`select id, code, name, purchase_price from products where kind='goods_stock' order by code`))
@@ -33,7 +35,7 @@ export default async function Purchases() {
       <div className="top"><div><h1>ใบรับสินค้า</h1>
         <p className="sub">บันทึกแล้วสินค้าเข้าสต็อกและตั้งเจ้าหนี้ทันที · ไม่อนุมัติ = กลับรายการและถอนสต็อก</p></div></div>
       {W && <RiForm vendors={vendors} products={products} today={today()} />}
-      {MW && <CardForm />}
+      {MW && <><CardForm /><PettyForm /></>}
       {rows.length === 0 && <div className="panel empty">ยังไม่มีใบรับสินค้า</div>}
       {sets.map(([s, title, color]) => {
         const rs = rows.filter(r => r.status === s); if (!rs.length) return null;
@@ -48,7 +50,7 @@ export default async function Purchases() {
                     {AP && (r.status === 'unpaid' || r.status === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={A.rejectGoodsReceipt.bind(null, r.id)} />}
                     {W && (r.status === 'unpaid' || r.status === 'approved') && (
                       <details><summary className="btn sm">จ่ายเงิน</summary>
-                        <PayForm net={Number(r.total)} banks={banks} cards={cards} onPay={A.payGoodsReceipt.bind(null, r.id)} /></details>)}
+                        <PayForm net={Number(r.total)} banks={banks} cards={cards} petties={petties} onPay={A.payGoodsReceipt.bind(null, r.id)} /></details>)}
                     {W && ['approved', 'paid', 'rejected'].includes(r.status) && <ActionButton label="รีเซ็ต" variant="ghost" action={A.resetGoodsReceipt.bind(null, r.id)} />}
                     {W && r.status !== 'cancelled' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={A.cancelGoodsReceipt.bind(null, r.id)} />}
                   </div></td></tr>))}</tbody></table>

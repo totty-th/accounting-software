@@ -39,7 +39,7 @@ beforeAll(async () => {
   for (const f of readdirSync(dir).sort()) await db.exec(readFileSync(new URL(f, dir), 'utf8'));
 });
 beforeEach(async () => {
-  await db.exec(`truncate purchase_payments, credit_cards, bank_accounts, stock_alerts, stock_movements, product_stock,
+  await db.exec(`truncate purchase_payments, cheque_accounts, petty_funds, credit_cards, bank_accounts, stock_alerts, stock_movements, product_stock,
     goods_receipt_lines, goods_receipts, products, wht_certs, expense_lines, expenses, contacts, journal_lines,
     journal_vouchers, period_locks, doc_sequences, accounts cascade`);
   for (const [c, n, t] of ACCOUNTS) await db.query('insert into accounts(code,name,type) values ($1,$2,$3)', [c, n, t]);
@@ -164,14 +164,58 @@ describe('M18 จ่ายหลายช่องทาง', () => {
       [id, D, JSON.stringify([{ method: 'cash', amount: 1040 }])])).v;
     expect(await entries(v)).toEqual([['21399', 1070, 0], ['27124', 0, 30], ['11112', 0, 1040]]);
   });
-  it('เช็ค/เงินสดย่อย ยังไม่รองรับ (ยังไม่ทดสอบ)', async () => {
+  it('ช่องทางอื่นๆ ที่ยังไม่ทดสอบ ยังปฏิเสธ', async () => {
     const id = await exp(1000);
     expect(await err(call('select pay_expense($1,$2::date,\'11112\',true,\'PND53\',null,$3::jsonb)',
-      [id, D, JSON.stringify([{ method: 'cheque', amount: 1070 }])]))).toContain('ยังไม่รองรับ');
+      [id, D, JSON.stringify([{ method: 'other', amount: 1070 }])]))).toContain('ยังไม่รองรับ');
   });
   it('ไม่ระบุช่องทาง = เงินสดเต็มจำนวน (เหมือนเดิม)', async () => {
     const id = await exp(1000);
     const v = (await one<any>('select pay_expense($1,$2::date) v', [id, D])).v;
     expect(await entries(v)).toEqual([['21399', 1070, 0], ['11112', 0, 1070]]);
+  });
+});
+
+describe('M18.2 เช็คและเงินสดย่อย', () => {
+  const payEx = (id: string, pays: object[]) =>
+    one<any>('select pay_expense($1,$2::date,\'11112\',true,\'PND53\',null,$3::jsonb) v', [id, D, JSON.stringify(pays)]);
+  const bank = async () => {
+    const acc = (await one<any>(`select id from accounts where code='11122'`)).id;
+    return (await one<any>(`insert into bank_accounts(account_id,bank_name,account_no,account_name) values ($1,'ธ.ทดสอบ','111','บริษัท') returning id`, [acc])).id;
+  };
+  it('เงินสดย่อย: เปิดบัญชี 11149.01 และ Cr บัญชีนั้น', async () => {
+    const f = (await one<any>(`select create_petty_fund('TEST Petty',5000,'วิศรุต') id`)).id;
+    const id = await exp(1000);
+    const { v } = await payEx(id, [{ method: 'petty', petty_fund_id: f, amount: 1070 }]);
+    expect(await entries(v)).toEqual([['21399', 1070, 0], ['11149.01', 0, 1070]]);
+    expect(await err(payEx(await exp(100), [{ method: 'petty', amount: 107 }]))).toContain('วงเงินสดย่อย');
+  });
+  it('เช็ค: PV วันจ่าย Dr เจ้าหนี้/Cr 21329.01 + PV วันตัดบัญชี Dr 21329.01/Cr ธนาคาร', async () => {
+    const bk = await bank();
+    const id = await exp(1000);
+    const { v } = await payEx(id, [{ method: 'cheque', bank_account_id: bk, cheque_no: '0001', clear_date: '2026-10-31', amount: 1070 }]);
+    expect(await entries(v)).toEqual([['21399', 1070, 0], ['21329.01', 0, 1070]]);
+    const cv = (await one<any>('select clear_voucher_id c, clear_date::text d from purchase_payments')).c;
+    expect(await entries(cv)).toEqual([['21329.01', 1070, 0], ['11122', 0, 1070]]);
+    expect(await tb('21329.01')).toBe(0);      // พักแล้วตัดหมดเมื่อถึงวันตัดบัญชี
+    expect(await tb('11122')).toBe(-1070);
+  });
+  it('เช็คต้องมีเลขที่/วันตัดบัญชี/ห้ามค่าธรรมเนียม · ตัดก่อนวันจ่ายไม่ได้', async () => {
+    const bk = await bank(); const id = await exp(1000);
+    const base = { method: 'cheque', bank_account_id: bk, amount: 1070 };
+    expect(await err(payEx(id, [{ ...base, clear_date: '2026-10-31' }]))).toContain('เลขที่เช็ค');
+    expect(await err(payEx(id, [{ ...base, cheque_no: '1' }]))).toContain('วันที่ถูกตัดบัญชี');
+    expect(await err(payEx(id, [{ ...base, cheque_no: '1', clear_date: '2026-10-01' }]))).toContain('ไม่ก่อนวันที่จ่าย');
+    expect(await err(payEx(id, [{ ...base, cheque_no: '1', clear_date: '2026-10-31', fee: 30 }]))).toContain('ค่าธรรมเนียมเช็ค');
+    expect(await err(payEx(id, [{ method: 'cheque', cheque_no: '1', clear_date: '2026-10-31', amount: 1070 }]))).toContain('บัญชีเช็คจ่าย');
+  });
+  it('รีเซ็ตเอกสารที่จ่ายด้วยเช็ค: PV และใบตัดเช็คได้ -R ทั้งคู่ ยอดกลับเป็นเจ้าหนี้', async () => {
+    const bk = await bank(); const id = await exp(1000);
+    await payEx(id, [{ method: 'cheque', bank_account_id: bk, cheque_no: '0001', clear_date: '2026-10-31', amount: 1070 }]);
+    await call('select reset_expense($1)', [id]);
+    expect((await reversals()).length).toBe(2);
+    expect(await tb('11122')).toBe(0);
+    expect(await tb('21399')).toBe(-1070);
+    expect(+(await one<any>('select count(*) c from purchase_payments')).c).toBe(0);
   });
 });

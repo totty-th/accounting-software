@@ -8,7 +8,7 @@ import { Group } from '@/components/Board';
 import { ActionButton } from '@/components/ActionButton';
 import * as A from '@/lib/actions';
 import { PayForm } from '@/components/PayForm';
-import { CardForm } from '@/components/CardForm';
+import { CardForm, PettyForm } from '@/components/CardForm';
 
 export default async function Expenses() {
   const user = await requirePage('expenses.read');
@@ -21,6 +21,8 @@ export default async function Expenses() {
     .map(b => ({ id: b.id as string, label: `${b.bank_name} ${b.account_no}` }));
   const cards = (await db.q(`select id, card_name, last4 from credit_cards where is_active order by card_name`))
     .map(c => ({ id: c.id as string, label: `${c.card_name} ****${c.last4}` }));
+  const petties = (await db.q(`select id, fund_name from petty_funds where is_active order by fund_name`))
+    .map(f => ({ id: f.id as string, label: f.fund_name as string }));
   const MW = can(user.role, 'master.write');
   const sets: [string, string, string][] = [['pending', 'รอดำเนินการ', 'var(--orange)'], ['approved', 'อนุมัติแล้ว', 'var(--blue)'],
     ['paid', 'ชำระแล้ว', 'var(--green)'], ['rejected', 'ไม่อนุมัติ', 'var(--red)'], ['cancelled', 'ยกเลิก', 'var(--grey)']];
@@ -28,7 +30,7 @@ export default async function Expenses() {
     <>
       <div className="top"><div><h1>ค่าใช้จ่าย</h1><p className="sub">บันทึกแล้วตั้งเจ้าหนี้ทันที จ่ายเงินแล้วออกหนังสือรับรองหัก ณ ที่จ่ายให้อัตโนมัติ</p></div>
         {W && <Link className="btn" href="/expenses/new">+ ค่าใช้จ่ายใหม่</Link>}</div>
-      {MW && <CardForm />}
+      {MW && <><CardForm /><PettyForm /></>}
       {rows.length === 0 && <div className="panel empty">ยังไม่มีค่าใช้จ่าย</div>}
       {sets.map(([s, title, color]) => {
         const rs = rows.filter(r => r.status === s); if (!rs.length) return null;
@@ -43,7 +45,7 @@ export default async function Expenses() {
                     {AP && (r.status === 'pending' || r.status === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={A.rejectExpense.bind(null, r.id)} />}
                     {W && (r.status === 'pending' || r.status === 'approved') && (
                       <details><summary className="btn sm">จ่ายเงิน</summary>
-                        <PayForm net={Number(r.total) - Number(r.wht_total)} banks={banks} cards={cards} onPay={A.payExpense.bind(null, r.id)} /></details>)}
+                        <PayForm net={Number(r.total) - Number(r.wht_total)} banks={banks} cards={cards} petties={petties} onPay={A.payExpense.bind(null, r.id)} /></details>)}
                     {W && ['approved', 'paid', 'rejected'].includes(r.status) && <ActionButton label="รีเซ็ต" variant="ghost" action={A.resetExpense.bind(null, r.id)} />}
                     {W && r.status !== 'cancelled' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={A.cancelExpense.bind(null, r.id)} />}
                   </div></td></tr>))}</tbody></table>

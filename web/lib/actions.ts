@@ -73,7 +73,8 @@ export async function createExpense(p: { date: string; contact: string; lines: a
   return run(call('select create_expense($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), ALL, 'expenses.write');
 }
 export const approveExpense = async (id: string) => run(call('select approve_expense($1)', id), ALL, 'expenses.approve');
-export type PurchasePay = { method: string; bank_account_id?: string; credit_card_id?: string; amount: number };
+export type PurchasePay = { method: string; bank_account_id?: string; credit_card_id?: string; petty_fund_id?: string;
+  cheque_no?: string; cheque_date?: string; clear_date?: string; amount: number };
 const payJson = (p?: PurchasePay[]) => (p && p.length ? JSON.stringify(p) : null);
 export const payExpense = async (id: string, payments?: PurchasePay[]) =>
   run(call(`select pay_expense($1,$2::date,'11112',true,'PND53',null,$3::jsonb)`, id, today(), payJson(payments)), ALL, 'expenses.write');
@@ -88,6 +89,8 @@ export const resetGoodsReceipt = async (id: string) => run(call('select reset_go
 export const cancelGoodsReceipt = async (id: string) => run(call('select cancel_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.write');
 export const payGoodsReceipt = async (id: string, payments?: PurchasePay[]) =>
   run(call('select pay_goods_receipt($1,$2::date,$3::jsonb)', id, today(), payJson(payments)), [...ALL, '/purchases'], 'expenses.write');
+export const createPettyFund = async (p: { name: string; limit: number; responsible: string }) =>
+  run(call('select create_petty_fund($1,$2,$3)', p.name, p.limit, p.responsible || null), ['/expenses', '/purchases'], 'master.write');
 export const createCreditCard = async (p: { bank: string; last4: string; holder: string; name: string; limit: number; statementDay: number; dueDay: number }) =>
   run(call('select create_credit_card($1,$2,$3,$4,$5,$6,$7)', p.bank, p.last4, p.holder, p.name, p.limit, p.statementDay, p.dueDay),
     ['/expenses', '/purchases'], 'master.write');

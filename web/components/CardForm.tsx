@@ -1,6 +1,6 @@
 'use client';
 import { useState, useTransition } from 'react';
-import { createCreditCard } from '@/lib/actions';
+import { createCreditCard, createPettyFund } from '@/lib/actions';
 
 // ตั้งค่าบัตรเครดิตจ่าย (เปิดบัญชีเจ้าหนี้บัตร 21379.NN ให้อัตโนมัติ)
 export function CardForm() {
@@ -24,6 +24,29 @@ export function CardForm() {
         <input aria-label="วันสรุปยอด (0=สิ้นเดือน)" placeholder="วันสรุปยอด (0=สิ้นเดือน)" value={v.statementDay} onChange={set('statementDay')} />
         <input aria-label="วันครบกำหนดชำระ" placeholder="วันครบกำหนด" value={v.dueDay} onChange={set('dueDay')} />
         <button type="button" className="btn sm" disabled={pending} onClick={save}>{pending ? '...' : 'บันทึกบัตร'}</button>
+      </div>
+      {msg && <p className="sub" role="status">{msg}</p>}
+    </details>
+  );
+}
+
+// ตั้งค่าวงเงินสดย่อย (เปิดบัญชี 11149.NN ให้อัตโนมัติ)
+export function PettyForm() {
+  const [v, setV] = useState({ name: '', limit: '', responsible: '' });
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV(o => ({ ...o, [k]: e.target.value }));
+  const save = () => start(async () => {
+    const r = await createPettyFund({ name: v.name, limit: Number(v.limit), responsible: v.responsible });
+    setMsg(r.error ?? 'บันทึกวงเงินสดย่อยแล้ว');
+  });
+  return (
+    <details className="panel"><summary>+ เพิ่มวงเงินสดย่อย</summary>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 6, marginTop: 8 }}>
+        <input aria-label="ชื่อวงเงินสดย่อย" placeholder="ชื่อวงเงินสดย่อย" value={v.name} onChange={set('name')} />
+        <input aria-label="วงเงินสดย่อย" placeholder="วงเงิน" inputMode="decimal" value={v.limit} onChange={set('limit')} />
+        <input aria-label="ผู้รับผิดชอบ" placeholder="ผู้รับผิดชอบ" value={v.responsible} onChange={set('responsible')} />
+        <button type="button" className="btn sm" disabled={pending} onClick={save}>{pending ? '...' : 'บันทึกวงเงิน'}</button>
       </div>
       {msg && <p className="sub" role="status">{msg}</p>}
     </details>

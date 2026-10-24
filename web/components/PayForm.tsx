@@ -2,22 +2,26 @@
 import { useState, useTransition } from 'react';
 import type { PurchasePay } from '@/lib/actions';
 
-const METHODS: [string, string][] = [['cash', 'เงินสด'], ['transfer', 'โอนเงิน'], ['card', 'บัตรเครดิต']];
-interface Row { method: string; bank_account_id: string; credit_card_id: string; amount: string }
+const METHODS: [string, string][] = [['cash', 'เงินสด'], ['transfer', 'โอนเงิน'], ['cheque', 'เช็ค'], ['card', 'บัตรเครดิต'], ['petty', 'เงินสดย่อย']];
+interface Row { method: string; bank_account_id: string; credit_card_id: string; petty_fund_id: string; cheque_no: string; clear_date: string; amount: string }
+const blank = (amount = ''): Row => ({ method: 'cash', bank_account_id: '', credit_card_id: '', petty_fund_id: '', cheque_no: '', clear_date: '', amount });
 export interface Opt { id: string; label: string }
 
 // จ่ายเงินฝั่งซื้อ: หลายช่องทาง (เงินสด/โอน/บัตรเครดิต) ผลรวมต้องเท่ายอดจ่ายสุทธิ · เช็คและช่องทางอื่นยังไม่เปิด (ยังไม่ทดสอบการลงบัญชี)
-export function PayForm({ net, banks, cards, onPay, label = 'จ่ายเงิน' }:
-  { net: number; banks: Opt[]; cards: Opt[]; onPay: (p: PurchasePay[]) => Promise<{ error?: string }>; label?: string }) {
-  const [rows, setRows] = useState<Row[]>([{ method: 'cash', bank_account_id: '', credit_card_id: '', amount: net.toFixed(2) }]);
+export function PayForm({ net, banks, cards, petties = [], onPay, label = 'จ่ายเงิน' }:
+  { net: number; banks: Opt[]; cards: Opt[]; petties?: Opt[]; onPay: (p: PurchasePay[]) => Promise<{ error?: string }>; label?: string }) {
+  const [rows, setRows] = useState<Row[]>([blank(net.toFixed(2))]);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const sum = Math.round(rows.reduce((a, r) => a + (Number(r.amount) || 0) * 100, 0)) / 100;
   const set = (i: number, p: Partial<Row>) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, ...p } : r)));
-  const bad = (r: Row) => (r.method === 'transfer' && !r.bank_account_id) || (r.method === 'card' && !r.credit_card_id);
+  const bad = (r: Row) => (r.method === 'transfer' && !r.bank_account_id) || (r.method === 'card' && !r.credit_card_id) ||
+    (r.method === 'petty' && !r.petty_fund_id) || (r.method === 'cheque' && (!r.bank_account_id || !r.cheque_no || !r.clear_date));
   const submit = () => start(async () => {
     const res = await onPay(rows.map(r => ({ method: r.method, amount: Number(r.amount),
-      bank_account_id: r.method === 'transfer' ? r.bank_account_id : undefined, credit_card_id: r.method === 'card' ? r.credit_card_id : undefined })));
+      bank_account_id: r.method === 'transfer' || r.method === 'cheque' ? r.bank_account_id : undefined,
+      credit_card_id: r.method === 'card' ? r.credit_card_id : undefined, petty_fund_id: r.method === 'petty' ? r.petty_fund_id : undefined,
+      cheque_no: r.method === 'cheque' ? r.cheque_no : undefined, clear_date: r.method === 'cheque' ? r.clear_date : undefined })));
     setMsg(res.error ?? null);
   });
   return (
@@ -27,18 +31,26 @@ export function PayForm({ net, banks, cards, onPay, label = 'จ่ายเง�
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr auto', gap: 6, marginBottom: 6 }}>
           <select aria-label="ช่องทาง" value={r.method} onChange={e => set(i, { method: e.target.value })}>
             {METHODS.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select>
-          {r.method === 'transfer'
-            ? <select aria-label="บัญชีจ่ายเงิน" value={r.bank_account_id} onChange={e => set(i, { bank_account_id: e.target.value })}>
-                <option value="">เลือกบัญชีจ่ายเงิน</option>{banks.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}</select>
+          {r.method === 'transfer' || r.method === 'cheque'
+            ? <select aria-label={r.method === 'cheque' ? 'บัญชีเช็คจ่าย' : 'บัญชีจ่ายเงิน'} value={r.bank_account_id} onChange={e => set(i, { bank_account_id: e.target.value })}>
+                <option value="">{r.method === 'cheque' ? 'เลือกบัญชีเช็คจ่าย' : 'เลือกบัญชีจ่ายเงิน'}</option>{banks.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}</select>
             : r.method === 'card'
               ? <select aria-label="บัตรเครดิต" value={r.credit_card_id} onChange={e => set(i, { credit_card_id: e.target.value })}>
                   <option value="">เลือกบัตรเครดิต</option>{cards.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}</select>
-              : <span />}
+              : r.method === 'petty'
+                ? <select aria-label="วงเงินสดย่อย" value={r.petty_fund_id} onChange={e => set(i, { petty_fund_id: e.target.value })}>
+                    <option value="">เลือกวงเงินสดย่อย</option>{petties.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}</select>
+                : <span />}
           <input aria-label="จำนวนเงิน" inputMode="decimal" value={r.amount} onChange={e => set(i, { amount: e.target.value })} />
           {rows.length > 1 ? <button type="button" className="btn sm ghost" onClick={() => setRows(rs => rs.filter((_, j) => j !== i))}>ลบ</button> : <span />}
+          {r.method === 'cheque' && (
+            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <input aria-label="เลขที่เช็ค" placeholder="เลขที่เช็ค" value={r.cheque_no} onChange={e => set(i, { cheque_no: e.target.value })} />
+              <input aria-label="วันที่ถูกตัดบัญชี" type="date" value={r.clear_date} onChange={e => set(i, { clear_date: e.target.value })} />
+            </div>)}
         </div>))}
       <div className="acts" style={{ justifyContent: 'flex-start', gap: 8 }}>
-        <button type="button" className="btn sm ghost" onClick={() => setRows(rs => [...rs, { method: 'cash', bank_account_id: '', credit_card_id: '', amount: '' }])}>+ เพิ่มช่องทาง</button>
+        <button type="button" className="btn sm ghost" onClick={() => setRows(rs => [...rs, blank()])}>+ เพิ่มช่องทาง</button>
         <button type="button" className="btn sm" disabled={pending || sum !== net || rows.some(bad)} onClick={submit}>{pending ? '...' : label}</button>
         {sum !== net && <span className="sub">ผลรวม {sum.toFixed(2)} ไม่เท่ายอดจ่ายสุทธิ</span>}
       </div>
