@@ -13,7 +13,7 @@ export default async function NewDoc({ searchParams }: { searchParams: { type?: 
   const type = ownOnly ? 'QT' : ['QT', 'INV', 'CA'].includes(searchParams.type ?? '') ? searchParams.type! : 'INV';
   if (ownOnly && searchParams.type && searchParams.type !== 'QT') redirect('/sales/new?type=QT');
   const db = await getDb();
-  const customers = (await db.q(`select id, business_name, contact_name from contacts where not is_cash_default order by business_name nulls last`))
+  const customers = (await db.q(`select id, business_name, contact_name from contacts where not is_cash_default and is_customer order by business_name nulls last`))
     .map(c => ({ id: c.id as string, label: partyName(c) }));
   const products = (await db.q(`select id, code, name, sale_price, kind from products where is_active order by code`))
     .map(p => ({ id: p.id as string, label: `${p.code} ${p.name}`, price: Number(p.sale_price), kind: p.kind as string }));

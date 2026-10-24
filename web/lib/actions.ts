@@ -70,6 +70,12 @@ export const payExpense = async (id: string) => run(call('select pay_expense($1,
 export const resetExpense = async (id: string) => run(call('select reset_expense($1)', id), ALL, 'expenses.write');
 export const cancelExpense = async (id: string) => run(call('select cancel_expense($1)', id), ALL, 'expenses.write');
 
+export async function saveContact(id: string | null, p: Record<string, unknown>): Promise<Result & { id?: string }> {
+  let out: string | undefined;
+  const r = await run(async () => { out = (await (await getDb()).q<any>('select contact_save($1,$2::jsonb) as id', [id, JSON.stringify(p)]))[0].id; },
+    ['/contacts', '/sales', '/expenses'], id ? ['master.write', 'contact.create'] : 'contact.create');
+  return { ...r, id: out };
+}
 export async function createContact(p: { business_name: string; contact_name: string; tax_id: string }) {
   return run(call('insert into contacts(business_name,contact_name,tax_id) values (nullif($1,\'\'),nullif($2,\'\'),nullif($3,\'\'))',
     p.business_name, p.contact_name, p.tax_id), ['/contacts', '/sales', '/expenses'], 'contact.create');
