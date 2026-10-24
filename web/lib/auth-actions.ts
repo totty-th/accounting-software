@@ -38,7 +38,7 @@ export async function loginAction(_prev: { error?: string } | null, f: FormData)
   if (!username || !password) return { error: BAD };
   const lock = fails.get(username);
   if (lock && lock.until > Date.now() && lock.n >= MAX_FAILS) return { error: 'ลองผิดหลายครั้งเกินไป กรุณารอ 5 นาทีแล้วลองใหม่' };
-  const u = (await (await getDb()).q('select id, role, auth_user_id from app_users where username=$1 and is_active', [username]))[0];
+  const u = (await (await getDb()).q('select id, username, role, auth_user_id from app_users where username=$1 and is_active', [username]))[0];
   const v = u ? await verifyPassword(username, password, u.auth_user_id) : { ok: false };
   if (!u || !v.ok || !isRole(u.role)) {
     const n = (lock && lock.until > Date.now() ? lock.n : 0) + 1;
@@ -46,7 +46,7 @@ export async function loginAction(_prev: { error?: string } | null, f: FormData)
     return { error: BAD };
   }
   fails.delete(username);
-  cookies().set(COOKIE, await signSession(u.id), {
+  cookies().set(COOKIE, await signSession(u.username)   // เก็บชื่อผู้ใช้ ไม่ใช่ uuid: เดโมบน Vercel มีหลาย instance ที่ uuid ไม่ตรงกัน, {
     httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' && !process.env.INSECURE_COOKIES, path: '/', maxAge: SESSION_HOURS * 3600 });
   redirect(homeOf(u.role));
 }

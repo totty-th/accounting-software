@@ -16,13 +16,13 @@ const b64 = (u: Uint8Array) => btoa(String.fromCharCode(...u)).replace(/\+/g, '-
 const unb64 = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const key = () => crypto.subtle.importKey('raw', enc.encode(secret()), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 
-export async function signSession(userId: string, now = Date.now()): Promise<string> {
-  const body = b64(enc.encode(JSON.stringify({ u: userId, e: Math.floor(now / 1000) + SESSION_HOURS * 3600 })));
+export async function signSession(username: string, now = Date.now()): Promise<string> {
+  const body = b64(enc.encode(JSON.stringify({ u: username, e: Math.floor(now / 1000) + SESSION_HOURS * 3600 })));
   const sig = new Uint8Array(await crypto.subtle.sign('HMAC', await key(), enc.encode(body)));
   return `${body}.${b64(sig)}`;
 }
 
-/** คืน user id ถ้าลายเซ็นถูกและยังไม่หมดอายุ */
+/** คืนชื่อผู้ใช้ถ้าลายเซ็นถูกและยังไม่หมดอายุ */
 export async function verifySession(token: string | undefined, now = Date.now()): Promise<string | null> {
   if (!token) return null;
   const [body, sig] = token.split('.');

@@ -9,9 +9,9 @@ export type AuthUser = { id: string; username: string; displayName: string; role
 
 /** ผู้ใช้ที่ล็อกอินอยู่ (โหลดจากฐานข้อมูลทุกครั้ง: ปิดใช้งาน/เปลี่ยนตำแหน่งมีผลทันที) */
 export async function currentUser(): Promise<AuthUser | null> {
-  const id = await verifySession(cookies().get(COOKIE)?.value);
-  if (!id) return null;
-  const r = (await (await getDb()).q('select id, username, display_name, role from app_users where id=$1 and is_active', [id]))[0];
+  const username = await verifySession(cookies().get(COOKIE)?.value);   // คุกกี้เก็บชื่อผู้ใช้ (คงที่ทุก instance)
+  if (!username) return null;
+  const r = (await (await getDb()).q('select id, username, display_name, role from app_users where username=$1 and is_active', [username]))[0];
   if (!r || !isRole(r.role)) return null;
   return { id: r.id, username: r.username, displayName: r.display_name, role: r.role };
 }
