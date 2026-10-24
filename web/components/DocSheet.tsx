@@ -36,7 +36,7 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
           <dt>เลขที่</dt><dd>{v.doc.doc_no}</dd>
           <dt>วันที่</dt><dd>{dateTh(v.doc.doc_date)}</dd>
           {credit > 0 && <><dt>เครดิต</dt><dd>{credit} วัน</dd></>}
-          {v.doc.due_date && (!qt || v.doc.term_mode === 'credit') && <><dt>ครบกำหนด</dt><dd>{dateTh(v.doc.due_date)}</dd></>}
+          {v.doc.due_date && !qt && <><dt>ครบกำหนด</dt><dd>{dateTh(v.doc.due_date)}</dd></>}
           {v.ref && (ty === 'CN' || ty === 'DN') && <><dt>วันที่อ้างอิง</dt><dd>{dateTh(v.ref.doc_date)}</dd></>}
           {v.doc.salesperson && <><dt>พนักงานขาย</dt><dd>{v.doc.salesperson}</dd></>}
           {v.ref && <><dt>อ้างอิง</dt><dd>{v.ref.doc_no}</dd></>}
@@ -49,7 +49,7 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
           {qt && <th className="num">ส่วนลด</th>}
           {showTax && <><th className="num">ภาษี</th><th className="num">หัก ณ ที่จ่าย</th></>}<th className="num">มูลค่า</th></tr></thead>
         <tbody>{v.lines.map(l => (
-          <tr key={l.line_no}><td>{l.line_no}</td><td className="desc">{l.description}</td><td className="num">{qty(l.qty)}{l.unit ? ` ${l.unit}` : ''}</td>
+          <tr key={l.line_no}><td>{l.line_no}</td><td className="desc" style={{ whiteSpace: 'pre-line' }}>{l.description}{l.detail ? `\n${l.detail}` : ''}</td><td className="num">{qty(l.qty)}{l.unit ? ` ${l.unit}` : ''}</td>
             <td className="num">{money(l.unit_price)}</td>
             {qt && <td className="num">{Number(l.discount) > 0 ? money(l.discount ?? 0) : ''}</td>}
             {showTax && <><td className="num">{lineTaxLabel(v, l)}</td><td className="num">{lineWhtLabel(v, l)}</td></>}

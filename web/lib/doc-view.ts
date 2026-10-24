@@ -9,7 +9,7 @@ export interface DocView {
   contact: { id: string; name: string; address: string | null; tax_id: string | null; credit_days: number };
   company: { name: string; address: string | null; tax_id: string | null } | null;
   lines: { line_no: number; description: string; item_kind: string; qty: string | number; unit_price: string | number; amount: string | number;
-    unit?: string | null; discount?: string | number; discount_type?: string; discount_value?: string | number; vat_rate?: string | number | null; vat_exempt?: boolean; wht_rate?: string | number; wht?: string | number }[];
+    unit?: string | null; detail?: string | null; discount?: string | number; discount_type?: string; discount_value?: string | number; vat_rate?: string | number | null; vat_exempt?: boolean; wht_rate?: string | number; wht?: string | number }[];
   ref: { id: string; doc_no: string; doc_type: string; doc_date: string; subtotal: string | number; total: string | number } | null;
   children: { id: string; doc_no: string; doc_type: string; status: string }[];
   receipts: { id: string; receipt_no: string; status: string; receipt_date: string; collected_date: string | null; amount: string | number }[];

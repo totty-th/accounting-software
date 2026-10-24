@@ -18,11 +18,11 @@ export default async function EditQt({ params }: { params: { id: string } }) {
   const header = { date: d10(o.doc_date), contact: o.contact_id, term_mode: o.term_mode, credit_days: String(o.credit_days), due_date: d10(o.due_date) || d10(o.doc_date),
     salesperson: o.salesperson ?? '', project: o.project ?? '', ref_no: o.ref_no ?? '', description: o.description ?? '', price_mode: o.price_mode,
     warehouse_id: o.warehouse_id ?? '', show_signature: o.show_signature, note: o.note ?? '', internal_note: o.internal_note ?? '' };
-  const lines = ls.map(l => ({ product_id: l.product_id ?? '', description: l.description ?? '', unit: l.unit ?? '', qty: n(l.qty), unit_price: n(l.unit_price),
+  const lines = ls.map(l => ({ product_id: l.product_id ?? '', name: l.description ?? '', detail: l.detail ?? '', unit: l.unit ?? '', qty: n(l.qty), unit_price: n(l.unit_price),
     dtype: l.discount_type, dval: Number(l.discount_value) ? n(l.discount_value) : '', vat: l.vat_exempt ? 'exempt' : n(l.vat_rate ?? 7), wht: n(l.wht_rate) }));
   return (<>
     <div className="top"><div><h1>แก้ไขใบเสนอราคา {o.doc_no}</h1></div></div>
     <QtForm id={o.id} {...d} today={today()} salesperson={o.salesperson ?? user.displayName ?? ''} init={{ header, lines: lines as any }}
-      canCreateCustomer={can(user.role, 'contact.create')} />
+      canCreateCustomer={can(user.role, 'contact.create')} canCreateProduct={can(user.role, 'master.write') || can(user.role, 'quote.own')} />
   </>);
 }

@@ -221,6 +221,15 @@ export async function quickCreateCustomer(p: { name: string; tax_id: string; add
     ['/contacts', '/sales'], 'contact.create');
   return { ...r, customer: out };
 }
+export async function quickCreateSaleProduct(p: { kind: string; name: string; code: string; unit: string; price: number; description: string }): Promise<Result & { product?: any }> {
+  let out: any;
+  if (!['service', 'goods_nostock', 'goods_stock'].includes(p.kind)) return { error: 'ประเภทสินค้าไม่ถูกต้อง' };
+  const r = await run(async () => { out = (await (await getDb()).q<any>(
+    `insert into products(code,name,kind,base_unit,sale_price,description) values (coalesce(nullif($1,''), 'NEW-' || substr(md5(random()::text || clock_timestamp()::text), 1, 8)),$2,$3,coalesce(nullif($4,''),'ชิ้น'),$5,nullif($6,''))
+     returning id, code, name, kind, base_unit, sale_price, description`, [p.code.trim(), p.name.trim(), p.kind, p.unit.trim(), p.price || 0, p.description.trim()]))[0]; },
+    ['/products', '/stock', '/sales'], u => can(u.role, 'master.write') || can(u.role, 'quote.own'));
+  return { ...r, product: out };
+}
 export async function quickCreateProduct(p: { code: string; name: string; unit: string; buy: number }): Promise<Result & { product?: any }> {
   let out: any;
   const r = await run(async () => { out = (await (await getDb()).q<any>(

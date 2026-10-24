@@ -1,27 +1,31 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveQuotation, quickCreateCustomer } from '@/lib/actions';
+import { saveQuotation, quickCreateCustomer, quickCreateSaleProduct } from '@/lib/actions';
 
 export interface Cust { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
-export interface QProd { id: string; code: string; name: string; unit: string; price: number; goods: boolean }
+export interface QProd { id: string; code: string; name: string; unit: string; price: number; kind: 'service' | 'goods_nostock' | 'goods_stock'; onhand: number; description: string }
 interface Wh { id: string; label: string }
-interface Line { product_id: string; description: string; unit: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
-const blank = (): Line => ({ product_id: '', description: '', unit: '', qty: '1', unit_price: '', dtype: 'percent', dval: '', vat: '7', wht: '0' });
+interface Line { product_id: string; name: string; detail: string; unit: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
+const blank = (): Line => ({ product_id: '', name: '', detail: '', unit: '', qty: '1', unit_price: '', dtype: 'percent', dval: '', vat: '7', wht: '0' });
 const WHT = ['0', '0.5', '0.75', '1', '1.5', '2', '3', '5', '10', '15'];
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
-const hasContent = (l: Line) => !!(l.product_id || l.description.trim());
+const hasContent = (l: Line) => !!(l.product_id || l.name.trim());
+const KIND_ICON: Record<string, string> = { service: '🛎', goods_nostock: '📦', goods_stock: '🏷' };
+const KIND_LABEL: Record<string, string> = { service: 'บริการ', goods_nostock: 'สินค้าไม่นับสต็อก', goods_stock: 'สินค้านับสต็อก' };
 
 /** ใบเสนอราคา: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — สร้างและแก้ไข (เฉพาะรออนุมัติ) */
-export function QtForm({ id, customers: c0, products, warehouses, people, today, salesperson, init, canCreateCustomer }: {
+export function QtForm({ id, customers: c0, products, warehouses, people, today, salesperson, init, canCreateCustomer, canCreateProduct }: {
   id: string | null; customers: Cust[]; products: QProd[]; warehouses: Wh[]; people: string[]; today: string; salesperson: string;
-  init?: { header: Record<string, any>; lines: Line[] }; canCreateCustomer: boolean;
+  init?: { header: Record<string, any>; lines: Line[] }; canCreateCustomer: boolean; canCreateProduct: boolean;
 }) {
   const router = useRouter();
   const back = '/sales?type=QT';
   const [customers, setCustomers] = useState(c0);
+  const [prods, setProds] = useState(products);
+  const [np, setNp] = useState<{ row: number; kind: string; name: string; code: string; unit: string; price: string; description: string } | null>(null);
   const h0 = init?.header ?? {};
   const [h, setH] = useState({ date: today, contact: '', term_mode: 'credit', credit_days: '0', due_date: today, salesperson, project: '', ref_no: '', description: '',
     price_mode: 'exclusive', warehouse_id: '', show_signature: true, note: '', internal_note: '', ...h0 });
@@ -34,8 +38,17 @@ export function QtForm({ id, customers: c0, products, warehouses, people, today,
   const cust = customers.find(v => v.id === h.contact);
   const pickCust = (cid: string) => { const v = customers.find(x => x.id === cid);
     const cd = v ? v.credit_days : 0; set({ contact: cid, credit_days: String(cd), due_date: addDays(h.date, cd) }); };
-  const pickProduct = (i: number, pid: string) => { const p = products.find(x => x.id === pid);
-    setL(i, { product_id: pid, unit: p?.unit ?? '', unit_price: p ? String(p.price) : '', description: p && !lines[i].description ? '' : lines[i].description }); };
+  // เลือกสินค้า: ใส่ชื่อ หน่วย ราคาขาย และรายละเอียดจากรายการสินค้าให้อัตโนมัติ (ตาม FA)
+  const pickProduct = (i: number, pid: string) => { const p = prods.find(x => x.id === pid); if (!p) return;
+    setL(i, { product_id: p.id, name: p.name, unit: p.unit, unit_price: String(p.price), detail: p.description || lines[i].detail }); };
+  const makeProduct = () => start(async () => {
+    if (!np?.name.trim()) return setErr('ต้องระบุชื่อสินค้า');
+    const r = await quickCreateSaleProduct({ kind: np.kind, name: np.name, code: np.code, unit: np.unit, price: Number(np.price) || 0, description: np.description });
+    if (r.error) return setErr(r.error);
+    const p = r.product; const q: QProd = { id: p.id, code: p.code, name: p.name, unit: p.base_unit, price: Number(p.sale_price), kind: p.kind, onhand: 0, description: p.description ?? '' };
+    setProds(ps => [...ps, q]); setL(np.row, { product_id: q.id, name: q.name, unit: q.unit, unit_price: String(q.price), detail: q.description || lines[np.row].detail });
+    setNp(null); setErr(null);
+  });
 
   const calc = useMemo(() => {
     let net = 0, vat = 0, disc = 0, ex = 0, wht = 0, noTax = 0;
@@ -56,7 +69,7 @@ export function QtForm({ id, customers: c0, products, warehouses, people, today,
   const submit = () => start(async () => {
     setErr(null);
     const r = await saveQuotation(id, { ...h, credit_days: Number(h.credit_days) || 0 },
-      lines.filter(hasContent).map(l => ({ product_id: l.product_id || undefined, description: l.description, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
+      lines.filter(hasContent).map(l => ({ product_id: l.product_id || undefined, description: l.name, detail: l.detail, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
         discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 })));
     if (r.error) return setErr(r.error);
     router.push(r.id ? `/sales/${r.id}` : back); router.refresh();
@@ -114,12 +127,13 @@ export function QtForm({ id, customers: c0, products, warehouses, people, today,
           <tbody>{lines.map((l, i) => (
             <tr key={i} style={{ verticalAlign: 'top' }}><td>{i + 1}</td>
               <td>
-                <select aria-label={`สินค้า ${i + 1}`} value={l.product_id} onChange={e => pickProduct(i, e.target.value)}>
-                  <option value="">พิมพ์รายการเอง / เลือกสินค้า</option>{products.map(x => <option key={x.id} value={x.id}>{x.code} {x.name}</option>)}</select>
-                <textarea aria-label={`รายละเอียด ${i + 1}`} rows={1} placeholder={l.product_id ? 'รายละเอียด (เว้นว่าง = ใช้ชื่อสินค้า)' : 'ชื่อรายการ / รายละเอียด'} value={l.description} onChange={e => setL(i, { description: e.target.value })} style={{ width: '100%' }} />
+                <ProductPicker label={`สินค้า ${i + 1}`} products={prods} value={l.name} productId={l.product_id} canCreate={canCreateProduct}
+                  onText={t => setL(i, { name: t, product_id: '' })} onPick={id => pickProduct(i, id)}
+                  onCreate={name => setNp({ row: i, kind: 'service', name, code: '', unit: '', price: '', description: '' })} />
+                <textarea aria-label={`รายละเอียด ${i + 1}`} rows={Math.max(1, l.detail.split('\n').length)} placeholder="รายละเอียด (กด Shift+Enter เพื่อขึ้นบรรทัดใหม่)" value={l.detail} onChange={e => setL(i, { detail: e.target.value })} style={{ width: '100%' }} />
               </td>
               <td><input aria-label={`จำนวน ${i + 1}`} inputMode="decimal" value={l.qty} onChange={e => setL(i, { qty: e.target.value })} /></td>
-              <td><input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} /></td>
+              <td>{l.product_id && l.unit ? <select aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })}><option value={l.unit}>{l.unit}{prods.find(x => x.id === l.product_id)?.kind === 'goods_stock' ? ` (คงเหลือ ${prods.find(x => x.id === l.product_id)?.onhand})` : ''}</option></select> : <input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} />}</td>
               <td><input aria-label={`ราคา ${i + 1}`} inputMode="decimal" value={l.unit_price} onChange={e => setL(i, { unit_price: e.target.value })} /></td>
               <td><input aria-label={`ส่วนลด ${i + 1}`} inputMode="decimal" value={l.dval} onChange={e => setL(i, { dval: e.target.value })} /></td>
               <td><select aria-label={`ภาษี ${i + 1}`} value={l.vat} onChange={e => setL(i, { vat: e.target.value })}><option value="0">0%</option><option value="7">7%</option><option value="exempt">ยกเว้น</option></select></td>
@@ -149,11 +163,63 @@ export function QtForm({ id, customers: c0, products, warehouses, people, today,
           </tbody></table>
         </section>
       </div>
-      {err && <p className="sub" role="alert" style={{ color: 'var(--red)' }}>{err}</p>}
+      {np && <div role="dialog" aria-label="สร้างบริการหรือสินค้า" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'grid', placeItems: 'start center', padding: 24, overflow: 'auto', zIndex: 50 }}>
+        <div className="panel" style={{ padding: 20, width: 'min(720px,100%)', display: 'grid', gap: 10 }}>
+          <h2 style={{ margin: 0 }}>สร้างบริการหรือสินค้า</h2>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {Object.entries(KIND_LABEL).map(([k, t]) => <label key={k}><input type="radio" name="pkind" checked={np.kind === k} onChange={() => setNp({ ...np, kind: k })} /> {KIND_ICON[k]} {t}</label>)}
+          </div>
+          {lbl('ชื่อสินค้า *', <input aria-label="ชื่อสินค้าใหม่" value={np.name} onChange={e => setNp({ ...np, name: e.target.value })} />)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8 }}>
+            {lbl('รหัสสินค้า', <input aria-label="รหัสสินค้าใหม่" placeholder="ระบุรหัสสินค้า เช่น ABC-0001 (เว้นว่าง = ระบบสร้างให้)" value={np.code} onChange={e => setNp({ ...np, code: e.target.value })} />)}
+            {lbl('หน่วยสินค้าหลัก', <input aria-label="หน่วยหลัก" placeholder="เช่น ชิ้น" value={np.unit} onChange={e => setNp({ ...np, unit: e.target.value })} />)}
+            {lbl('ราคาขาย', <input aria-label="ราคาขายใหม่" inputMode="decimal" placeholder="0.00" value={np.price} onChange={e => setNp({ ...np, price: e.target.value })} />)}
+          </div>
+          {lbl('รายละเอียดสินค้า', <textarea aria-label="รายละเอียดสินค้าใหม่" rows={3} value={np.description} onChange={e => setNp({ ...np, description: e.target.value })} />)}
+          <div className="acts" style={{ justifyContent: 'flex-end', gap: 8 }}>
+            <button type="button" className="btn ghost" onClick={() => setNp(null)}>ยกเลิก</button>
+            <button type="button" className="btn" disabled={pending} onClick={makeProduct}>บันทึก</button></div>
+          {err && <p className="sub" role="alert" style={{ color: 'var(--red)' }}>{err}</p>}
+        </div></div>}
+      {err && !np && <p className="sub" role="alert" style={{ color: 'var(--red)' }}>{err}</p>}
       <div className="acts" style={{ justifyContent: 'flex-start', gap: 8 }}>
         <button type="button" className="btn" disabled={pending || !ok} onClick={submit}>{pending ? '...' : 'บันทึกเอกสาร'}</button>
         <button type="button" className="btn ghost" onClick={() => router.push(id ? `/sales/${id}` : back)}>ปิดหน้าต่าง</button>
       </div>
+    </div>
+  );
+}
+
+/** ช่องชื่อสินค้า: พิมพ์ค้นหา/เลือก · ไม่พบ → เพิ่มเป็นสินค้าใหม่ · พิมพ์เองแล้วข้ามไป = รายการใหม่ (แท็ก New) ตาม FA */
+function ProductPicker({ label, products, value, productId, canCreate, onText, onPick, onCreate }: {
+  label: string; products: QProd[]; value: string; productId: string; canCreate: boolean;
+  onText: (t: string) => void; onPick: (id: string) => void; onCreate: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const q = value.trim().toLowerCase();
+  const list = products.filter(p => !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)).slice(0, 50);
+  const exact = products.some(p => p.name.toLowerCase() === q);
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
+        <input aria-label={label} placeholder="ชื่อสินค้า" autoComplete="off" value={value} style={{ width: '100%', paddingRight: 52 }}
+          onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onChange={e => { onText(e.target.value); setOpen(true); }} />
+        {value.trim() && !productId && <span className="sub" style={{ position: 'absolute', right: 8, top: 6, color: 'var(--blue, #1f6fb5)', fontSize: 12 }}>New</span>}
+      </div>
+      {open && (
+        <div role="listbox" style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: 'var(--panel, #fff)', border: '1px solid var(--line, #ccc)', borderRadius: 6, boxShadow: '0 6px 18px rgba(0,0,0,.15)', maxHeight: 320, overflow: 'auto' }}>
+          {q && !exact && list.length === 0 && canCreate && (
+            <div role="option" style={{ padding: '8px 10px', cursor: 'pointer' }} onMouseDown={e => { e.preventDefault(); onCreate(value.trim()); setOpen(false); }}>
+              ＋ เพิ่ม "<b>{value.trim()}</b>" เป็นสินค้าใหม่</div>)}
+          {list.map(p => (
+            <div key={p.id} role="option" aria-label={p.name} style={{ padding: '6px 10px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8 }}
+              onMouseDown={e => { e.preventDefault(); onPick(p.id); setOpen(false); }}>
+              <span>{KIND_ICON[p.kind]} {p.name}{p.code && <small className="sub" style={{ display: 'block' }}>รหัสสินค้า: {p.code}</small>}</span>
+              {p.kind === 'goods_stock' && <span className="sub" style={{ whiteSpace: 'nowrap' }}>คงเหลือ {p.onhand} {p.unit}</span>}
+            </div>))}
+          {canCreate && <div role="option" style={{ padding: '8px 10px', cursor: 'pointer', borderTop: '1px solid var(--line, #ddd)', color: 'var(--blue, #1f6fb5)' }}
+            onMouseDown={e => { e.preventDefault(); onCreate(value.trim()); setOpen(false); }}>＋ เพิ่มรายการสินค้า</div>}
+        </div>)}
     </div>
   );
 }

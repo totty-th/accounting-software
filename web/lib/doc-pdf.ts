@@ -69,7 +69,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
     const meta: [string, string][] = [['เลขที่', v.doc.doc_no], ['วันที่', thDate(v.doc.doc_date)]];
     const credit = qt ? (v.doc.term_mode === 'cash' ? 0 : Number(v.doc.credit_days ?? 0)) : v.contact.credit_days;
     if (credit > 0) meta.push(['เครดิต', `${credit} วัน`]);
-    if (v.doc.due_date && (!qt || v.doc.term_mode === 'credit')) meta.push(['ครบกำหนด', thDate(v.doc.due_date)]);
+    if (v.doc.due_date && !qt) meta.push(['ครบกำหนด', thDate(v.doc.due_date)]);
     if (qt && v.doc.ref_no) meta.push(['เลขที่อ้างอิง', v.doc.ref_no]);
     if (qt && v.doc.project) meta.push(['โปรเจกต์', v.doc.project]);
     if (v.doc.salesperson) meta.push(['พนักงานขาย', v.doc.salesperson]);
@@ -98,7 +98,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
     let { page, y } = sheet(label);
     y = tableHead(page, y);
     for (const l of v.lines) {
-      const desc = wrap(l.description, 10, 230);
+      const desc = wrap(l.description + (l.detail ? `\n${l.detail}` : ''), 10, 230);
       const h = Math.max(1, desc.length) * 13 + 6;
       if (y - h < 200) { ({ page, y } = sheet(label)); y = tableHead(page, y); }
       draw(page, String(l.line_no), L + 6, y, 10);

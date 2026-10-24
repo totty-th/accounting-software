@@ -123,4 +123,26 @@ describe('M18.8 ใบเสนอราคาเต็มรูปแบบ', (
     expect([v.doc.term_mode, v.doc.salesperson_name, v.doc.note, +v.doc.discount_total, +v.doc.wht_total, +v.lines[0].discount, +v.lines[0].wht_rate, v.lines[0].unit])
       .toEqual(['cash', 'ส', 'ห', 150, 40.5, 150, 3, 'แผ่น']);
   });
+  it('ชื่อที่พิมพ์เอง → สร้างสินค้าบริการให้ตอนบันทึก (ตาม FA) และใช้ตัวเดิมถ้าชื่อซ้ำ', async () => {
+    await qt({}, [L({ description: 'FREETEXT', unit_price: 300 })]);
+    await qt({}, [L({ description: 'freetext', unit_price: 999 })]);
+    const ps = (await db.query<any>(`select name, kind, sale_price from products where lower(name)='freetext'`)).rows;
+    expect(ps.map(p => [p.name, p.kind, +p.sale_price])).toEqual([['FREETEXT', 'service', 300]]);
+  });
+  it('รายละเอียดหลายบรรทัด (detail) แยกจากชื่อ · แปลงเป็นใบแจ้งหนี้รวมเข้ากับชื่อ · สร้างซ้ำคัดลอก detail', async () => {
+    const id = await qt({}, [{ product_id: prod, description: 'ตะแกรง A', detail: 'บรรทัดที่หนึ่ง\nบรรทัดที่สอง', qty: 1, unit_price: 750 }]);
+    const l = (await one<any>('select description, detail from sales_doc_lines where doc_id=$1', [id]));
+    expect([l.description, l.detail]).toEqual(['ตะแกรง A', 'บรรทัดที่หนึ่ง\nบรรทัดที่สอง']);
+    const v = (await one<any>('select sales_doc_view($1) v', [id])).v;
+    expect(v.lines[0].detail).toBe('บรรทัดที่หนึ่ง\nบรรทัดที่สอง');
+    const cp = (await one<any>('select duplicate_quotation($1,$2::date) id', [id, D])).id;
+    expect((await one<any>('select detail from sales_doc_lines where doc_id=$1', [cp])).detail).toBe('บรรทัดที่หนึ่ง\nบรรทัดที่สอง');
+    await db.query('select approve_quotation($1)', [id]);
+    const inv = (await one<any>('select quotation_to_invoice($1,$2::date) id', [id, D])).id;
+    expect((await one<any>('select description from sales_doc_lines where doc_id=$1', [inv])).description).toBe('ตะแกรง A\nบรรทัดที่หนึ่ง\nบรรทัดที่สอง');
+  });
+  it('สินค้ามีรายละเอียด (products.description)', async () => {
+    await db.query(`update products set description='รายละเอียดจากสินค้า' where id=$1`, [prod]);
+    expect((await one<any>('select description from products where id=$1', [prod])).description).toBe('รายละเอียดจากสินค้า');
+  });
 });
