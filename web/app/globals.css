@@ -58,7 +58,7 @@ td.no{font-weight:600;white-space:nowrap}
 .pill.purple{background:var(--purple)} .pill.red{background:var(--red)} .pill.grey{background:var(--grey)} .pill.teal{background:var(--teal)}
 .acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
 .empty{padding:22px;color:var(--muted);text-align:center}
-form.panel,.panel{background:var(--surface);border-radius:10px;padding:18px;box-shadow:var(--shadow);max-width:980px}
+form.panel,.panel{background:var(--surface);border-radius:10px;padding:18px;box-shadow:var(--shadow);max-width:none}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px}
 label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
 input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 10px;min-width:0;width:100%}
@@ -146,3 +146,4 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:-1px}
 .wide .main-grid{display:grid;gap:12px}
 .wide td input:not([type=checkbox]),.wide td select,.wide td textarea{width:100%;min-width:0;box-sizing:border-box}
 .wide-main{max-width:none}
+input[type=checkbox],input[type=radio]{width:auto;padding:0}
