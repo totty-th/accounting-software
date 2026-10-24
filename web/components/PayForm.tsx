@@ -8,12 +8,14 @@ const blank = (amount = ''): Row => ({ method: 'cash', bank_account_id: '', cred
 export interface Opt { id: string; label: string }
 
 // จ่ายเงินฝั่งซื้อ: หลายช่องทาง (เงินสด/โอน/บัตรเครดิต) ผลรวมต้องเท่ายอดจ่ายสุทธิ · เช็คและช่องทางอื่นยังไม่เปิด (ยังไม่ทดสอบการลงบัญชี)
-export function PayForm({ net, banks, cards, petties = [], onPay, label = 'จ่ายเงิน' }:
-  { net: number; banks: Opt[]; cards: Opt[]; petties?: Opt[]; onPay: (p: PurchasePay[]) => Promise<{ error?: string }>; label?: string }) {
+export function PayForm({ net, banks, cards, petties = [], onPay, label = 'จ่ายเงิน', allowShort = false }:
+  { net: number; banks: Opt[]; cards: Opt[]; petties?: Opt[]; onPay: (p: PurchasePay[], shortReason?: string) => Promise<{ error?: string }>; label?: string; allowShort?: boolean }) {
   const [rows, setRows] = useState<Row[]>([blank(net.toFixed(2))]);
+  const [short, setShort] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const sum = Math.round(rows.reduce((a, r) => a + (Number(r.amount) || 0) * 100, 0)) / 100;
+  const shortOk = allowShort && short && sum > 0 && sum < net;
   const set = (i: number, p: Partial<Row>) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, ...p } : r)));
   const bad = (r: Row) => (r.method === 'transfer' && !r.bank_account_id) || (r.method === 'card' && !r.credit_card_id) ||
     (r.method === 'petty' && !r.petty_fund_id) || (r.method === 'cheque' && (!r.bank_account_id || !r.cheque_no || !r.clear_date));
@@ -21,7 +23,8 @@ export function PayForm({ net, banks, cards, petties = [], onPay, label = 'จ�
     const res = await onPay(rows.map(r => ({ method: r.method, amount: Number(r.amount),
       bank_account_id: r.method === 'transfer' || r.method === 'cheque' ? r.bank_account_id : undefined,
       credit_card_id: r.method === 'card' ? r.credit_card_id : undefined, petty_fund_id: r.method === 'petty' ? r.petty_fund_id : undefined,
-      cheque_no: r.method === 'cheque' ? r.cheque_no : undefined, clear_date: r.method === 'cheque' ? r.clear_date : undefined })));
+      cheque_no: r.method === 'cheque' ? r.cheque_no : undefined, clear_date: r.method === 'cheque' ? r.clear_date : undefined })),
+      shortOk ? 'discount' : undefined);
     setMsg(res.error ?? null);
   });
   return (
@@ -51,8 +54,10 @@ export function PayForm({ net, banks, cards, petties = [], onPay, label = 'จ�
         </div>))}
       <div className="acts" style={{ justifyContent: 'flex-start', gap: 8 }}>
         <button type="button" className="btn sm ghost" onClick={() => setRows(rs => [...rs, blank()])}>+ เพิ่มช่องทาง</button>
-        <button type="button" className="btn sm" disabled={pending || sum !== net || rows.some(bad)} onClick={submit}>{pending ? '...' : label}</button>
-        {sum !== net && <span className="sub">ผลรวม {sum.toFixed(2)} ไม่เท่ายอดจ่ายสุทธิ</span>}
+        <button type="button" className="btn sm" disabled={pending || (sum !== net && !shortOk) || rows.some(bad)} onClick={submit}>{pending ? '...' : label}</button>
+        {allowShort && sum > 0 && sum < net && (
+          <label className="sub"><input type="checkbox" checked={short} onChange={e => setShort(e.target.checked)} /> จ่ายไม่ครบ: ส่วนที่ขาด {(net - sum).toFixed(2)} บันทึกเป็นส่วนลดรับ/รายได้อื่น (ถือว่าชำระแล้ว)</label>)}
+        {sum !== net && !shortOk && <span className="sub">ผลรวม {sum.toFixed(2)} ไม่เท่ายอดจ่ายสุทธิ</span>}
       </div>
       {msg && <div className="toast" role="alert" onClick={() => setMsg(null)}>{msg}</div>}
     </div>

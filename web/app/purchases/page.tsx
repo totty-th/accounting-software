@@ -55,7 +55,7 @@ export default async function Purchases() {
                     {AP && (r.status === 'unpaid' || r.status === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={A.rejectGoodsReceipt.bind(null, r.id)} />}
                     {W && (r.status === 'unpaid' || r.status === 'approved') && (
                       <details><summary className="btn sm">จ่ายเงิน</summary>
-                        <PayForm net={Number(r.total)} banks={banks} cards={cards} petties={petties} onPay={A.payGoodsReceipt.bind(null, r.id)} /></details>)}
+                        <PayForm net={Number(r.total)} banks={banks} cards={cards} petties={petties} allowShort onPay={A.payGoodsReceipt.bind(null, r.id)} /></details>)}
                     {W && ['approved', 'paid', 'rejected'].includes(r.status) && <ActionButton label="รีเซ็ต" variant="ghost" action={A.resetGoodsReceipt.bind(null, r.id)} />}
                     {W && r.status !== 'cancelled' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={A.cancelGoodsReceipt.bind(null, r.id)} />}
                   </div></td></tr>))}</tbody></table>

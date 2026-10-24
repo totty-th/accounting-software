@@ -120,3 +120,19 @@ describe('M18.4 ลิงก์แชร์ PO/RI/PAY', () => {
     }
   });
 });
+
+describe('M18.5 จ่ายใบรับสินค้าไม่ครบ (ส่วนลดรับ)', () => {
+  it('จ่าย 400 จาก 1,284 + ระบุส่วนลดรับ → Dr เจ้าหนี้ เต็ม / Cr เงินสด 400 / Cr 49090 ส่วนต่าง · ชำระแล้ว', async () => {
+    await db.query(`insert into accounts(code,name,type) values ('49090','ส่วนลดเงินสดรับ','revenue')`);
+    const id = await ri(); const tot = +(await one<any>('select total from goods_receipts where id=$1', [id])).total;
+    expect(await err(call(`select pay_goods_receipt($1,$2::date,$3::jsonb)`, [id, D, JSON.stringify([{ method: 'cash', amount: 400 }])]))).toContain('ไม่เท่ายอดจ่ายสุทธิ');
+    expect(await err(call(`select pay_goods_receipt($1,$2::date,$3::jsonb,'other')`, [id, D, JSON.stringify([{ method: 'cash', amount: 400 }])]))).toContain('ยังไม่รองรับ');
+    expect(await err(call(`select pay_goods_receipt($1,$2::date,$3::jsonb,'discount')`, [id, D, JSON.stringify([{ method: 'cash', amount: tot + 1 }])]))).toContain('จ่ายเกินยังไม่รองรับ');
+    await call(`select pay_goods_receipt($1,$2::date,$3::jsonb,'discount')`, [id, D, JSON.stringify([{ method: 'cash', amount: 400 }])]);
+    const g = await one<any>('select status, pv_voucher_id from goods_receipts where id=$1', [id]);
+    expect(g.status).toBe('paid');
+    const ls = (await db.query<any>(`select a.code, l.debit, l.credit from journal_lines l join accounts a on a.id=l.account_id where l.voucher_id=$1`, [g.pv_voucher_id])).rows
+      .map(r => [r.code, +r.debit, +r.credit]).sort();
+    expect(ls).toEqual([['11112', 0, 400], ['21311', tot, 0], ['49090', 0, tot - 400]].sort());
+  });
+});
