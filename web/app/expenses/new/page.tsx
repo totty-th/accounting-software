@@ -1,16 +1,18 @@
+import { can } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
-import { getDb, today } from '@/lib/db';
-import { ExpenseForm } from '@/components/DocForm';
-import { createExpense } from '@/lib/actions';
-import { partyName } from '@/lib/format';
+import { today } from '@/lib/db';
+import { getDb } from '@/lib/db';
+import { poFormData } from '@/lib/po-data';
+import { ExpForm } from '@/components/ExpForm';
 
 export default async function NewExpense() {
-  await requirePage('expenses.write');
+  const user = await requirePage('expenses.write');
+  const { vendors } = await poFormData();
   const db = await getDb();
-  const vendors = (await db.q(`select id, business_name, contact_name from contacts where not is_cash_default and is_vendor order by business_name nulls last`))
-    .map(c => ({ id: c.id as string, label: partyName(c) }));
   const accounts = (await db.q(`select code, name from accounts where type in ('expense','asset') and code not in ('11112','11311','11319','17111','17113','17114','17120') order by code`))
     .map(a => ({ id: a.code as string, label: `${a.code} ${a.name}` }));
-  return (<><div className="top"><h1>ค่าใช้จ่ายใหม่</h1></div>
-    <ExpenseForm vendors={vendors} accounts={accounts} today={today()} action={createExpense} /></>);
+  return (<>
+    <div className="top"><div><h1>สร้างค่าใช้จ่าย</h1><p className="sub">บันทึกแล้วตั้งเจ้าหนี้ทันที · จ่ายเงินที่หน้าเอกสาร</p></div></div>
+    <ExpForm vendors={vendors} accounts={accounts} today={today()} purchaser={user.displayName || user.username} canCreateVendor={can(user.role, 'contact.create')} />
+  </>);
 }

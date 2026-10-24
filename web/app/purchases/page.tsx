@@ -3,7 +3,7 @@ import { requirePage } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { CardForm, PettyForm } from '@/components/CardForm';
-import { RiForm } from '@/components/RiForm';
+import Link from 'next/link';
 import * as A from '@/lib/actions';
 
 import { DocList, type DocRow } from '@/components/DocList';
@@ -28,7 +28,7 @@ export default async function Purchases() {
     <>
       <div className="top"><div><h1>ใบรับสินค้า</h1>
         <p className="sub">บันทึกแล้วสินค้าเข้าสต็อกและตั้งเจ้าหนี้ทันที · ไม่อนุมัติ = กลับรายการและถอนสต็อก · คลิกแถวเพื่อเปิดเอกสาร</p></div></div>
-      {W && <RiForm vendors={vendors} products={products} today={today()} action={A.createGoodsReceipt} />}
+      {W && <p><Link className="btn" href="/purchases/new">+ สร้างใบรับสินค้า</Link></p>}
       {MW && <><CardForm /><PettyForm /></>}
       <DocList rows={list} showDue empty="ยังไม่มีใบรับสินค้า" />
     </>

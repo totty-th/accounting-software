@@ -32,12 +32,25 @@ export async function loadPurchaseView(kind: PKind, id: string): Promise<PView |
     const h = (await db.q('select * from expenses where id=$1', [id]))[0];
     if (!h) return null;
     const ls = await db.q('select * from expense_lines where expense_id=$1 order by line_no', [id]);
-    const meta: [string, string][] = h.due_date ? [['ครบกำหนด', th(h.due_date)]] : [];
-    return { kind, title: 'ค่าใช้จ่าย', no: h.exp_no, date: h.exp_date, status: h.status, company, party: (await party(h.contact_id)) as PView['party'], meta,
-      cols: [{ h: '#', w: 22 }, { h: 'รายละเอียด', w: 200 }, { h: 'จำนวน', right: true, w: 50 }, { h: 'ราคาต่อหน่วย', right: true, w: 72 }, { h: 'VAT', right: true, w: 40 }, { h: 'หัก ณ ที่จ่าย', right: true, w: 52 }, { h: 'มูลค่า', right: true, w: 75 }],
-      rows: ls.map(l => [String(l.line_no), l.description + (l.category ? ` (${l.category})` : ''), qty(l.qty), fmt(l.unit_price), `${qty(l.vat_rate)}%`, +l.wht_rate ? `${qty(l.wht_rate)}%` : 'ไม่หัก', fmt(l.net)]),
-      totals: [['รวมก่อน VAT', fmt(h.subtotal)], ['ภาษีมูลค่าเพิ่ม', fmt(h.vat)], ['ยอดรวม', fmt(h.total)], ['หัก ณ ที่จ่าย', fmt(h.wht_total)], ['ยอดจ่ายสุทธิ', fmt(+h.total - +h.wht_total), true]],
-      total: +h.total, signers: ['ผู้จัดทำ', 'ผู้อนุมัติ'] };
+    const pt = (await party(h.contact_id)) as PView['party'];
+    const sub = +h.subtotal, disc = +h.discount_total, wht = +h.wht_total;
+    const meta: [string, string][] = [];
+    if (h.due_date) meta.push(['ครบกำหนด', th(h.due_date)]);
+    if (h.purchaser) meta.push(['ผู้สั่งซื้อ', h.purchaser]);
+    if (h.ref_no) meta.push(['เลขที่อ้างอิง', h.ref_no]);
+    if (h.project) meta.push(['โปรเจค', h.project]);
+    return { kind, title: 'ค่าใช้จ่าย', no: h.exp_no, date: h.exp_date, status: h.status, company, party: pt, meta,
+      cols: [{ h: '#', w: 20 }, { h: 'รายละเอียด', w: 150 }, { h: 'จำนวน', right: true, w: 45 }, { h: 'หน่วย', w: 38 }, { h: 'ราคาต่อหน่วย', right: true, w: 62 },
+        { h: 'ส่วนลด', right: true, w: 48 }, { h: 'ภาษี', right: true, w: 40 }, { h: 'หัก ณ ที่จ่าย', right: true, w: 52 }, { h: 'มูลค่า', right: true, w: 56 }],
+      rows: ls.map(l => [String(l.line_no), l.description + (l.category ? ` (${l.category})` : ''), qty(l.qty), l.unit ?? '', fmt(l.unit_price),
+        +l.discount ? (l.discount_type === 'percent' ? `${qty(l.discount_value)}%` : fmt(l.discount)) : '', l.vat_exempt ? 'ยกเว้น' : `${qty(l.vat_rate)}%`,
+        +l.wht_rate ? `${qty(l.wht_rate)}%` : 'ไม่หัก', fmt(h.price_mode === 'inclusive' ? +l.net + +l.vat : l.net)]),
+      totals: [['รวมเป็นเงิน', fmt(sub + disc)], ['ส่วนลดรวม', fmt(disc)], ['ราคาหลังหักส่วนลด', fmt(sub)],
+        ['มูลค่าที่ไม่มี/ยกเว้นภาษี', fmt(h.exempt_base)], ['มูลค่าที่คำนวณภาษี', fmt(sub - +h.exempt_base)], ['ภาษีมูลค่าเพิ่ม', fmt(h.vat)],
+        ['จำนวนเงินรวมทั้งสิ้น', fmt(h.total), true], ['หักภาษี ณ ที่จ่ายทั้งสิ้น', fmt(wht)], ['ยอดจ่ายสุทธิ', fmt(+h.total - wht), true]],
+      total: +h.total, note: [h.description, h.note].filter(Boolean).join('\n') || undefined,
+      signers: ['ผู้จัดทำ', 'ผู้อนุมัติ'], onBehalf: [pt?.name ?? '', company?.name ?? ''],
+      sign: { show: !!h.show_signature, signature: company?.signature_img, stamp: company?.stamp_img } };
   }
   if (kind === 'PO') {
     const h = (await db.q('select * from purchase_orders where id=$1', [id]))[0];
@@ -68,12 +81,25 @@ export async function loadPurchaseView(kind: PKind, id: string): Promise<PView |
     const h = (await db.q('select * from goods_receipts where id=$1', [id]))[0];
     if (!h) return null;
     const ls = await db.q(`select l.*, p.code, p.name from goods_receipt_lines l join products p on p.id=l.product_id where ri_id=$1 order by line_no`, [id]);
-    return { kind, title: 'ใบรับสินค้า', no: h.ri_no, date: h.ri_date, status: h.status, company, party: (await party(h.contact_id)) as PView['party'],
-      meta: h.ref_no ? [['อ้างอิง', h.ref_no]] : [],
-      cols: [{ h: '#', w: 22 }, { h: 'สินค้า', w: 220 }, { h: 'จำนวน', right: true, w: 60 }, { h: 'ราคาต่อหน่วย', right: true, w: 80 }, { h: 'VAT', right: true, w: 50 }, { h: 'มูลค่า', right: true, w: 80 }],
-      rows: ls.map(l => [String(l.line_no), `${l.code} ${l.name}`, qty(l.qty), fmt(l.unit_price), fmt(l.vat), fmt(l.net)]),
-      totals: [['รวมก่อน VAT', fmt(h.subtotal)], ['ภาษีมูลค่าเพิ่ม', fmt(h.vat)], ['ยอดรวมสุทธิ', fmt(h.total), true]], total: +h.total,
-      note: h.note ?? undefined, signers: ['ผู้รับสินค้า', 'ผู้อนุมัติ'] };
+    const pt = (await party(h.contact_id)) as PView['party'];
+    const sub = +h.subtotal, disc = +h.discount_total, wht = +h.wht_total;
+    const meta: [string, string][] = [];
+    if (h.due_date) meta.push(['ครบกำหนด', th(h.due_date)]);
+    if (h.purchaser) meta.push(['ผู้รับสินค้า', h.purchaser]);
+    if (h.ref_no) meta.push(['เลขที่อ้างอิง', h.ref_no]);
+    if (h.project) meta.push(['โปรเจค', h.project]);
+    return { kind, title: 'ใบรับสินค้า', no: h.ri_no, date: h.ri_date, status: h.status, company, party: pt, meta,
+      cols: [{ h: '#', w: 20 }, { h: 'รายละเอียด', w: 150 }, { h: 'จำนวน', right: true, w: 45 }, { h: 'หน่วย', w: 38 }, { h: 'ราคาต่อหน่วย', right: true, w: 62 },
+        { h: 'ส่วนลด', right: true, w: 48 }, { h: 'ภาษี', right: true, w: 40 }, { h: 'หัก ณ ที่จ่าย', right: true, w: 52 }, { h: 'มูลค่า', right: true, w: 56 }],
+      rows: ls.map(l => [String(l.line_no), `${l.code} ${l.name}${l.description ? '\n' + l.description : ''}`, qty(l.qty), l.unit ?? '', fmt(l.unit_price),
+        +l.discount ? (l.discount_type === 'percent' ? `${qty(l.discount_value)}%` : fmt(l.discount)) : '', l.vat_exempt ? 'ยกเว้น' : `${qty(l.vat_rate)}%`,
+        +l.wht_rate ? `${qty(l.wht_rate)}%` : 'ไม่หัก', fmt(h.price_mode === 'inclusive' ? +l.net + +l.vat : l.net)]),
+      totals: [['รวมเป็นเงิน', fmt(sub + disc)], ['ส่วนลดรวม', fmt(disc)], ['ราคาหลังหักส่วนลด', fmt(sub)],
+        ['มูลค่าที่ไม่มี/ยกเว้นภาษี', fmt(h.exempt_base)], ['มูลค่าที่คำนวณภาษี', fmt(sub - +h.exempt_base)], ['ภาษีมูลค่าเพิ่ม', fmt(h.vat)],
+        ['จำนวนเงินรวมทั้งสิ้น', fmt(h.total), true], ['หักภาษี ณ ที่จ่ายทั้งสิ้น', fmt(wht)], ['ยอดจ่าย', fmt(+h.total - wht), true]],
+      total: +h.total, note: [h.description, h.note].filter(Boolean).join('\n') || undefined,
+      signers: ['ผู้รับสินค้า', 'ผู้อนุมัติ'], onBehalf: [pt?.name ?? '', company?.name ?? ''],
+      sign: { show: !!h.show_signature, signature: company?.signature_img, stamp: company?.stamp_img } };
   }
   const s = (await db.q('select * from payment_slips where id=$1', [id]))[0];
   if (!s) return null;

@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { savePurchaseOrder, quickCreateVendor, quickCreateProduct } from '@/lib/actions';
+import { savePurchaseOrder, saveGoodsReceiptFull, quickCreateVendor, quickCreateProduct } from '@/lib/actions';
 
 export interface Vendor { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
 export interface Prod { id: string; code: string; name: string; unit: string; price: number; onhand: number }
@@ -14,11 +14,12 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2,
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
 /** ใบสั่งซื้อ: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — สร้างและแก้ไข */
-export function PoForm({ id, vendors: v0, products: p0, warehouses, today, purchaser, init, canCreateVendor, canCreateProduct }: {
-  id: string | null; vendors: Vendor[]; products: Prod[]; warehouses: Wh[]; today: string; purchaser: string;
+export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses, today, purchaser, init, canCreateVendor, canCreateProduct }: {
+  kind?: 'PO' | 'RI'; id: string | null; vendors: Vendor[]; products: Prod[]; warehouses: Wh[]; today: string; purchaser: string;
   init?: { header: Record<string, any>; lines: Line[] }; canCreateVendor: boolean; canCreateProduct: boolean;
 }) {
   const router = useRouter();
+  const back = kind === 'RI' ? '/purchases' : '/purchases/orders';
   const [vendors, setVendors] = useState(v0); const [products, setProducts] = useState(p0);
   const h0 = init?.header ?? {};
   const [h, setH] = useState({ date: today, contact: '', credit_days: '0', due_date: today, purchaser, project: '', ref_no: '', description: '',
@@ -53,11 +54,12 @@ export function PoForm({ id, vendors: v0, products: p0, warehouses, today, purch
   const ok = h.contact && lines.some(l => l.product_id) && lines.filter(l => l.product_id).every(l => Number(l.qty) > 0 && l.unit_price !== '');
   const submit = () => start(async () => {
     setErr(null);
-    const r = await savePurchaseOrder(id, { ...h, credit_days: Number(h.credit_days) || 0 },
+    const save = kind === 'RI' ? (_: string | null, a: any, b: any[]) => saveGoodsReceiptFull(a, b) : savePurchaseOrder;
+    const r = await save(id, { ...h, credit_days: Number(h.credit_days) || 0 },
       lines.filter(l => l.product_id).map(l => ({ product_id: l.product_id, description: l.description, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
         discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 })));
     if (r.error) return setErr(r.error);
-    router.push('/purchases/orders'); router.refresh();
+    router.push(back); router.refresh();
   });
   const makeVendor = () => start(async () => {
     if (!nv?.name.trim()) return setErr('ต้องระบุชื่อผู้จำหน่าย');
@@ -94,7 +96,7 @@ export function PoForm({ id, vendors: v0, products: p0, warehouses, today, purch
             {lbl('วันที่', <input type="date" value={h.date} onChange={e => set({ date: e.target.value, due_date: addDays(e.target.value, Number(h.credit_days) || 0) })} />)}
             {lbl('เครดิต (วัน)', <input inputMode="numeric" value={h.credit_days} onChange={e => set({ credit_days: e.target.value, due_date: addDays(h.date, Number(e.target.value) || 0) })} />)}
             {lbl('ครบกำหนด', <input type="date" value={h.due_date} onChange={e => set({ due_date: e.target.value })} />)}
-            {lbl('ผู้สั่งซื้อ', <input value={h.purchaser} onChange={e => set({ purchaser: e.target.value })} />)}
+            {lbl(kind === 'RI' ? 'ผู้รับสินค้า' : 'ผู้สั่งซื้อ', <input value={h.purchaser} onChange={e => set({ purchaser: e.target.value })} />)}
             {lbl('สกุลเงิน', <input value="THB - ไทย" disabled />)}
           </div>
         </div>
@@ -162,7 +164,7 @@ export function PoForm({ id, vendors: v0, products: p0, warehouses, today, purch
       {err && <p className="sub" role="alert" style={{ color: 'var(--red)' }}>{err}</p>}
       <div className="acts" style={{ justifyContent: 'flex-start', gap: 8 }}>
         <button type="button" className="btn" disabled={pending || !ok} onClick={submit}>{pending ? '...' : 'บันทึกเอกสาร'}</button>
-        <button type="button" className="btn ghost" onClick={() => router.push('/purchases/orders')}>ปิดหน้าต่าง</button>
+        <button type="button" className="btn ghost" onClick={() => router.push(back)}>ปิดหน้าต่าง</button>
       </div>
     </div>
   );
