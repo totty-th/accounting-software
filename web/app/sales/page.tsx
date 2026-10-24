@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ClickRow } from '@/components/ClickRow';
 import { redirect } from 'next/navigation';
 import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
@@ -63,11 +64,11 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
         <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
           <table><thead><tr><th>วันที่</th><th>เลขที่เอกสาร</th><th>ชื่อลูกค้า</th>{!noDue && <th>ครบกำหนด</th>}<th className="num">ยอดรวมสุทธิ</th><th>สถานะ</th><th /></tr></thead>
             <tbody>{rows.map(r => (
-              <tr key={r.id} style={r.status === 'cancelled' ? { opacity: .55 } : undefined}>
+              <ClickRow key={r.id} href={`/sales/${r.doc_no}`} style={r.status === 'cancelled' ? { opacity: .55 } : undefined}>
                 <td>{dateTh(r.doc_date)}</td>
                 <td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link>{r.is_deposit ? ' (มัดจำ)' : ''}</td>
                 <td>{partyName(r)}</td>{!noDue && <td>{dateTh(r.due_date)}</td>}
-                <td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td><td><SalesActions d={r} role={user.role} /></td></tr>))}</tbody></table>
+                <td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td><td><SalesActions d={r} role={user.role} /></td></ClickRow>))}</tbody></table>
         </div>)}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
         <span className="sub">{n} รายการ · หน้า {page}/{pages}</span>

@@ -1,6 +1,7 @@
 import { can } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
 import Link from 'next/link';
+import { ClickRow } from '@/components/ClickRow';
 import { getDb } from '@/lib/db';
 import { money } from '@/lib/format';
 import { Group } from '@/components/Board';
@@ -32,14 +33,14 @@ export default async function Bank() {
             <tbody>{banks.map((b, i) => {
               const s = st[i];
               return (
-                <tr key={b.id}>
+                <ClickRow key={b.id} href={`/bank/${b.id}`}>
                   <td className="no">{b.bank_name} {b.account_no} <span style={{ fontWeight: 400 }}>({b.code})</span></td>
                   <td className="num">{money(b.ledger)}</td>
                   <td className="num">{s.total_lines ? money(s.bank_balance) : '-'}</td>
                   <td className="num">{s.matched_lines}/{s.total_lines}</td>
                   <td className="num" style={{ color: Number(s.diff) !== 0 && s.total_lines ? 'var(--red)' : undefined }}>{s.total_lines ? money(s.diff) : '-'}</td>
                   <td><Link className="btn sm" href={`/bank/${b.id}`}>กระทบยอด</Link></td>
-                </tr>);
+                </ClickRow>);
             })}</tbody></table>)}
       </Group>
     </>

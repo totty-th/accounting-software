@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ClickRow } from '@/components/ClickRow';
 import { requirePage } from '@/lib/auth';
 import { can } from '@/lib/permissions';
 import { getDb } from '@/lib/db';
@@ -25,13 +26,13 @@ export default async function Contacts({ searchParams }: { searchParams: { q?: s
       <Group title="รายชื่อทั้งหมด" color="var(--grey)" count={rows.length}>
         <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>ผู้ติดต่อ</th><th>เบอร์/อีเมล</th><th>เลขผู้เสียภาษี</th><th>เครดิต</th><th>ประเภท</th></tr></thead>
           <tbody>{rows.map(r => (
-            <tr key={r.id}><td>{r.contact_code ?? '-'}</td>
+            <ClickRow key={r.id} href={`/contacts/${r.id}`}><td>{r.contact_code ?? '-'}</td>
               <td className="no"><Link href={`/contacts/${r.id}`}>{r.business_name ?? r.contact_name}</Link>
                 <div className="sub">{r.person_kind === 'individual' ? 'บุคคลธรรมดา' : 'นิติบุคคล'}{r.is_foreign ? ' · ต่างประเทศ' : ''}{r.branch_code ? ` · สาขา ${r.branch_code}` : ''}</div></td>
               <td>{r.business_name ? r.contact_name ?? '-' : '-'}</td>
               <td>{[r.person_mobile, r.person_email].filter(Boolean).join(' / ') || '-'}</td>
               <td>{r.tax_id ?? '-'}</td><td>{r.credit_days ? `${r.credit_days} วัน` : '-'}</td>
-              <td>{[r.is_customer && 'ลูกค้า', r.is_vendor && 'ผู้จำหน่าย'].filter(Boolean).join(', ') || '-'}</td></tr>))}</tbody></table>
+              <td>{[r.is_customer && 'ลูกค้า', r.is_vendor && 'ผู้จำหน่าย'].filter(Boolean).join(', ') || '-'}</td></ClickRow>))}</tbody></table>
       </Group>
     </>
   );

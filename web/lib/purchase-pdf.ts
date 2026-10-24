@@ -5,7 +5,7 @@ import fontkit from '@pdf-lib/fontkit';
 import { getDb } from './db';
 import { bahtText } from './wht-pdf';
 
-export type PKind = 'PO' | 'RI' | 'PAY';
+export type PKind = 'PO' | 'RI' | 'PAY' | 'EXP';
 export type PView = {
   kind: PKind; title: string; no: string; date: string; status: string;
   company: { name?: string; address?: string; tax_id?: string } | null;
@@ -15,7 +15,7 @@ export type PView = {
   totals: [string, string, boolean?][]; total?: number; note?: string; signers: [string, string];
   onBehalf?: [string, string]; sign?: { show: boolean; signature?: string | null; stamp?: string | null };
 };
-const COLOR = { PO: rgb(0.16, 0.38, 0.7), RI: rgb(0.1, 0.5, 0.35), PAY: rgb(0.55, 0.3, 0.65) };
+const COLOR = { PO: rgb(0.16, 0.38, 0.7), RI: rgb(0.1, 0.5, 0.35), PAY: rgb(0.55, 0.3, 0.65), EXP: rgb(0.75, 0.4, 0.15) };
 const ASSETS = () => { const a = path.join(process.cwd(), 'assets'); return fs.existsSync(a) ? a : path.join(process.cwd(), 'web/assets'); };
 const fmt = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qty = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: 4 });
@@ -28,6 +28,17 @@ export async function loadPurchaseView(kind: PKind, id: string): Promise<PView |
   const db = await getDb();
   const company = (await db.q('select name,address,tax_id,signature_img,stamp_img from company_profile'))[0] ?? null;
   const party = async (cid: string) => { const c = (await db.q('select coalesce(business_name,contact_name) name,address,tax_id from contacts where id=$1', [cid]))[0]; return c; };
+  if (kind === 'EXP') {
+    const h = (await db.q('select * from expenses where id=$1', [id]))[0];
+    if (!h) return null;
+    const ls = await db.q('select * from expense_lines where expense_id=$1 order by line_no', [id]);
+    const meta: [string, string][] = h.due_date ? [['ครบกำหนด', th(h.due_date)]] : [];
+    return { kind, title: 'ค่าใช้จ่าย', no: h.exp_no, date: h.exp_date, status: h.status, company, party: (await party(h.contact_id)) as PView['party'], meta,
+      cols: [{ h: '#', w: 22 }, { h: 'รายละเอียด', w: 200 }, { h: 'จำนวน', right: true, w: 50 }, { h: 'ราคาต่อหน่วย', right: true, w: 72 }, { h: 'VAT', right: true, w: 40 }, { h: 'หัก ณ ที่จ่าย', right: true, w: 52 }, { h: 'มูลค่า', right: true, w: 75 }],
+      rows: ls.map(l => [String(l.line_no), l.description + (l.category ? ` (${l.category})` : ''), qty(l.qty), fmt(l.unit_price), `${qty(l.vat_rate)}%`, +l.wht_rate ? `${qty(l.wht_rate)}%` : 'ไม่หัก', fmt(l.net)]),
+      totals: [['รวมก่อน VAT', fmt(h.subtotal)], ['ภาษีมูลค่าเพิ่ม', fmt(h.vat)], ['ยอดรวม', fmt(h.total)], ['หัก ณ ที่จ่าย', fmt(h.wht_total)], ['ยอดจ่ายสุทธิ', fmt(+h.total - +h.wht_total), true]],
+      total: +h.total, signers: ['ผู้จัดทำ', 'ผู้อนุมัติ'] };
+  }
   if (kind === 'PO') {
     const h = (await db.q('select * from purchase_orders where id=$1', [id]))[0];
     if (!h) return null;
