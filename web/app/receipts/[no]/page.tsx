@@ -22,6 +22,9 @@ export default async function ReceiptDetail({ params }: { params: { no: string }
   const v = await loadReceiptView(id);
   if (!id || !v) notFound();
   const db = await getDb();
+  const banks = (await db.q<{ id: string; bank_name: string; account_no: string }>(
+    `select b.id, b.bank_name, b.account_no from bank_accounts b join accounts a on a.id=b.account_id where b.is_active order by a.code`))
+    .map(b => ({ id: b.id, label: `${b.bank_name} ${b.account_no}` }));
   const tok = (await db.q<{ t: string | null }>('select share_token as t from receipts where id=$1', [id]))[0]?.t;
   const h = headers(), host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
   const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
@@ -39,7 +42,7 @@ export default async function ReceiptDetail({ params }: { params: { no: string }
       <div className="detail">
         <ReceiptSheet v={v} />
         <aside className="side-panels noprint">
-          {W && v.receipt.status === 'pending' && <CollectForm id={id} net={net} />}
+          {W && v.receipt.status === 'pending' && <CollectForm id={id} net={net} banks={banks} />}
           <section className="panel">
             <h3>ลิงก์แชร์</h3>
             {link ? (

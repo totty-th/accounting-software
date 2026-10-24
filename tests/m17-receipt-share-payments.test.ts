@@ -7,7 +7,7 @@ let db: PGlite;
 let cust: string;
 
 const ACCOUNTS: [string, string, string][] = [
-  ['11112', 'เงินสด', 'asset'], ['11311', 'ลูกหนี้', 'asset'], ['11319', 'ใบเสร็จรอเรียกเก็บ', 'asset'],
+  ['11112', 'เงินสด', 'asset'], ['11122', 'เงินฝากธนาคาร', 'asset'], ['11311', 'ลูกหนี้', 'asset'], ['11319', 'ใบเสร็จรอเรียกเก็บ', 'asset'],
   ['17120', 'ภาษีถูกหัก ณ ที่จ่าย', 'asset'], ['27111', 'ภาษีขาย', 'liability'],
   ['41110', 'รายได้ขายสินค้า', 'revenue'], ['41210', 'รายได้บริการ', 'revenue'], ['41400', 'รับคืนและส่วนลด', 'revenue'],
   ['21921', 'เงินมัดจำรับ', 'liability'], ['11922', 'เงินประกัน', 'asset'], ['21398', 'เงินทดรอง', 'liability'],
@@ -41,7 +41,7 @@ beforeAll(async () => {
   for (const f of readdirSync(dir).sort()) await db.exec(readFileSync(new URL(f, dir), 'utf8'));
 });
 beforeEach(async () => {
-  await db.exec(`truncate receipt_payments, receipt_items, receipts, billing_note_items, sales_doc_lines, sales_docs, contacts, journal_lines,
+  await db.exec(`truncate receipt_payments, bank_accounts, receipt_items, receipts, billing_note_items, sales_doc_lines, sales_docs, contacts, journal_lines,
                  journal_vouchers, period_locks, doc_sequences, accounts cascade`);
   for (const [c, n, t] of ACCOUNTS) await db.query('insert into accounts(code,name,type) values ($1,$2,$3)', [c, n, t]);
   cust = (await one<{ id: string }>(`insert into contacts(business_name) values ('ลูกค้าทดสอบ') returning id`)).id;
@@ -54,18 +54,25 @@ describe('M17 ใบเสร็จ: ช่องทางรับชำระ�
     const v = (await one<{ v: any }>('select receipt_view($1) as v', [re])).v;
     expect(v.payments).toEqual([{ method: 'cash', bank: null, ref_no: null, pay_date: D, amount: 1070 }]);
   });
-  it('หลายช่องทาง ผลรวมต้องเท่ายอดสุทธิหลังหัก ณ ที่จ่าย', async () => {
+  it('หลายช่องทาง: โอนเข้าบัญชีธนาคารที่เลือก, เงินสดเข้า 11112, รวมต้องเท่ายอดสุทธิ', async () => {
     const inv = await doc('INV', D, svc(10000));
     await call('select set_invoice_wht($1,3)', [inv]);
     const re = await RE(inv);   // amount 10700 wht 300 → net 10400
-    const bad = JSON.stringify([{ method: 'cash', amount: 400 }, { method: 'transfer', amount: 9000 }]);
+    const k = (await one<{ id: string }>(`select bank_account_create('กสิกรไทย','748-2-31004-9','บจก.') as id`)).id;
+    const kb = (await one<{ id: string }>(`select bank_account_create('กรุงไทย','111-1-11111-1') as id`)).id;
+    const code = async (id: string) => (await one<{ c: string }>('select a.code c from bank_accounts b join accounts a on a.id=b.account_id where b.id=$1', [id])).c;
+    const bad = JSON.stringify([{ method: 'cash', amount: 400 }, { method: 'transfer', bank_account_id: k, amount: 9000 }]);
     expect(await err(call('select collect_receipt($1,$2::date,$3::jsonb)', [re, D, bad]))).toContain('ไม่เท่ายอดรับสุทธิ');
+    expect(await err(call('select collect_receipt($1,$2::date,$3::jsonb)', [re, D, JSON.stringify([{ method: 'transfer', amount: 10400 }])]))).toContain('เลือกบัญชีรับเงิน');
     expect((await rc(re)).status).toBe('pending');
-    const ok = JSON.stringify([{ method: 'cash', amount: 400 }, { method: 'transfer', bank: 'กสิกร', ref_no: 'T123', amount: 10000 }]);
+    const ok = JSON.stringify([{ method: 'cash', amount: 400 }, { method: 'transfer', bank_account_id: k, amount: 6000 }, { method: 'transfer', bank_account_id: kb, amount: 4000 }]);
     await call('select collect_receipt($1,$2::date,$3::jsonb)', [re, D, ok]);
     const p = (await call('select method, bank, ref_no, amount from receipt_payments where receipt_id=$1 order by line_no', [re])).rows as any[];
-    expect(p.map(x => [x.method, x.bank, x.ref_no, +x.amount])).toEqual([['cash', null, null, 400], ['transfer', 'กสิกร', 'T123', 10000]]);
-    expect(await entries((await rc(re)).collect_voucher_id)).toEqual([['11112', 10400, 0], ['17120', 300, 0], ['11319', 0, 10700]]);
+    expect(p.map(x => [x.method, x.bank, x.ref_no, +x.amount])).toEqual([['cash', null, null, 400],
+      ['transfer', 'กสิกรไทย', '748-2-31004-9', 6000], ['transfer', 'กรุงไทย', '111-1-11111-1', 4000]]);
+    const e = await entries((await rc(re)).collect_voucher_id);
+    expect(e).toEqual(expect.arrayContaining([['11112', 400, 0], [await code(k), 6000, 0], [await code(kb), 4000, 0], ['17120', 300, 0], ['11319', 0, 10700]]));
+    expect(e).toHaveLength(5);
   });
   it('ช่องทางไม่ถูกต้องถูกปฏิเสธ และรีเซ็ตล้างช่องทาง', async () => {
     const re = await RE(await doc('INV', D, svc(1000)));

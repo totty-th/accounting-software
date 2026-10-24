@@ -106,8 +106,7 @@ export async function buildReceiptPdf(v: ReceiptView, mode: PdfMode = 'original'
     y -= 18;
     const P = v.payments.length ? v.payments : [null];
     for (const p of P) {
-      const mname = p ? PAY_METHODS.find(m => m[0] === p.method)?.[1] ?? '' : '';
-      const cells: [string, string, number, number][] = [['ธนาคาร', p?.bank ?? (p ? mname : ''), L, 150], ['เลขที่', p?.ref_no ?? '', L + 160, 110],
+      const cells: [string, string, number, number][] = [['ธนาคาร', p?.bank ?? '', L, 150], ['เลขที่', p?.ref_no ?? '', L + 160, 110],
         ['วันที่', thDate(p?.pay_date), L + 280, 90], ['จำนวนเงิน', p ? fmt(p.amount) : '', L + 380, 131]];
       for (const [k, val, x, w] of cells) {
         draw(page, k, x, y, 9, { color: grey }); const kw = width(k, 9) + 4;

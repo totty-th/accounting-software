@@ -12,7 +12,6 @@ export interface ReceiptView {
   payments: { method: string; bank: string | null; ref_no: string | null; pay_date: string; amount: string | number }[];
 }
 const METHODS: [string, string][] = [['cash', 'เงินสด'], ['cheque', 'เช็ค'], ['transfer', 'โอนเงิน'], ['card', 'บัตรเครดิต']];
-const MNAME: Record<string, string> = { cash: 'เงินสด', cheque: 'เช็ค', transfer: 'โอนเงิน', card: 'บัตรเครดิต', other: 'อื่นๆ' };
 
 const COLOR = '#2e8b3d';
 // ใบเสร็จรับเงิน A4: รายการเอกสารที่รับชำระ สรุปยอด ช่องแสดงวิธีรับเงิน และลายเซ็น
@@ -57,7 +56,7 @@ export function ReceiptSheet({ v, copy = false }: { v: ReceiptView; copy?: boole
       <div className="pay-box"><span>การชำระเงินจะสมบูรณ์เมื่อบริษัทได้รับเงินเรียบร้อยแล้ว</span>
         {METHODS.map(([k, m]) => <span key={k}><i className={`cb${v.payments.some(p => p.method === k) ? ' on' : ''}`} />{m}</span>)}</div>
       {(v.payments.length ? v.payments : [null]).map((p, i) => (
-        <div className="pay-line" key={i}><span>ธนาคาร {p ? (p.bank ?? MNAME[p.method]) : ''}</span><span>เลขที่ {p?.ref_no ?? ''}</span>
+        <div className="pay-line" key={i}><span>ธนาคาร {p?.bank ?? ''}</span><span>เลขที่ {p?.ref_no ?? ''}</span>
           <span>วันที่ {p ? dateTh(p.pay_date) : ''}</span><span>จำนวนเงิน {p ? money(p.amount) : ''}</span></div>))}
       <footer className="sh-sign">
         <div><span className="on">ในนาม {v.contact.name}</span><i />{signL} / วันที่</div>

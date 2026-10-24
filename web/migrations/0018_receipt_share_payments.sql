@@ -22,13 +22,14 @@ create table receipt_payments (
   method     text not null check (method in ('cash','transfer','cheque','card','other')),
   bank       text,
   ref_no     text,
+  bank_account_id uuid references bank_accounts(id),
   pay_date   date not null,
   amount     numeric(18,2) not null check (amount > 0),
   primary key (receipt_id, line_no)
 );
 drop function collect_receipt(uuid, date);
 create function collect_receipt(p_id uuid, p_date date, p_payments jsonb default null) returns void language plpgsql as $$
-declare r receipts; v uuid; v_lines jsonb; p jsonb; n int := 0; v_sum numeric := 0; v_net numeric;
+declare r receipts; v uuid; v_lines jsonb; p jsonb; n int := 0; v_sum numeric := 0; v_net numeric; v_cash numeric := 0; ba bank_accounts; ac text;
 begin
   select * into r from receipts where id = p_id for update;
   if not found or r.status <> 'pending' then raise exception 'เก็บเงินได้เฉพาะใบเสร็จที่รอเก็บเงิน'; end if;
@@ -40,17 +41,29 @@ begin
     n := n + 1; v_sum := v_sum + (p->>'amount')::numeric;
     if coalesce(p->>'method','') not in ('cash','transfer','cheque','card','other') then raise exception 'ช่องทางรับชำระไม่ถูกต้อง'; end if;
     if (p->>'amount')::numeric <= 0 then raise exception 'จำนวนเงินของช่องทางรับชำระต้องมากกว่า 0'; end if;
+    if p->>'method' = 'transfer' then   -- โอนเงิน: ต้องเลือกบัญชีธนาคารของบริษัท
+      select * into ba from bank_accounts where id = nullif(p->>'bank_account_id','')::uuid and is_active;
+      if not found then raise exception 'โอนเงินต้องเลือกบัญชีรับเงิน'; end if;
+    end if;
   end loop;
   if v_sum <> v_net then raise exception 'ยอดรวมช่องทางรับชำระ % ไม่เท่ายอดรับสุทธิ %', v_sum, v_net; end if;
-  v_lines := jsonb_build_array(jsonb_build_object('account','11112','debit', v_net));
+  v_lines := '[]'::jsonb;
+  for ac, v_cash in
+    select case when x->>'method' = 'transfer' then (select a.code from bank_accounts b join accounts a on a.id = b.account_id
+                                                      where b.id = (x->>'bank_account_id')::uuid) else '11112' end,
+           sum((x->>'amount')::numeric)
+    from jsonb_array_elements(p_payments) x group by 1 order by 1
+  loop v_lines := v_lines || jsonb_build_object('account', ac, 'debit', v_cash); end loop;
   if r.wht > 0 then v_lines := v_lines || jsonb_build_object('account','17120','debit', r.wht); end if;
   v_lines := v_lines || jsonb_build_object('account','11319','credit', r.amount);
   v := post_voucher('RV', p_date, null, 'RE-COLLECT', p_id::text, v_lines);
   n := 0;
   for p in select * from jsonb_array_elements(p_payments) loop
     n := n + 1;
-    insert into receipt_payments(receipt_id, line_no, method, bank, ref_no, pay_date, amount)
-    values (p_id, n, p->>'method', nullif(btrim(p->>'bank'),''), nullif(btrim(p->>'ref_no'),''), p_date, (p->>'amount')::numeric);
+    select * into ba from bank_accounts where id = nullif(p->>'bank_account_id','')::uuid;
+    insert into receipt_payments(receipt_id, line_no, method, bank, ref_no, bank_account_id, pay_date, amount)
+    values (p_id, n, p->>'method', coalesce(ba.bank_name, nullif(btrim(p->>'bank'),'')),
+            coalesce(ba.account_no, nullif(btrim(p->>'ref_no'),'')), ba.id, p_date, (p->>'amount')::numeric);
   end loop;
   update receipts set status = 'collected', collect_voucher_id = v, collected_date = p_date where id = p_id;
 end $$;
