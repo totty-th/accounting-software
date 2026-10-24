@@ -16,7 +16,24 @@ async function init(): Promise<Db> {
     const { Pool } = await import('pg');
     // Supabase pooler (transaction mode) บน serverless: จำกัดการเชื่อมต่อต่อ instance (TLS ตามที่กำหนดใน DATABASE_URL)
     const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
-    return { q: async (s, p) => (await pool.query(s, p as any[])).rows };
+    const db: Db = { q: async (s, p) => (await pool.query(s, p as any[])).rows };
+    // ฐานว่างเปล่า → ติดตั้ง migration + ข้อมูลตัวอย่างครั้งแรก (ทำในทรานแซกชันเดียว ล็อกด้วย advisory lock กันหลาย instance ชนกัน)
+    if (!(await db.q(`select to_regclass('public.accounts') as t`))[0].t) {
+      const c = await pool.connect();
+      try {
+        await c.query('begin');
+        await c.query('select pg_advisory_xact_lock(727001)');
+        if (!(await c.query(`select to_regclass('public.accounts') as t`)).rows[0].t) {
+          const local = path.join(process.cwd(), 'migrations');
+          const mdir = fs.existsSync(local) ? local : path.join(process.cwd(), '..', 'supabase', 'migrations');
+          for (const f of fs.readdirSync(mdir).sort()) await c.query(fs.readFileSync(path.join(mdir, f), 'utf8'));
+          const { seed } = await import('./seed');
+          await seed({ q: async (s, p) => (await c.query(s, p as any[])).rows });
+        }
+        await c.query('commit');
+      } catch (e) { await c.query('rollback').catch(() => {}); throw e; } finally { c.release(); }
+    }
+    return db;
   }
   // บน Vercel ระบบไฟล์เขียนได้เฉพาะ /tmp (เดโมเท่านั้น: ข้อมูลรีเซ็ตเมื่อ instance เริ่มใหม่)
   const dir = process.env.PGLITE_DIR ?? (process.env.VERCEL ? path.join(os.tmpdir(), 'pglite') : path.join(process.cwd(), '.data', 'pglite'));
