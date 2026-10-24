@@ -58,7 +58,14 @@ export const collectCash = async (id: string) => run(call('select collect_cash_s
 export const resetCash = async (id: string) => run(call('select reset_cash_sale($1)', id), ALL, 'sales.write');
 
 export const createReceipt = async (inv: string) => run(call('select create_receipt_from_invoice($1,$2::date)', inv, today()), ALL, 'receipts.write');
-export const collectReceipt = async (id: string) => run(call('select collect_receipt($1,$2::date)', id, today()), ALL, 'receipts.write');
+export const collectReceipt = async (id: string, payments?: { method: string; bank?: string; ref_no?: string; amount: number }[]) =>
+  run(call('select collect_receipt($1,$2::date,$3::jsonb)', id, today(), payments && payments.length ? JSON.stringify(payments) : null), ALL, 'receipts.write');
+export async function createReceiptShareLink(id: string): Promise<Result> {
+  return run(call('select ensure_receipt_share_token($1)', id), ['/receipts'], 'receipts.write');
+}
+export async function revokeReceiptShareLink(id: string): Promise<Result> {
+  return run(call('select revoke_receipt_share_token($1)', id), ['/receipts'], 'receipts.write');
+}
 export const resetReceipt = async (id: string) => run(call('select reset_receipt($1)', id), ALL, 'receipts.write');
 export const cancelReceipt = async (id: string) => run(call('select cancel_receipt($1)', id), ALL, 'receipts.write');
 

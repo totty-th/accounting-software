@@ -9,7 +9,10 @@ export interface ReceiptView {
   company: { name: string; address: string | null; tax_id: string | null } | null;
   items: { line_no: number; doc_no: string | null; doc_date: string | null; due_date: string | null; doc_total: string | number | null;
     description: string | null; amount: string | number; wht: string | number }[];
+  payments: { method: string; bank: string | null; ref_no: string | null; pay_date: string; amount: string | number }[];
 }
+const METHODS: [string, string][] = [['cash', 'เงินสด'], ['cheque', 'เช็ค'], ['transfer', 'โอนเงิน'], ['card', 'บัตรเครดิต']];
+const MNAME: Record<string, string> = { cash: 'เงินสด', cheque: 'เช็ค', transfer: 'โอนเงิน', card: 'บัตรเครดิต', other: 'อื่นๆ' };
 
 const COLOR = '#2e8b3d';
 // ใบเสร็จรับเงิน A4: รายการเอกสารที่รับชำระ สรุปยอด ช่องแสดงวิธีรับเงิน และลายเซ็น
@@ -52,8 +55,10 @@ export function ReceiptSheet({ v, copy = false }: { v: ReceiptView; copy?: boole
         </dl>
       </section>
       <div className="pay-box"><span>การชำระเงินจะสมบูรณ์เมื่อบริษัทได้รับเงินเรียบร้อยแล้ว</span>
-        {['เงินสด', 'เช็ค', 'โอนเงิน', 'บัตรเครดิต'].map(m => <span key={m}><i className="cb" />{m}</span>)}</div>
-      <div className="pay-line"><span>ธนาคาร</span><span>เลขที่</span><span>วันที่ {r.collected_date ? dateTh(r.collected_date) : ''}</span><span>จำนวนเงิน {r.collected_date ? money(r.amount) : ''}</span></div>
+        {METHODS.map(([k, m]) => <span key={k}><i className={`cb${v.payments.some(p => p.method === k) ? ' on' : ''}`} />{m}</span>)}</div>
+      {(v.payments.length ? v.payments : [null]).map((p, i) => (
+        <div className="pay-line" key={i}><span>ธนาคาร {p ? (p.bank ?? MNAME[p.method]) : ''}</span><span>เลขที่ {p?.ref_no ?? ''}</span>
+          <span>วันที่ {p ? dateTh(p.pay_date) : ''}</span><span>จำนวนเงิน {p ? money(p.amount) : ''}</span></div>))}
       <footer className="sh-sign">
         <div><span className="on">ในนาม {v.contact.name}</span><i />{signL} / วันที่</div>
         <div><span className="on">ในนาม {v.company?.name ?? ''}</span><i />{signR} / วันที่</div>
