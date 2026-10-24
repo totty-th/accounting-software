@@ -10,7 +10,7 @@ import { DocSheet } from '@/components/DocSheet';
 import { SalesActions } from '@/components/SalesActions';
 import { ActionButton } from '@/components/ActionButton';
 import { CopyBox, PrintButton } from '@/components/ShareTools';
-import { createShareLink, revokeShareLink } from '@/lib/actions';
+import { createShareLink, revokeShareLink, closeQuotation, reopenQuotation } from '@/lib/actions';
 import { requirePage, canViewSalesDoc } from '@/lib/auth';
 import { can } from '@/lib/permissions';
 import { NoteBox, FileUpload, FileRemove, WhtPick, DeliveryForm } from '@/components/DocExtras';
@@ -37,6 +37,7 @@ export default async function SalesDetail({ params }: { params: { id: string } }
   const evText = (e: any) => e.event === 'delivery' ? (e.detail === 'pickup' ? 'ข้อมูลจัดส่ง: ลูกค้ามารับเอง' : e.detail === 'ship' ? 'ข้อมูลจัดส่ง: ส่งให้ลูกค้า' : 'ล้างข้อมูลจัดส่ง') : e.event === 'status' ? `${EV.status}: ${String(e.detail).split('>').map((t: string) => STATUS[t]?.[0] ?? t).join(' → ')}`
     : e.event === 'wht' ? `${EV.wht}: ${String(e.detail).replace('>', '% → ')}%` : e.detail && e.event.startsWith('file') ? `${EV[e.event]}: ${e.detail}` : EV[e.event] ?? e.event;
   const dlvOk = (v.doc.doc_type === 'QT' && ['approved', 'converted'].includes(v.doc.status)) || (v.doc.doc_type === 'INV' && v.doc.status !== 'cancelled');
+  const bill = v.doc.doc_type === 'QT' ? (await db.q<any>('select quotation_billing_summary($1) as s', [v.doc.id]))[0].s : null;
   const title = DOC_TITLE[v.doc.doc_type].title;
   const subject = `เอกสารเลขที่ ${v.doc.doc_no} จาก ${v.company?.name ?? ''}`;
   const body = `เรียน ${v.contact.name}\n\n${v.company?.name ?? ''} ขอส่ง${title} เลขที่ ${v.doc.doc_no} ยอดรวม ${money(v.doc.total)} บาท` +
@@ -51,7 +52,7 @@ export default async function SalesDetail({ params }: { params: { id: string } }
           <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf`}>ดาวน์โหลด PDF</a>
           <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a>
           {dlvOk && <a className="btn ghost" href={`/sales/${v.doc.doc_no}/delivery`}>พิมพ์ใบส่งของ</a>}
-          <SalesActions d={v.doc} role={user.role} />
+          <SalesActions d={v.doc} role={user.role} detail />
         </div>
       </div>
       <div className="detail">
@@ -91,6 +92,23 @@ export default async function SalesDetail({ params }: { params: { id: string } }
               <p className="sub">ลูกค้าหักเรา คิดจากมูลค่าก่อน VAT ของใบนี้ แก้ได้ก่อนมีใบเสร็จ</p>
               <WhtPick id={v.doc.id} rate={Number(x.wht_rate)} canEdit={can(user.role, 'sales.write') && v.doc.status !== 'cancelled'} />
             </section>)}
+          {bill && (bill.docs.length > 0 || bill.closeouts.length > 0 || ['approved', 'partial', 'converted'].includes(v.doc.status)) && <section className="panel">
+            <h3>การเรียกเก็บเงิน</h3>
+            <ul className="rel">
+              <li>มูลค่าใบเสนอราคา: <b>{money(bill.total)}</b></li>
+              <li>เรียกเก็บแล้ว: <b>{money(bill.billed)}</b></li>
+              {Number(bill.closed) > 0 && <li>ปิดยอดโดยไม่ออกเอกสาร: <b>{money(bill.closed)}</b></li>}
+              <li>ยังไม่ได้เรียกเก็บ: <b>{money(bill.remaining)}</b></li>
+              <li>สถานะการเรียกเก็บ: <b>{Number(bill.percent)}%</b></li>
+            </ul>
+            <ul className="rel">
+              {bill.docs.map((d: any) => <li key={d.id}><Link href={`/sales/${d.doc_no}`}>{d.doc_no}</Link> ({DOC_TYPE[d.doc_type]}{d.is_deposit ? ' มัดจำ' : ''}) {dateTh(d.doc_date)} · {money(d.total)} <Pill s={d.status} /></li>)}
+              {bill.closeouts.map((c: any) => <li key={c.id}>ปิดยอดคงเหลือ {money(c.amount)} (ไม่ออกเอกสาร){canWrite && <> <ActionButton label="ยกเลิกการเก็บเงิน" variant="ghost" action={reopenQuotation.bind(null, v.doc.id)} /></>}</li>)}
+              {!bill.docs.length && !bill.closeouts.length && <li className="sub">ยังไม่มีเอกสารที่ออกจากใบนี้</li>}
+            </ul>
+            {canWrite && v.doc.status === 'partial' && Number(bill.remaining) > 0 && <div className="acts" style={{ justifyContent: 'flex-start', marginTop: 8 }}>
+              <ActionButton label="เก็บเงินทั้งหมด (ปิดยอดที่เหลือ)" variant="ghost" confirmText="c" action={closeQuotation.bind(null, v.doc.id)} /></div>}
+          </section>}
           {dlvOk && <section className="panel">
             <h3>ข้อมูลจัดส่ง (ใบส่งของ)</h3>
             <p className="sub">ฝ่ายขายกรอกว่าลูกค้ามารับเอง หรือส่งที่ไหน ถึงใคร ผ่านขนส่งอะไร — ที่อยู่ส่งต่างจากที่อยู่เปิดบิลได้ แล้วกด "พิมพ์ใบส่งของ"</p>

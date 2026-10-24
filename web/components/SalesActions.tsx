@@ -3,7 +3,7 @@ import * as A from '@/lib/actions';
 import { can, type Role } from '@/lib/permissions';
 
 // ปุ่มต่อยอด/เปลี่ยนสถานะของเอกสารขาย (ใช้ทั้งหน้ารายการและหน้ารายละเอียด)
-export function SalesActions({ d, role }: { d: any; role: Role }) {
+export function SalesActions({ d, role, detail = false }: { d: any; role: Role; detail?: boolean }) {
   const W = can(role, 'sales.write');
   const b = (label: string, fn: () => Promise<any>, v: '' | 'ghost' | 'danger' = 'ghost', confirmText?: string) =>
     <ActionButton key={label} label={label} variant={v} confirmText={confirmText} action={fn} />;
@@ -17,12 +17,20 @@ export function SalesActions({ d, role }: { d: any; role: Role }) {
   }
   if (can(role, 'sales.approve') && d.doc_type === 'QT' && s === 'pending_approval') out.push(b('อนุมัติ', A.approveQuote.bind(null, d.id), ''));
   if (can(role, 'sales.approve') && d.doc_type === 'QT' && (s === 'pending_approval' || s === 'approved')) out.push(b('ไม่อนุมัติ', A.rejectQuote.bind(null, d.id), 'ghost', 'c'));
-  if (can(role, 'sales.approve') && d.doc_type === 'QT' && (s === 'rejected' || s === 'approved')) out.push(b('รีเซ็ต', A.resetQuote.bind(null, d.id)));
+  if (can(role, 'sales.approve') && d.doc_type === 'QT' && (['rejected','approved','partial','converted'].includes(s))) out.push(b('รีเซ็ต', A.resetQuote.bind(null, d.id)));
   if ((W || can(role, 'quote.own')) && d.doc_type === 'QT' && s === 'pending_approval' && d.doc_no)
     out.push(<a key="qe" className="btn sm ghost" href={`/sales/${d.doc_no}/edit`}>แก้ไข</a>);
   if ((W || can(role, 'quote.own')) && d.doc_type === 'QT') out.push(b('สร้างซ้ำ', A.duplicateQuote.bind(null, d.id)));
   if (W && d.doc_type === 'INV' && s !== 'cancelled') out.push(b('สร้างซ้ำ', A.duplicateInvoice.bind(null, d.id)));
-  if (W && d.doc_type === 'QT' && s === 'approved') out.push(b('สร้างใบแจ้งหนี้', A.quoteToInvoice.bind(null, d.id), ''));
+  if (W && d.doc_type === 'QT' && ['pending_approval', 'approved', 'partial'].includes(s)) {   // M18.11: ข้ามการอนุมัติได้ (ตาม FA)
+    out.push(b(s === 'partial' ? 'ออกใบแจ้งหนี้ที่เหลือ' : 'สร้างใบแจ้งหนี้', A.quoteToInvoice.bind(null, d.id), ''));
+    if (detail) {
+      out.push(b('สร้างขายสด', A.billQuotation.bind(null, d.id, 'CA'), 'ghost'));
+      if (s !== 'partial') out.push(b('สร้างใบวางบิล', A.billQuotation.bind(null, d.id, 'BL'), 'ghost'));
+      if (d.doc_no) out.push(<a key="sp" className="btn sm ghost" href={`/sales/${d.doc_no}/split`}>แบ่งจ่าย</a>);
+    }
+  }
+  if (W && d.doc_type === 'QT' && s === 'approved') out.push(b('ดำเนินการแล้ว', A.closeQuotation.bind(null, d.id), 'ghost', 'c'));
   if (W && d.doc_type === 'CA' && s === 'pending_collect') out.push(b('เก็บเงิน', A.collectCash.bind(null, d.id), ''));
   if (W && d.doc_type === 'CA' && s === 'collected') out.push(b('รีเซ็ต', A.resetCash.bind(null, d.id)));
   if (W && (d.doc_type === 'CN' || d.doc_type === 'DN') && s === 'cancelled') out.push(b('รีเซ็ต', A.restoreSalesDoc.bind(null, d.id), '', 'c'));

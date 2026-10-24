@@ -93,7 +93,7 @@ describe('SAL-01 ใบเสนอราคา', () => {
   it('QT ไม่มีรายการบัญชี → อนุมัติ → สร้าง INV → QT "ดำเนินการแล้ว"', async () => {
     const qt = await doc('QT', '2026-10-15', svc(1000));
     expect((await get(qt)).voucher_id).toBeNull();
-    expect(await err(db.query('select quotation_to_invoice($1,$2::date)', [qt, '2026-10-16']))).toContain('อนุมัติแล้ว');
+    // M18.11: สร้างใบแจ้งหนี้จาก QT ที่ยังรออนุมัติได้เลย (ตาม FA) — ดูเทสต์ m18-11
     await db.query('select approve_quotation($1)', [qt]);
     const inv = (await db.query<{ id: string }>('select quotation_to_invoice($1,$2::date) as id', [qt, '2026-10-16'])).rows[0].id;
     expect((await get(qt)).status).toBe('converted');

@@ -19,7 +19,7 @@ export const SIGNERS: Record<string, [string, string]> = {
 
 type Ln = DocView['lines'][number];
 /** เอกสารแบบเต็มรูปแบบ (ส่วนลด/ภาษี/หัก ณ ที่จ่ายต่อบรรทัด): ใบเสนอราคาทุกใบ และใบแจ้งหนี้ที่สร้างด้วยฟอร์มใหม่ (ทุกบรรทัดมี vat_rate) */
-export const isFull = (v: DocView) => v.doc.doc_type === 'QT' || (v.doc.doc_type === 'INV' && v.lines.length > 0 && v.lines.every(l => l.vat_rate != null));
+export const isFull = (v: DocView) => v.doc.doc_type === 'QT' || (['INV', 'CA'].includes(v.doc.doc_type) && v.lines.length > 0 && v.lines.every(l => l.vat_rate != null));
 export function lineTaxLabel(v: DocView, l?: Ln): string {
   if (v.doc.doc_type === 'BL') return '';
   if (isFull(v) && l) return l.vat_exempt ? 'ยกเว้น' : `${Number(l.vat_rate ?? 7)} %`;

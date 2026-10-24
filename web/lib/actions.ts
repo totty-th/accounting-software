@@ -77,6 +77,18 @@ export async function saveInvoice(header: Record<string, unknown>, lines: any[])
   return { ...r, id: out };
 }
 export const duplicateInvoice = async (id: string) => run(u => callAs(u.id, 'duplicate_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
+/** เรียกเก็บเงินจากใบเสนอราคา: kind INV|CA|BL · mode all|percent|amount|qty */
+export async function billQuotation(id: string, kind: 'INV' | 'CA' | 'BL', mode: 'all' | 'percent' | 'amount' | 'qty' = 'all',
+  value: number | null = null, qtys: Record<string, number> | null = null): Promise<Result & { id?: string }> {
+  let out: string | undefined;
+  const r = await run(async u => {
+    out = (await (await getDb()).q<any>(`select quotation_bill($2,$3,$4::date,$5,$6::numeric,$7::jsonb) as id from (select set_config('app.user_id',$1,true)) s`,
+      [u.id, id, kind, today(), mode, value, qtys ? JSON.stringify(qtys) : null]))[0].id;
+  }, [...ALL, `/sales/${id}`], 'sales.write');
+  return { ...r, id: out };
+}
+export const closeQuotation = async (id: string) => run(u => callAs(u.id, 'close_quotation($1)', id), [...ALL, `/sales/${id}`], 'sales.write');
+export const reopenQuotation = async (id: string) => run(u => callAs(u.id, 'reopen_quotation($1)', id), [...ALL, `/sales/${id}`], 'sales.write');
 export const quoteToInvoice = async (id: string) => run(call('select quotation_to_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
 export const collectCash = async (id: string) => run(call('select collect_cash_sale($1,$2::date)', id, today()), ALL, 'sales.write');
 export const resetCash = async (id: string) => run(call('select reset_cash_sale($1)', id), ALL, 'sales.write');
