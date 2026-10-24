@@ -4,7 +4,7 @@ import { PDFDocument, PDFFont, PDFPage, rgb, degrees } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { DOC_TITLE, type DocView } from './doc-view';
 import { bahtText } from './wht-pdf';
-import { docSummary, isFull, lineTaxLabel, lineWhtLabel, SIGNERS } from './doc-calc';
+import { docSummary, isFull, lineTaxLabel, lineWhtLabel, shipRows, SIGNERS } from './doc-calc';
 
 const ASSETS = () => { const a = path.join(process.cwd(), 'assets'); return fs.existsSync(a) ? a : path.join(process.cwd(), 'web/assets'); };
 const fmt = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -14,7 +14,11 @@ const isThai = (c: string) => /[฀-๿]/.test(c);
 
 export type PdfMode = 'original' | 'copy' | 'both';
 
-export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promise<Uint8Array> {
+export type PdfKind = 'doc' | 'delivery';
+
+// kind='delivery' = ใบส่งของ: ไม่มีราคา (#/รายละเอียด/จำนวน) + บล็อกข้อมูลจัดส่ง (ตาม FlowAccount + ส่วนเพิ่มของเรา)
+export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: PdfKind = 'doc'): Promise<Uint8Array> {
+  const dlv = kind === 'delivery';
   const qt = v.doc.doc_type === 'QT', full = isFull(v), showTax = v.doc.doc_type !== 'BL';
   const dir = ASSETS();
   const pdf = await PDFDocument.create();
@@ -22,7 +26,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
   const f = (n: string) => pdf.embedFont(fs.readFileSync(path.join(dir, 'fonts', n)), { subset: true });
   const F = { th: await f('sarabun-thai-400-normal.woff'), la: await f('sarabun-latin-400-normal.woff'),
               thB: await f('sarabun-thai-700-normal.woff'), laB: await f('sarabun-latin-700-normal.woff') };
-  const t = DOC_TITLE[v.doc.doc_type], col = rgb(...t.rgb), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
+  const t = dlv ? { title: 'ใบส่งของ', rgb: [0.18, 0.49, 0.43] as [number, number, number] } : DOC_TITLE[v.doc.doc_type], col = rgb(...t.rgb), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
 
   const runs = (s: string) => { const out: [string, boolean][] = []; for (const ch of s) {
     const th = isThai(ch) || ch === '฿'; const last = out[out.length - 1];
@@ -69,21 +73,32 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
     const meta: [string, string][] = [['เลขที่', v.doc.doc_no], ['วันที่', v.doc.doc_type === 'INV' && full && v.doc.term_mode === 'credit_nodate' ? '................................' : thDate(v.doc.doc_date)]];
     const nodate = v.doc.doc_type === 'INV' && full && v.doc.term_mode === 'credit_nodate';
     const credit = full ? (v.doc.term_mode === 'cash' || nodate ? 0 : Number(v.doc.credit_days ?? 0)) : v.contact.credit_days;
-    if (credit > 0) meta.push(['เครดิต', `${credit} วัน`]);
-    if (v.doc.due_date && !qt && !nodate) meta.push(['ครบกำหนด', thDate(v.doc.due_date)]);
+    if (credit > 0 && !dlv) meta.push(['เครดิต', `${credit} วัน`]);
+    if (v.doc.due_date && !qt && !nodate && !dlv) meta.push(['ครบกำหนด', thDate(v.doc.due_date)]);
     if (full && v.doc.ref_no) meta.push(['เลขที่อ้างอิง', v.doc.ref_no]);
     if (full && v.doc.project) meta.push(['โปรเจกต์', v.doc.project]);
     if (v.doc.salesperson) meta.push(['พนักงานขาย', v.doc.salesperson]);
-    if (v.ref && (v.doc.doc_type === 'CN' || v.doc.doc_type === 'DN')) meta.push(['วันที่อ้างอิง', thDate(v.ref.doc_date)]);
-    if (v.ref) meta.push(['อ้างอิง', v.ref.doc_no]);
+    if (v.ref && !dlv && (v.doc.doc_type === 'CN' || v.doc.doc_type === 'DN')) meta.push(['วันที่อ้างอิง', thDate(v.ref.doc_date)]);
+    if (v.ref && !dlv) meta.push(['อ้างอิง', v.ref.doc_no]);
     meta.forEach(([k, val], i) => { draw(page, k, 360, y - i * 14, 10, { color: grey }); draw(page, val, R, y - i * 14, 10, { right: true }); });
     y = Math.min(cy, y - meta.length * 14) - 14;
+    if (dlv) {   // บล็อกข้อมูลจัดส่ง
+      const sr = shipRows(v);
+      if (sr.length) {
+        const lines = sr.flatMap(([k, val]) => wrap(val, 10, 400).map((ln, i) => [i === 0 ? k : '', ln] as [string, string]));
+        const bh = lines.length * 13 + 12;
+        page.drawRectangle({ x: L, y: y - bh + 8, width: R - L, height: bh, borderColor: rgb(0.8, 0.8, 0.84), borderWidth: 0.6 });
+        lines.forEach(([k, ln], i) => { draw(page, k, L + 8, y - 4 - i * 13, 10, { color: grey }); draw(page, ln, L + 100, y - 4 - i * 13, 10); });
+        y -= bh + 10;
+      }
+    }
     return { page, y };
   };
   const tableHead = (page: PDFPage, y: number) => {
     page.drawRectangle({ x: L, y: y - 5, width: R - L, height: 20, color: col });
     const w = rgb(1, 1, 1);
     draw(page, '#', L + 6, y, 10, { bold: true, color: w }); draw(page, 'รายละเอียด', L + 28, y, 10, { bold: true, color: w });
+    if (dlv) { draw(page, 'จำนวน', R - 6, y, 10, { bold: true, color: w, right: true }); return y - 22; }
     draw(page, 'จำนวน', 300, y, 10, { bold: true, color: w, right: true });
     draw(page, 'ราคาต่อหน่วย', full ? 366 : 372, y, 10, { bold: true, color: w, right: true });
     if (full) draw(page, 'ส่วนลด', 410, y, 10, { bold: true, color: w, right: true });
@@ -93,25 +108,28 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
   };
 
   const sum = docSummary(v);
-  const [signL, signR] = SIGNERS[v.doc.doc_type];
+  const [signL, signR] = dlv ? ['ผู้รับสินค้า', 'ผู้ส่งสินค้า'] : SIGNERS[v.doc.doc_type];
   const labels = mode === 'both' ? ['ต้นฉบับ', 'สำเนา'] : [mode === 'copy' ? 'สำเนา' : 'ต้นฉบับ'];
   for (const label of labels) {
     let { page, y } = sheet(label);
     y = tableHead(page, y);
     for (const l of v.lines) {
-      const desc = wrap(l.description + (l.detail ? `\n${l.detail}` : ''), 10, 230);
+      const desc = wrap(l.description + (l.detail ? `\n${l.detail}` : ''), 10, dlv ? 400 : 230);
       const h = Math.max(1, desc.length) * 13 + 6;
       if (y - h < 200) { ({ page, y } = sheet(label)); y = tableHead(page, y); }
       draw(page, String(l.line_no), L + 6, y, 10);
       desc.forEach((ln, i) => draw(page, ln, L + 28, y - i * 13, 10));
-      draw(page, qtyFmt(l.qty) + (l.unit ? ` ${l.unit}` : ''), 300, y, 10, { right: true }); draw(page, fmt(l.unit_price), full ? 366 : 372, y, 10, { right: true });
+      if (dlv) draw(page, qtyFmt(l.qty) + (l.unit ? ` ${l.unit}` : ''), R - 6, y, 10, { right: true });
+      else { draw(page, qtyFmt(l.qty) + (l.unit ? ` ${l.unit}` : ''), 300, y, 10, { right: true }); draw(page, fmt(l.unit_price), full ? 366 : 372, y, 10, { right: true });
       if (full && Number(l.discount) > 0) draw(page, fmt(l.discount), 410, y, 10, { right: true });
       if (showTax) { draw(page, lineTaxLabel(v, l), full ? 445 : 414, y, 10, { right: true }); draw(page, lineWhtLabel(v, l), full ? 498 : 482, y, 10, { right: true }); }
-      draw(page, fmt(l.amount), R - 6, y, 10, { right: true });
+      draw(page, fmt(l.amount), R - 6, y, 10, { right: true }); }
       page.drawLine({ start: { x: L, y: y - 8 }, end: { x: R, y: y - 8 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
       y -= h;
     }
     // สรุปยอด
+    if (dlv) { if (y < 170) ({ page, y } = sheet(label)); draw(page, `จำนวน ${v.lines.length} รายการ`, L, y - 4, 10, { color: grey }); }
+    else {
     const need = (sum.rows.length + sum.wht.length) * 15 + 150;
     if (y < need) ({ page, y } = sheet(label));
     y -= 6;
@@ -128,9 +146,10 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
     const noteTxt = v.doc.reason || v.doc.note;
     if (full && v.doc.description) { draw(page, 'รายละเอียด', L, y, 9.5, { color: col }); const dl = wrap(v.doc.description, 10, 500); dl.forEach((ln, i) => draw(page, ln, L, y - 13 - i * 12, 10)); y -= 13 + dl.length * 12 + 4; }
     if (noteTxt) { draw(page, 'หมายเหตุ', L, y, 9.5, { color: col }); wrap(noteTxt, 10, 500).forEach((ln, i) => draw(page, ln, L, y - 13 - i * 12, 10)); }
+    }
     // ลายเซ็น (ในนาม + ช่องเซ็น + วันที่)
     const sy = 84;
-    if (v.doc.show_signature !== false) [[L, signL, v.contact.name], [312, signR, v.company?.name ?? '']].forEach(([x, cap, who]) => {
+    if (dlv || v.doc.show_signature !== false) [[L, signL, v.contact.name], [312, signR, v.company?.name ?? '']].forEach(([x, cap, who]) => {
       const xx = x as number;
       draw(page, `ในนาม ${who}`, xx, sy + 52, 9.5, { color: grey });
       page.drawLine({ start: { x: xx, y: sy + 14 }, end: { x: xx + 138, y: sy + 14 }, thickness: 0.6, color: grey });

@@ -41,6 +41,8 @@ export const cancelSalesDoc = async (id: string) => run(u => callAs(u.id, 'cance
 export const restoreSalesDoc = async (id: string) => run(u => callAs(u.id, 'restore_sales_doc($1)', id), ALL, 'sales.write');
 export const saveSalesNote = async (id: string, note: string) =>
   run(u => callAs(u.id, 'set_sales_doc_note($1,$2)', id, note), [`/sales/${id}`], salesDocGate(id));
+export const setDelivery = async (id: string, p: { mode: string; name?: string; address?: string; phone?: string; carrier?: string; note?: string }) =>
+  run(u => callAs(u.id, 'set_delivery($1,$2::jsonb)', id, JSON.stringify(p)), [`/sales/${id}`, `/sales/${id}/delivery`], salesDocGate(id));
 export const setDnWht = async (id: string, rate: number) =>
   run(u => callAs(u.id, 'set_debit_note_wht($1,$2)', id, rate), ALL.concat(`/sales/${id}`), 'sales.write');
 export async function uploadSalesFile(f: FormData): Promise<Result> {

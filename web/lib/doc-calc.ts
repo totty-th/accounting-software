@@ -66,3 +66,19 @@ export function docSummary(v: DocView): { rows: SumRow[]; wht: SumRow[]; total: 
   }
   return { rows, wht, total: m(total) };
 }
+
+// ใบส่งของ: บล็อกข้อมูลจัดส่ง (ว่างเมื่อฝ่ายขายยังไม่กรอก)
+export function shipRows(v: DocView): [string, string][] {
+  const d = v.doc, out: [string, string][] = [];
+  if (d.delivery_mode === 'pickup') {
+    out.push(['การรับสินค้า', 'ลูกค้ามารับเอง']);
+    if (d.ship_name) out.push(['ผู้มารับ', d.ship_name]);
+    if (d.ship_phone) out.push(['เบอร์โทร', d.ship_phone]);
+  } else if (d.delivery_mode === 'ship') {
+    out.push(['ผู้รับ', d.ship_name ?? ''], ['ที่อยู่จัดส่ง', d.ship_address ?? '']);
+    if (d.ship_phone) out.push(['เบอร์โทร', d.ship_phone]);
+    if (d.carrier) out.push(['ขนส่งโดย', d.carrier]);
+  } else return out;
+  if (d.delivery_note) out.push(['หมายเหตุจัดส่ง', d.delivery_note]);
+  return out;
+}

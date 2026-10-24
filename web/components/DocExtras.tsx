@@ -42,3 +42,29 @@ export function WhtPick({ id, rate, canEdit }: { id: string; rate: number; canEd
     </select>{m && <div className="toast" role="alert" onClick={() => setM(null)}>{m}</div>}
   </div>);
 }
+
+/** ข้อมูลจัดส่ง (ใบส่งของ): ฝ่ายขายกรอกหลังใบเสนอราคาอนุมัติ — รับเอง หรือ ส่งให้ที่อยู่ที่อาจต่างจากที่อยู่เปิดบิล */
+export function DeliveryForm({ id, d, canEdit }: { id: string; d: any; canEdit: boolean }) {
+  const [mode, setMode] = useState<string>(d.delivery_mode ?? '');
+  const [f, setF] = useState({ name: d.ship_name ?? '', address: d.ship_address ?? '', phone: d.ship_phone ?? '', carrier: d.carrier ?? '', note: d.delivery_note ?? '' });
+  const [m, setM] = useState<string | null>(null); const [p, st] = useTransition();
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
+  const ship = mode === 'ship';
+  return (<div className="dlv">
+    <div className="acts" role="radiogroup" aria-label="วิธีรับสินค้า" style={{ justifyContent: 'flex-start', gap: 14 }}>
+      {[['pickup', 'ลูกค้ามารับเอง'], ['ship', 'ส่งให้ลูกค้า']].map(([k, t]) =>
+        <label key={k}><input type="radio" name="dlv-mode" checked={mode === k} disabled={!canEdit} onChange={() => setMode(k)} /> {t}</label>)}
+    </div>
+    {mode && <div className="fgrid" style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+      <label>{ship ? 'ชื่อผู้รับ *' : 'ชื่อผู้มารับ'}<input value={f.name} disabled={!canEdit} onChange={set('name')} style={{ width: '100%' }} /></label>
+      {ship && <label>ที่อยู่ที่ส่ง * (ต่างจากที่อยู่เปิดบิลได้)<textarea rows={3} value={f.address} disabled={!canEdit} onChange={set('address')} style={{ width: '100%' }} /></label>}
+      <label>เบอร์โทรผู้{ship ? 'รับ' : 'มารับ'}<input value={f.phone} disabled={!canEdit} onChange={set('phone')} style={{ width: '100%' }} /></label>
+      {ship && <label>ขนส่งโดย<input value={f.carrier} disabled={!canEdit} onChange={set('carrier')} placeholder="เช่น รถบริษัท, Kerry, Flash" style={{ width: '100%' }} /></label>}
+      <label>หมายเหตุการจัดส่ง<input value={f.note} disabled={!canEdit} onChange={set('note')} style={{ width: '100%' }} /></label>
+    </div>}
+    {canEdit && <div className="acts" style={{ justifyContent: 'flex-start', marginTop: 8 }}>
+      <button className="btn sm" disabled={p} onClick={() => st(async () => setM(msgOf(await A.setDelivery(id, { mode, ...f })) ?? 'บันทึกแล้ว'))}>{p ? '...' : 'บันทึกข้อมูลจัดส่ง'}</button>
+      {mode && <button className="btn sm ghost" disabled={p} onClick={() => st(async () => { const r = await A.setDelivery(id, { mode: '' }); if (!r.error) { setMode(''); setF({ name: '', address: '', phone: '', carrier: '', note: '' }); } setM(msgOf(r) ?? 'ล้างข้อมูลแล้ว'); })}>ล้าง</button>}
+      {m && <span className="sub">{m}</span>}</div>}
+  </div>);
+}

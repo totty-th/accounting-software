@@ -5,7 +5,8 @@ export interface DocView {
     vat_rate: string | number; subtotal: string | number; vat: string | number; total: string | number; reason: string | null;
     is_deposit: boolean; deposit_net: string | number; deposit_vat: string | number; wht_rate?: string | number; salesperson?: string | null;
     term_mode?: string; credit_days?: number; salesperson_name?: string | null; project?: string | null; ref_no?: string | null; description?: string | null;
-    show_signature?: boolean; note?: string | null; discount_total?: string | number; exempt_base?: string | number; wht_total?: string | number };
+    show_signature?: boolean; note?: string | null; discount_total?: string | number; exempt_base?: string | number; wht_total?: string | number;
+    delivery_mode?: 'pickup' | 'ship' | null; ship_name?: string | null; ship_address?: string | null; ship_phone?: string | null; carrier?: string | null; delivery_note?: string | null };
   contact: { id: string; name: string; address: string | null; tax_id: string | null; credit_days: number };
   company: { name: string; address: string | null; tax_id: string | null } | null;
   lines: { line_no: number; description: string; item_kind: string; qty: string | number; unit_price: string | number; amount: string | number;
