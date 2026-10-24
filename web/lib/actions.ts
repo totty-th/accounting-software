@@ -52,7 +52,19 @@ export async function uploadSalesFile(f: FormData): Promise<Result> {
 }
 export const removeSalesFile = async (docId: string, fileId: string) =>
   run(u => callAs(u.id, 'remove_sales_doc_file($1)', fileId), [`/sales/${docId}`], salesDocGate(docId));
-export const approveQuote = async (id: string) => run(call('select approve_quotation($1)', id), ALL, 'sales.approve');
+export const approveQuote = async (id: string) => run(u => callAs(u.id, 'approve_quotation($1)', id), ALL, 'sales.approve');
+export const rejectQuote = async (id: string) => run(u => callAs(u.id, 'reject_quotation($1)', id), ALL, 'sales.approve');
+export const resetQuote = async (id: string) => run(u => callAs(u.id, 'reset_quotation($1)', id), ALL, 'sales.approve');
+export const duplicateQuote = async (id: string) => run(u => callAs(u.id, 'duplicate_quotation($1,$2::date)', id, today()), ALL, salesDocGate(id));
+/** สร้าง (id=null) หรือแก้ไข (เฉพาะรออนุมัติ) ใบเสนอราคาเต็มรูปแบบ */
+export async function saveQuotation(id: string | null, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
+  let out: string | undefined;
+  const r = await run(async u => {
+    out = (await (await getDb()).q<any>(`select save_quotation($2,$3::jsonb,$4::jsonb) as id from (select set_config('app.user_id',$1,true)) s`,
+      [u.id, id, JSON.stringify(header), JSON.stringify(lines)]))[0].id;
+  }, id ? [...ALL, `/sales/${id}`] : ALL, async u => can(u.role, 'sales.write') || (can(u.role, 'quote.own') && (!id || (await ownQuote(u, id)))));
+  return { ...r, id: out };
+}
 export const quoteToInvoice = async (id: string) => run(call('select quotation_to_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
 export const collectCash = async (id: string) => run(call('select collect_cash_sale($1,$2::date)', id, today()), ALL, 'sales.write');
 export const resetCash = async (id: string) => run(call('select reset_cash_sale($1)', id), ALL, 'sales.write');
@@ -200,6 +212,14 @@ export async function quickCreateVendor(p: { name: string; tax_id: string; addre
      returning id, business_name, tax_id, address, postal_code, branch_code, credit_days`, [p.name.trim(), p.tax_id.trim(), p.address.trim()]))[0]; },
     ['/contacts', '/purchases/orders'], 'contact.create');
   return { ...r, vendor: out };
+}
+export async function quickCreateCustomer(p: { name: string; tax_id: string; address: string }): Promise<Result & { customer?: any }> {
+  let out: any;
+  const r = await run(async () => { out = (await (await getDb()).q<any>(
+    `insert into contacts(business_name, tax_id, address, is_customer, is_vendor) values ($1, nullif($2,''), nullif($3,''), true, false)
+     returning id, business_name, tax_id, address, postal_code, branch_code, credit_days`, [p.name.trim(), p.tax_id.trim(), p.address.trim()]))[0]; },
+    ['/contacts', '/sales'], 'contact.create');
+  return { ...r, customer: out };
 }
 export async function quickCreateProduct(p: { code: string; name: string; unit: string; buy: number }): Promise<Result & { product?: any }> {
   let out: any;

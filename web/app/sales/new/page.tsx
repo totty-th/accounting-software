@@ -1,5 +1,7 @@
 import { getDb, today } from '@/lib/db';
 import { SalesDocForm } from '@/components/DocForm';
+import { QtForm } from '@/components/QtForm';
+import { qtFormData } from '@/lib/qt-data';
 import { DOC_TYPE } from '@/lib/status';
 import { createSalesDoc } from '@/lib/actions';
 import { partyName } from '@/lib/format';
@@ -12,6 +14,13 @@ export default async function NewDoc({ searchParams }: { searchParams: { type?: 
   const ownOnly = !can(user.role, 'sales.write');                // ฝ่ายขายสร้างได้เฉพาะใบเสนอราคา
   const type = ownOnly ? 'QT' : ['QT', 'INV', 'CA'].includes(searchParams.type ?? '') ? searchParams.type! : 'INV';
   if (ownOnly && searchParams.type && searchParams.type !== 'QT') redirect('/sales/new?type=QT');
+  if (type === 'QT') {
+    const d = await qtFormData();
+    return (<>
+      <div className="top"><div><h1>สร้างใบเสนอราคา</h1><p className="sub">ไม่ลงบัญชีและไม่ขยับสต็อก · อนุมัติแล้วจึงสร้างใบแจ้งหนี้ได้</p></div></div>
+      <QtForm id={null} {...d} today={today()} salesperson={user.displayName || user.username} canCreateCustomer={can(user.role, 'contact.create')} />
+    </>);
+  }
   const db = await getDb();
   const customers = (await db.q(`select id, business_name, contact_name from contacts where not is_cash_default and is_customer order by business_name nulls last`))
     .map(c => ({ id: c.id as string, label: partyName(c) }));

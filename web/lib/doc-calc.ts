@@ -17,12 +17,14 @@ export const SIGNERS: Record<string, [string, string]> = {
   RE: ['ผู้จ่ายเงิน', 'ผู้รับเงิน'],
 };
 
-export function lineTaxLabel(v: DocView): string {
+type Ln = DocView['lines'][number];
+export function lineTaxLabel(v: DocView, l?: Ln): string {
   if (v.doc.doc_type === 'BL') return '';
+  if (v.doc.doc_type === 'QT' && l) return l.vat_exempt ? 'ยกเว้น' : `${Number(l.vat_rate ?? 7)} %`;
   return c(v.doc.vat) > 0 ? `${Number(v.doc.vat_rate)} %` : 'ไม่มี';
 }
-export function lineWhtLabel(v: DocView): string {
-  const r = Number((v.doc as any).wht_rate ?? 0);
+export function lineWhtLabel(v: DocView, l?: Ln): string {
+  const r = Number(v.doc.doc_type === 'QT' && l ? l.wht_rate ?? 0 : (v.doc as any).wht_rate ?? 0);
   return r > 0 ? `${r} %` : 'ไม่หัก';
 }
 
@@ -30,6 +32,16 @@ export function docSummary(v: DocView): { rows: SumRow[]; wht: SumRow[]; total: 
   const d = v.doc, t = d.doc_type;
   const sub = c(d.subtotal), vat = c(d.vat), total = c(d.total);
   const rows: SumRow[] = [];
+  if (t === 'QT') {   // ใบเสนอราคาเต็มรูปแบบ: ส่วนลด / ไม่มี-ยกเว้นภาษี / หัก ณ ที่จ่ายต่อบรรทัด
+    const disc = c(d.discount_total);
+    const noTax = v.lines.reduce((s, l) => s + (l.vat_exempt || Number(l.vat_rate ?? 7) === 0 ? c(l.amount) : 0), 0);
+    rows.push({ label: 'รวมเป็นเงิน', value: m(sub + disc) });
+    if (disc > 0) rows.push({ label: 'ส่วนลดรวม', value: m(disc) }, { label: 'ราคาหลังหักส่วนลด', value: m(sub) });
+    rows.push({ label: 'มูลค่าที่ไม่มี/ยกเว้นภาษี', value: m(noTax), gap: true }, { label: 'มูลค่าที่คำนวณภาษี', value: m(sub - noTax) },
+      { label: `ภาษีมูลค่าเพิ่ม ${Number(d.vat_rate)}%`, value: m(vat) }, { label: 'จำนวนเงินรวมทั้งสิ้น', value: m(total), strong: true });
+    const w = c(d.wht_total);
+    return { rows, wht: [{ label: 'หักภาษี ณ ที่จ่ายทั้งสิ้น', value: m(w) }, { label: 'ยอดจ่าย', value: m(total - w) }], total: m(total) };
+  }
   if (t === 'CN' || t === 'DN') {
     const orig = c(v.ref?.subtotal), diff = sub;
     rows.push({ label: 'มูลค่าตามเอกสารเดิม', value: m(orig) },

@@ -9,7 +9,8 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
   const sum = docSummary(v);
   const [signL, signR] = SIGNERS[ty];
   const showTax = ty !== 'BL';
-  const credit = v.contact.credit_days;
+  const qt = ty === 'QT';
+  const credit = qt ? (v.doc.term_mode === 'cash' ? 0 : Number(v.doc.credit_days ?? 0)) : v.contact.credit_days;
   return (
     <article className={`sheet${v.doc.status === 'cancelled' ? ' cancelled' : ''}`} style={{ ['--dc' as any]: t.color }}>
       {v.doc.status === 'cancelled' && <div className="sh-mark">ยกเลิก</div>}
@@ -35,19 +36,23 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
           <dt>เลขที่</dt><dd>{v.doc.doc_no}</dd>
           <dt>วันที่</dt><dd>{dateTh(v.doc.doc_date)}</dd>
           {credit > 0 && <><dt>เครดิต</dt><dd>{credit} วัน</dd></>}
-          {v.doc.due_date && ty !== 'QT' && <><dt>ครบกำหนด</dt><dd>{dateTh(v.doc.due_date)}</dd></>}
+          {v.doc.due_date && (!qt || v.doc.term_mode === 'credit') && <><dt>ครบกำหนด</dt><dd>{dateTh(v.doc.due_date)}</dd></>}
           {v.ref && (ty === 'CN' || ty === 'DN') && <><dt>วันที่อ้างอิง</dt><dd>{dateTh(v.ref.doc_date)}</dd></>}
           {v.doc.salesperson && <><dt>พนักงานขาย</dt><dd>{v.doc.salesperson}</dd></>}
           {v.ref && <><dt>อ้างอิง</dt><dd>{v.ref.doc_no}</dd></>}
+          {qt && v.doc.ref_no && <><dt>เลขที่อ้างอิง</dt><dd>{v.doc.ref_no}</dd></>}
+          {qt && v.doc.project && <><dt>โปรเจกต์</dt><dd>{v.doc.project}</dd></>}
         </dl>
       </section>
       <table className="sh-lines">
         <thead><tr><th>#</th><th>รายละเอียด</th><th className="num">จำนวน</th><th className="num">ราคาต่อหน่วย</th>
+          {qt && <th className="num">ส่วนลด</th>}
           {showTax && <><th className="num">ภาษี</th><th className="num">หัก ณ ที่จ่าย</th></>}<th className="num">มูลค่า</th></tr></thead>
         <tbody>{v.lines.map(l => (
-          <tr key={l.line_no}><td>{l.line_no}</td><td className="desc">{l.description}</td><td className="num">{qty(l.qty)}</td>
+          <tr key={l.line_no}><td>{l.line_no}</td><td className="desc">{l.description}</td><td className="num">{qty(l.qty)}{l.unit ? ` ${l.unit}` : ''}</td>
             <td className="num">{money(l.unit_price)}</td>
-            {showTax && <><td className="num">{lineTaxLabel(v)}</td><td className="num">{lineWhtLabel(v)}</td></>}
+            {qt && <td className="num">{Number(l.discount) > 0 ? money(l.discount ?? 0) : ''}</td>}
+            {showTax && <><td className="num">{lineTaxLabel(v, l)}</td><td className="num">{lineWhtLabel(v, l)}</td></>}
             <td className="num">{money(l.amount)}</td></tr>))}</tbody>
       </table>
       <section className="sh-sum">
@@ -58,11 +63,12 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
           {sum.wht.map(r => <div key={r.label}><dt>{r.label}</dt><dd>{money(r.value)} บาท</dd></div>)}
         </dl>
       </section>
-      {v.doc.reason && <p className="sh-note"><small>หมายเหตุ</small>{v.doc.reason}</p>}
-      <footer className="sh-sign">
+      {v.doc.description && <p className="sh-note"><small>รายละเอียด</small>{v.doc.description}</p>}
+      {(v.doc.reason || v.doc.note) && <p className="sh-note" style={{ whiteSpace: 'pre-line' }}><small>หมายเหตุ</small>{v.doc.reason || v.doc.note}</p>}
+      {v.doc.show_signature !== false && <footer className="sh-sign">
         <div><span className="on">ในนาม {v.contact.name}</span><i />{signL} / วันที่</div>
         <div><span className="on">ในนาม {v.company?.name ?? ''}</span><i />{signR} / วันที่</div>
-      </footer>
+      </footer>}
     </article>
   );
 }

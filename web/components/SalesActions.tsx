@@ -16,10 +16,15 @@ export function SalesActions({ d, role }: { d: any; role: Role }) {
     out.push(<a key="cn" className="btn sm ghost" href={`/sales/adjust?type=CN&ref=${d.doc_no}`}>ออกใบลดหนี้</a>);
   }
   if (can(role, 'sales.approve') && d.doc_type === 'QT' && s === 'pending_approval') out.push(b('อนุมัติ', A.approveQuote.bind(null, d.id), ''));
+  if (can(role, 'sales.approve') && d.doc_type === 'QT' && (s === 'pending_approval' || s === 'approved')) out.push(b('ไม่อนุมัติ', A.rejectQuote.bind(null, d.id), 'ghost', 'c'));
+  if (can(role, 'sales.approve') && d.doc_type === 'QT' && (s === 'rejected' || s === 'approved')) out.push(b('รีเซ็ต', A.resetQuote.bind(null, d.id)));
+  if ((W || can(role, 'quote.own')) && d.doc_type === 'QT' && s === 'pending_approval' && d.doc_no)
+    out.push(<a key="qe" className="btn sm ghost" href={`/sales/${d.doc_no}/edit`}>แก้ไข</a>);
+  if ((W || can(role, 'quote.own')) && d.doc_type === 'QT') out.push(b('สร้างซ้ำ', A.duplicateQuote.bind(null, d.id)));
   if (W && d.doc_type === 'QT' && s === 'approved') out.push(b('สร้างใบแจ้งหนี้', A.quoteToInvoice.bind(null, d.id), ''));
   if (W && d.doc_type === 'CA' && s === 'pending_collect') out.push(b('เก็บเงิน', A.collectCash.bind(null, d.id), ''));
   if (W && d.doc_type === 'CA' && s === 'collected') out.push(b('รีเซ็ต', A.resetCash.bind(null, d.id)));
   if (W && (d.doc_type === 'CN' || d.doc_type === 'DN') && s === 'cancelled') out.push(b('รีเซ็ต', A.restoreSalesDoc.bind(null, d.id), '', 'c'));
-  if ((W || (can(role, 'quote.own') && d.doc_type === 'QT')) && s !== 'cancelled' && s !== 'converted') out.push(cancel);
+  if ((W || (can(role, 'quote.own') && d.doc_type === 'QT')) && s !== 'cancelled' && s !== 'converted' && s !== 'rejected') out.push(cancel);
   return <div className="acts">{out}</div>;
 }
