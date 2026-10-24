@@ -173,6 +173,40 @@ const PO = [...ALL, '/purchases/orders', '/purchases'];
 export async function createPurchaseOrder(p: { date: string; contact: string; lines: any[] }) {
   return run(call('select create_purchase_order($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), PO, 'expenses.write');
 }
+export async function savePurchaseOrder(id: string | null, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
+  let out: string | undefined;
+  const r = await run(async () => { out = (await (await getDb()).q<any>('select save_purchase_order($1,$2::jsonb,$3::jsonb) as id', [id, JSON.stringify(header), JSON.stringify(lines)]))[0].id; },
+    [...PO, '/purchases/orders/new'], 'expenses.write');
+  return { ...r, id: out };
+}
+export const duplicatePurchaseOrder = async (id: string) => run(call('select duplicate_purchase_order($1,$2::date)', id, today()), PO, 'expenses.write');
+/** สร้างผู้จำหน่าย/สินค้าใหม่จากหน้าใบสั่งซื้อ (คืนข้อมูลให้เลือกต่อได้ทันที) */
+export async function quickCreateVendor(p: { name: string; tax_id: string; address: string }): Promise<Result & { vendor?: any }> {
+  let out: any;
+  const r = await run(async () => { out = (await (await getDb()).q<any>(
+    `insert into contacts(business_name, tax_id, address, is_customer, is_vendor) values ($1, nullif($2,''), nullif($3,''), false, true)
+     returning id, business_name, tax_id, address, postal_code, branch_code, credit_days`, [p.name.trim(), p.tax_id.trim(), p.address.trim()]))[0]; },
+    ['/contacts', '/purchases/orders'], 'contact.create');
+  return { ...r, vendor: out };
+}
+export async function quickCreateProduct(p: { code: string; name: string; unit: string; buy: number }): Promise<Result & { product?: any }> {
+  let out: any;
+  const r = await run(async () => { out = (await (await getDb()).q<any>(
+    `insert into products(code,name,kind,base_unit,purchase_price) values ($1,$2,'goods_stock',$3,$4) returning id, code, name, base_unit, purchase_price`,
+    [p.code.trim(), p.name.trim(), p.unit.trim() || 'ชิ้น', p.buy || 0]))[0]; }, ['/products', '/stock', '/purchases/orders'], 'master.write');
+  return { ...r, product: out };
+}
+export async function saveSignatures(f: FormData): Promise<void> {
+  const img = async (k: string) => { const file = f.get(k) as File | null; if (!file || !file.size) return null;
+    if (file.size > 600 * 1024) throw new Error('รูปใหญ่เกิน 600 KB'); if (!/^image\/(png|jpeg)$/.test(file.type)) throw new Error('รองรับเฉพาะ PNG/JPG');
+    return `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`; };
+  const clr = (k: string) => f.get(k) === '1';
+  await run(async () => {
+    const sig = await img('signature'), stp = await img('stamp'); const db = await getDb();
+    if (sig) await db.q('update company_profile set signature_img=$1', [sig]); if (clr('clear_signature')) await db.q('update company_profile set signature_img=null');
+    if (stp) await db.q('update company_profile set stamp_img=$1', [stp]); if (clr('clear_stamp')) await db.q('update company_profile set stamp_img=null');
+  }, ['/settings/company'], 'settings.company');
+}
 export const approvePurchaseOrder = async (id: string) => run(call('select approve_purchase_order($1)', id), PO, 'expenses.approve');
 export const rejectPurchaseOrder = async (id: string) => run(call('select reject_purchase_order($1)', id), PO, 'expenses.approve');
 export const resetPurchaseOrder = async (id: string) => run(call('select reset_purchase_order($1)', id), PO, 'expenses.write');

@@ -13,31 +13,56 @@ export type PView = {
   meta: [string, string][];
   cols: { h: string; right?: boolean; w: number }[]; rows: string[][];
   totals: [string, string, boolean?][]; total?: number; note?: string; signers: [string, string];
+  onBehalf?: [string, string]; sign?: { show: boolean; signature?: string | null; stamp?: string | null };
 };
 const COLOR = { PO: rgb(0.16, 0.38, 0.7), RI: rgb(0.1, 0.5, 0.35), PAY: rgb(0.55, 0.3, 0.65) };
 const ASSETS = () => { const a = path.join(process.cwd(), 'assets'); return fs.existsSync(a) ? a : path.join(process.cwd(), 'web/assets'); };
 const fmt = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qty = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: 4 });
-const th = (iso: unknown) => { if (!iso) return ''; const [y, m, d] = String(iso).slice(0, 10).split('-'); return `${d}/${m}/${+y + 543}`; };
+const th = (iso: unknown) => { if (!iso) return ''; const [y, m, d] = (iso instanceof Date ? iso.toISOString() : String(iso)).slice(0, 10).split('-'); return `${d}/${m}/${+y + 543}`; };
 const isThai = (c: string) => /[฀-๿]/.test(c);
 const STATUS: Record<string, string> = { pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว', rejected: 'ไม่อนุมัติ', converted: 'อัปเกรดเป็นใบรับสินค้าแล้ว',
   cancelled: 'ยกเลิก', unpaid: 'รออนุมัติ', paid: 'จ่ายแล้ว', active: 'ใช้งานอยู่' };
 
 export async function loadPurchaseView(kind: PKind, id: string): Promise<PView | null> {
   const db = await getDb();
-  const company = (await db.q('select name,address,tax_id from company_profile'))[0] ?? null;
+  const company = (await db.q('select name,address,tax_id,signature_img,stamp_img from company_profile'))[0] ?? null;
   const party = async (cid: string) => { const c = (await db.q('select coalesce(business_name,contact_name) name,address,tax_id from contacts where id=$1', [cid]))[0]; return c; };
-  if (kind === 'PO' || kind === 'RI') {
-    const h = (await db.q(kind === 'PO' ? 'select * from purchase_orders where id=$1' : 'select * from goods_receipts where id=$1', [id]))[0];
+  if (kind === 'PO') {
+    const h = (await db.q('select * from purchase_orders where id=$1', [id]))[0];
     if (!h) return null;
-    const ls = await db.q(`select l.*, p.code, p.name from ${kind === 'PO' ? 'purchase_order_lines' : 'goods_receipt_lines'} l
-      join products p on p.id=l.product_id where ${kind === 'PO' ? 'po_id' : 'ri_id'}=$1 order by line_no`, [id]);
-    return { kind, title: kind === 'PO' ? 'ใบสั่งซื้อ' : 'ใบรับสินค้า', no: kind === 'PO' ? h.po_no : h.ri_no, date: kind === 'PO' ? h.po_date : h.ri_date,
-      status: h.status, company, party: (await party(h.contact_id)) as PView['party'], meta: h.ref_no ? [['อ้างอิง', h.ref_no]] : [],
+    const ls = await db.q(`select l.*, p.code, p.name from purchase_order_lines l join products p on p.id=l.product_id where po_id=$1 order by line_no`, [id]);
+    const pt = (await party(h.contact_id)) as PView['party'];
+    const sub = +h.subtotal, disc = +h.discount_total;
+    const meta: [string, string][] = [];
+    if (h.due_date) meta.push(['ครบกำหนด', th(h.due_date)]);
+    if (h.purchaser) meta.push(['ผู้สั่งซื้อ', h.purchaser]);
+    if (h.ref_no) meta.push(['เลขที่อ้างอิง', h.ref_no]);
+    if (h.project) meta.push(['โปรเจค', h.project]);
+    const wht = +h.wht_total;
+    return { kind, title: 'ใบสั่งซื้อ', no: h.po_no, date: h.po_date, status: h.status, company, party: pt, meta,
+      cols: [{ h: '#', w: 20 }, { h: 'รายละเอียด', w: 150 }, { h: 'จำนวน', right: true, w: 45 }, { h: 'หน่วย', w: 38 }, { h: 'ราคาต่อหน่วย', right: true, w: 62 },
+        { h: 'ส่วนลด', right: true, w: 48 }, { h: 'ภาษี', right: true, w: 40 }, { h: 'หัก ณ ที่จ่าย', right: true, w: 52 }, { h: 'มูลค่า', right: true, w: 56 }],
+      rows: ls.map(l => [String(l.line_no), `${l.code} ${l.name}${l.description ? '\n' + l.description : ''}`, qty(l.qty), l.unit ?? '', fmt(l.unit_price),
+        +l.discount ? (l.discount_type === 'percent' ? `${qty(l.discount_value)}%` : fmt(l.discount)) : '', l.vat_exempt ? 'ยกเว้น' : `${qty(l.vat_rate)}%`,
+        +l.wht_rate ? `${qty(l.wht_rate)}%` : 'ไม่หัก', fmt(l.price_mode === 'inclusive' ? +l.net + +l.vat : l.net)]),
+      totals: [['รวมเป็นเงิน', fmt(sub + disc)], ['ส่วนลดรวม', fmt(disc)], ['ราคาหลังหักส่วนลด', fmt(sub)],
+        ['มูลค่าที่ไม่มี/ยกเว้นภาษี', fmt(h.exempt_base)], ['มูลค่าที่คำนวณภาษี', fmt(sub - +h.exempt_base)], ['ภาษีมูลค่าเพิ่ม', fmt(h.vat)],
+        ['จำนวนเงินรวมทั้งสิ้น', fmt(h.total), true], ['หักภาษี ณ ที่จ่ายทั้งสิ้น', fmt(wht)], ['ยอดจ่าย', fmt(+h.total - wht), true]],
+      total: +h.total, note: [h.description, h.note].filter(Boolean).join('\n') || undefined,
+      signers: ['ผู้ขาย', 'ผู้อนุมัติ'], onBehalf: [pt?.name ?? '', company?.name ?? ''],
+      sign: { show: !!h.show_signature, signature: company?.signature_img, stamp: company?.stamp_img } };
+  }
+  if (kind === 'RI') {
+    const h = (await db.q('select * from goods_receipts where id=$1', [id]))[0];
+    if (!h) return null;
+    const ls = await db.q(`select l.*, p.code, p.name from goods_receipt_lines l join products p on p.id=l.product_id where ri_id=$1 order by line_no`, [id]);
+    return { kind, title: 'ใบรับสินค้า', no: h.ri_no, date: h.ri_date, status: h.status, company, party: (await party(h.contact_id)) as PView['party'],
+      meta: h.ref_no ? [['อ้างอิง', h.ref_no]] : [],
       cols: [{ h: '#', w: 22 }, { h: 'สินค้า', w: 220 }, { h: 'จำนวน', right: true, w: 60 }, { h: 'ราคาต่อหน่วย', right: true, w: 80 }, { h: 'VAT', right: true, w: 50 }, { h: 'มูลค่า', right: true, w: 80 }],
       rows: ls.map(l => [String(l.line_no), `${l.code} ${l.name}`, qty(l.qty), fmt(l.unit_price), fmt(l.vat), fmt(l.net)]),
       totals: [['รวมก่อน VAT', fmt(h.subtotal)], ['ภาษีมูลค่าเพิ่ม', fmt(h.vat)], ['ยอดรวมสุทธิ', fmt(h.total), true]], total: +h.total,
-      note: h.note ?? undefined, signers: kind === 'PO' ? ['ผู้สั่งซื้อ', 'ผู้อนุมัติ'] : ['ผู้รับสินค้า', 'ผู้อนุมัติ'] };
+      note: h.note ?? undefined, signers: ['ผู้รับสินค้า', 'ผู้อนุมัติ'] };
   }
   const s = (await db.q('select * from payment_slips where id=$1', [id]))[0];
   if (!s) return null;
@@ -101,7 +126,8 @@ export async function buildPurchasePdf(v: PView): Promise<Uint8Array> {
     const h = Math.max(...wr.map(w => w.length)) * 13 + 6;
     if (y - h < 200) ({ page, y } = sheet());
     wr.forEach((lines, i) => lines.forEach((ln, k) => draw(page, ln, v.cols[i].right ? xs[i] + v.cols[i].w - 4 : xs[i] + 4, y - k * 13, 10, { right: v.cols[i].right })));
-    page.drawLine({ start: { x: L, y: y - 8 }, end: { x: R, y: y - 8 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
+    const sepY = y - (Math.max(...wr.map(w => w.length)) - 1) * 13 - 8;
+    page.drawLine({ start: { x: L, y: sepY }, end: { x: R, y: sepY }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
     y -= h;
   }
   if (y < v.totals.length * 16 + 150) ({ page, y } = sheet());
@@ -114,6 +140,16 @@ export async function buildPurchasePdf(v: PView): Promise<Uint8Array> {
   y -= 6;
   if (v.note) { draw(page, 'หมายเหตุ', L, y, 9.5, { color: col }); wrap(v.note, 10, 500).forEach((ln, i) => draw(page, ln, L, y - 13 - i * 12, 10)); }
   const sy = 84;
+  if (v.onBehalf) {
+    draw(page, `ในนาม ${v.onBehalf[0]}`, L, sy + 92, 9.5); draw(page, `ในนาม ${v.onBehalf[1]}`, 312, sy + 92, 9.5);
+    if (v.sign?.show) {
+      const img = async (u?: string | null) => { if (!u) return null; const b = Buffer.from(u.split(',')[1] ?? '', 'base64');
+        try { return u.startsWith('data:image/png') ? await pdf.embedPng(b) : await pdf.embedJpg(b); } catch { return null; } };
+      const sg = await img(v.sign.signature), st = await img(v.sign.stamp);
+      if (sg) { const k = Math.min(110 / sg.width, 42 / sg.height); page.drawImage(sg, { x: 322, y: sy + 18, width: sg.width * k, height: sg.height * k }); }
+      if (st) { const k = Math.min(70 / st.width, 70 / st.height); page.drawImage(st, { x: 440, y: sy + 8, width: st.width * k, height: st.height * k, opacity: 0.85 }); }
+    }
+  }
   [[L, v.signers[0]], [312, v.signers[1]]].forEach(([x, cap]) => {
     const xx = x as number;
     page.drawLine({ start: { x: xx, y: sy + 14 }, end: { x: xx + 138, y: sy + 14 }, thickness: 0.6, color: grey });
