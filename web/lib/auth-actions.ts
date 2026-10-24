@@ -46,7 +46,8 @@ export async function loginAction(_prev: { error?: string } | null, f: FormData)
     return { error: BAD };
   }
   fails.delete(username);
-  cookies().set(COOKIE, await signSession(u.username)   // เก็บชื่อผู้ใช้ ไม่ใช่ uuid: เดโมบน Vercel มีหลาย instance ที่ uuid ไม่ตรงกัน, {
+  // เก็บชื่อผู้ใช้ ไม่ใช่ uuid: เดโมบน Vercel มีหลาย instance ที่ uuid ไม่ตรงกัน
+  cookies().set(COOKIE, await signSession(u.username), {
     httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' && !process.env.INSECURE_COOKIES, path: '/', maxAge: SESSION_HOURS * 3600 });
   redirect(homeOf(u.role));
 }
