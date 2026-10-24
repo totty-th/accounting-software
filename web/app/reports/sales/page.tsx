@@ -8,7 +8,8 @@ import { requirePage } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 type Sp = { view?: string; period?: string; from?: string; to?: string; type?: string };
-// รายงานสรุปยอดขาย: INV + ขายสด + ใบเพิ่มหนี้ เป็นบวก, ใบลดหนี้เป็นลบ · ไม่รวมใบเสนอราคา/ใบวางบิล/เอกสารที่ยกเลิก
+// รายงานสรุปยอดขาย: INV + ขายสด + ใบเพิ่มหนี้ เป็นบวก, ใบลดหนี้เป็นลบ · ไม่รวมใบเสนอราคา/ใบวางบิล/เอกสารที่ยกเลิก/ใบมัดจำ (มัดจำไม่ใช่รายได้)
+// ยอดต้องตรงบัญชีรายได้หมวด 41 — มีแผงกระทบยอดด้านล่าง (sales_revenue_reconcile)
 const TYPES = ['INV', 'CA', 'CN', 'DN'];
 const VIEWS: [string, string][] = [['summary', 'สรุปยอดขาย'], ['customer', 'ยอดขายตามลูกค้า'], ['product', 'ยอดขายตามสินค้า/รายการ']];
 
@@ -21,7 +22,7 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
   const range = periodRange(period, t, searchParams.from, searchParams.to);
   const db = await getDb();
   const args = [type, range?.[0] ?? null, range?.[1] ?? null];
-  const base = `d.status<>'cancelled' and d.doc_type = any(array['INV','CA','CN','DN']) and ($1='' or d.doc_type=$1)
+  const base = `d.status<>'cancelled' and not d.is_deposit and d.doc_type = any(array['INV','CA','CN','DN']) and ($1='' or d.doc_type=$1)
     and ($2::date is null or d.doc_date>=$2::date) and ($3::date is null or d.doc_date<=$3::date)`;
   const sgn = `case when d.doc_type='CN' then -1 else 1 end`;
   const [tot] = await db.q(`select count(*)::int n, coalesce(sum(d.subtotal*(${sgn})),0) sub, coalesce(sum(d.vat*(${sgn})),0) vat, coalesce(sum(d.total*(${sgn})),0) total
@@ -33,12 +34,13 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
   if (view === 'customer') rows = await db.q(`select coalesce(c.business_name,c.contact_name,'-') name, count(*)::int n,
       sum(d.subtotal*(${sgn})) sub, sum(d.vat*(${sgn})) vat, sum(d.total*(${sgn})) total
     from sales_docs d join contacts c on c.id=d.contact_id where ${base} group by 1 order by total desc`, args);
-  if (view === 'product') rows = await db.q(`select l.description name, sum(l.qty*(${sgn}))::numeric(18,4) qty, sum(l.amount*(${sgn})) sub
-    from sales_docs d join sales_doc_lines l on l.doc_id=d.id where ${base} group by 1 order by sub desc`, args);
+  if (view === 'product') rows = await db.q(`select description name, sum(qty)::numeric(18,4) qty, sum(net) sub
+    from sales_report_lines($2::date,$3::date,nullif($1,'')) group by 1 order by sub desc`, args);
+  const rc = type === '' ? (await db.q<any>('select sales_revenue_reconcile($1::date,$2::date) r', [range?.[0] ?? null, range?.[1] ?? null]))[0].r : null;
   const q = (o: Partial<Sp>) => { const u = new URLSearchParams(); Object.entries({ view, period, type, from: searchParams.from, to: searchParams.to, ...o }).forEach(([k, v]) => v && u.set(k, String(v))); return `/reports/sales?${u}`; };
   return (
     <>
-      <div className="top"><div><h1>รายงานขาย</h1><p className="sub">ใบลดหนี้นับเป็นลบ · ไม่รวมเอกสารที่ยกเลิก ใบเสนอราคา และใบวางบิล</p></div></div>
+      <div className="top"><div><h1>รายงานขาย</h1><p className="sub">ใบลดหนี้นับเป็นลบ · ไม่รวมเอกสารที่ยกเลิก ใบเสนอราคา ใบวางบิล และใบมัดจำ</p></div></div>
       <div className="tabs">{VIEWS.map(([k, v]) => <Link key={k} href={q({ view: k })} className={view === k ? 'on' : ''}>{v}</Link>)}</div>
       <form className="row-inline" method="get">
         <input type="hidden" name="view" value={view} />
@@ -56,6 +58,18 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
           <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(tot.total)}</strong></div>
         </div>
       </div>
+      {rc && <div className="panel" style={{ marginTop: 14 }}>
+        <h3>กระทบยอดกับบัญชีรายได้ (หมวด 41)</h3>
+        <ul className="rel">
+          <li>ยอดขายตามเอกสาร (ก่อน VAT): <b>{money(rc.doc.total)}</b> · INV {money(rc.doc.inv)} · ขายสด {money(rc.doc.ca)} · ใบเพิ่มหนี้ {money(rc.doc.dn)} · ใบลดหนี้ {money(rc.doc.cn)}</li>
+          <li>ยอดรายได้ตามบัญชี (ใบสำคัญจากเอกสารขาย): <b>{money(rc.gl.from_docs)}</b>{rc.gl.by_account.map((a: any) => <span key={a.code} className="sub"> · {a.code} {a.name} {money(a.amount)}</span>)}</li>
+          <li>ผลต่าง: <b style={{ color: Number(rc.diff) === 0 ? 'var(--green)' : 'var(--red)' }}>{money(rc.diff)}</b> {Number(rc.diff) === 0 ? '✓ ตรงกับบัญชี' : '— ไม่ตรง ต้องตรวจสอบ'}</li>
+          {Number(rc.doc.deposit_count) > 0 && <li className="sub">ใบมัดจำ {rc.doc.deposit_count} ใบ รวม {money(rc.doc.deposit_excluded)} ไม่นับเป็นยอดขาย (บันทึกเป็นเงินมัดจำรับ จะเป็นรายได้เมื่อออกใบแจ้งหนี้ฉบับสุดท้าย)</li>}
+        </ul>
+        {rc.gl.manual_items.length > 0 && <>
+          <div className="sub" style={{ marginTop: 8 }}>รายการบัญชีรายได้ที่ลงตรง (ไม่ผ่านเอกสารขาย เช่น ใบสำคัญทั่วไป) รวม {money(rc.gl.manual)} · ไม่นับในยอดขายข้างบน</div>
+          <ul className="rel">{rc.gl.manual_items.map((m: any) => <li key={m.voucher_no + m.code}>{m.voucher_no} {dateTh(m.date)} · {m.code} {m.name} · {money(m.amount)}</li>)}</ul></>}
+      </div>}
       <div className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 14 }}>
         {rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : view === 'summary' ? (
           <table><thead><tr><th>เลขที่เอกสาร</th><th>วันที่</th><th>ลูกค้า</th><th className="num">มูลค่า</th><th className="num">ภาษีมูลค่าเพิ่ม</th><th className="num">ยอดรวมสุทธิ</th><th>สถานะ</th></tr></thead>
