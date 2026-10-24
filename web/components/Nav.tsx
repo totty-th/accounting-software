@@ -7,7 +7,8 @@ import { can, type Perm } from '@/lib/permissions';
 // [path, ป้าย, สี, หัวข้อกลุ่ม, สิทธิ์ที่ต้องมี (อย่างน้อยหนึ่งอย่าง)]
 const ITEMS: [string, string, string, string, Perm[]][] = [
   ['/', 'ภาพรวม', 'var(--brand)', '', ['dash.view']],
-  ['/expenses', 'ซื้อ/ค่าใช้จ่าย', 'var(--purple)', 'ซื้อ', ['expenses.read']],
+  ['/purchases', 'ใบรับสินค้า', 'var(--purple)', 'ซื้อ', ['expenses.read']],
+  ['/expenses', 'ค่าใช้จ่าย', 'var(--purple)', '', ['expenses.read']],
   ['/wht', 'หัก ณ ที่จ่าย (50 ทวิ)', 'var(--purple)', '', ['wht.read']],
   ['/stock', 'สต็อก', 'var(--blue)', '', ['stock.read']],
   ['/bank', 'ธนาคาร/กระทบยอด', 'var(--teal)', '', ['bank.read']],

@@ -73,7 +73,24 @@ export async function createExpense(p: { date: string; contact: string; lines: a
   return run(call('select create_expense($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), ALL, 'expenses.write');
 }
 export const approveExpense = async (id: string) => run(call('select approve_expense($1)', id), ALL, 'expenses.approve');
-export const payExpense = async (id: string) => run(call('select pay_expense($1,$2::date)', id, today()), ALL, 'expenses.write');
+export type PurchasePay = { method: string; bank_account_id?: string; credit_card_id?: string; amount: number };
+const payJson = (p?: PurchasePay[]) => (p && p.length ? JSON.stringify(p) : null);
+export const payExpense = async (id: string, payments?: PurchasePay[]) =>
+  run(call(`select pay_expense($1,$2::date,'11112',true,'PND53',null,$3::jsonb)`, id, today(), payJson(payments)), ALL, 'expenses.write');
+export const rejectExpense = async (id: string) => run(call('select reject_expense($1)', id), ALL, 'expenses.approve');
+// ใบรับสินค้า (RI)
+export async function createGoodsReceipt(p: { date: string; contact: string; lines: any[] }) {
+  return run(call('select create_goods_receipt($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), [...ALL, '/purchases'], 'expenses.write');
+}
+export const approveGoodsReceipt = async (id: string) => run(call('select approve_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.approve');
+export const rejectGoodsReceipt = async (id: string) => run(call('select reject_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.approve');
+export const resetGoodsReceipt = async (id: string) => run(call('select reset_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.write');
+export const cancelGoodsReceipt = async (id: string) => run(call('select cancel_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.write');
+export const payGoodsReceipt = async (id: string, payments?: PurchasePay[]) =>
+  run(call('select pay_goods_receipt($1,$2::date,$3::jsonb)', id, today(), payJson(payments)), [...ALL, '/purchases'], 'expenses.write');
+export const createCreditCard = async (p: { bank: string; last4: string; holder: string; name: string; limit: number; statementDay: number; dueDay: number }) =>
+  run(call('select create_credit_card($1,$2,$3,$4,$5,$6,$7)', p.bank, p.last4, p.holder, p.name, p.limit, p.statementDay, p.dueDay),
+    ['/expenses', '/purchases'], 'master.write');
 export const resetExpense = async (id: string) => run(call('select reset_expense($1)', id), ALL, 'expenses.write');
 export const cancelExpense = async (id: string) => run(call('select cancel_expense($1)', id), ALL, 'expenses.write');
 
