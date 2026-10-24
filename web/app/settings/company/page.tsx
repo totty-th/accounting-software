@@ -1,7 +1,9 @@
+import { requirePage } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import * as A from '@/lib/actions';
 
 export default async function Company() {
+  await requirePage('settings.company');
   const c = (await (await getDb()).q('select * from company_profile'))[0];
   return (
     <>

@@ -15,8 +15,16 @@ const COA: [string, string, string][] = [
   ['53103', 'ค่าขนส่ง', 'expense'], ['53104', 'ค่าการตลาด', 'expense'], ['53211', 'ค่าธรรมเนียมธนาคาร (ชั่วคราว)', 'expense'], ['59910', 'ค่าใช้จ่ายเบ็ดเตล็ด (ชั่วคราว)', 'expense'],
 ];
 
+// ผู้ใช้ตัวอย่าง (โหมดเดโมทุกคนใช้รหัสเดโมเดียวกัน — ดู lib/auth-actions.ts)
+const USERS: [string, string, string][] = [
+  ['admin', 'ผู้ดูแลระบบ', 'super_admin'], ['owner', 'คุณสมชาย (เจ้าของ)', 'owner'], ['account', 'คุณนิดา (นักบัญชี)', 'accountant'],
+  ['sale1', 'คุณมานี (ฝ่ายขาย)', 'sales'], ['sale2', 'คุณวีระ (ฝ่ายขาย)', 'sales'], ['itadmin', 'คุณไอที (IT)', 'it'],
+];
+
 export async function seed(db: Db) {
   for (const [c, n, t] of COA) await db.q('insert into accounts(code,name,type) values ($1,$2,$3)', [c, n, t]);
+  const uid: Record<string, string> = {};
+  for (const [u, n, r] of USERS) uid[u] = (await db.q('select app_user_create($1,$2,$3) as id', [u, n, r]))[0].id;
   const d = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   const c1 = (await db.q(`insert into contacts(business_name,tax_id) values ('บริษัท สยามก่อสร้าง จำกัด','0105500000001') returning id`))[0].id;
   await db.q(`insert into contacts(business_name,tax_id) values ('ห้างหุ้นส่วน ไทยเหล็กกล้า','0103500000002')`);
@@ -28,8 +36,12 @@ export async function seed(db: Db) {
   await db.q(`select create_sales_doc('INV',$1::date,$2,$3::jsonb)`, [d, c1, JSON.stringify([
     { description: 'ตะแกรงเหล็กสำเร็จรูป 1x2 ม.', product_id: p1, qty: 10, unit_price: 1000 },
     { description: 'ค่าติดตั้ง', kind: 'service', qty: 1, unit_price: 2000 }])]);
-  await db.q(`select create_sales_doc('QT',$1::date,$2,$3::jsonb)`, [d, c1, JSON.stringify([
-    { description: 'ตะแกรงยืดสั่งทำ', kind: 'goods', qty: 20, unit_price: 1500 }])]);
+  // ใบเสนอราคาตัวอย่างของฝ่ายขายแต่ละคน (ให้ลองดู "เห็นเฉพาะของตัวเอง")
+  const qt = (u: string, desc: string, qty: number, price: number) => db.q(
+    `select create_sales_doc('QT',$2::date,$3,$4::jsonb) from (select set_config('app.user_id',$1,true)) s`,
+    [uid[u], d, c1, JSON.stringify([{ description: desc, kind: 'goods', qty, unit_price: price }])]);
+  await qt('sale1', 'ตะแกรงยืดสั่งทำ', 20, 1500);
+  await qt('sale2', 'ตะแกรงลวดเชื่อม 2x4 ม.', 8, 2100);
   await db.q(`select create_expense($1::date,$2,$3::jsonb)`, [d, v1, JSON.stringify([
     { description: 'ค่าเช่าโกดัง', account: '53102', qty: 1, unit_price: 15000, wht_rate: 5 }])]);
   // ตัวอย่างค่าใช้จ่ายที่จ่ายแล้ว (มีหนังสือรับรอง 50 ทวิ ให้ทดลองพิมพ์)

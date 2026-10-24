@@ -1,3 +1,5 @@
+import { can } from '@/lib/permissions';
+import { requirePage } from '@/lib/auth';
 import Link from 'next/link';
 import { getDb } from '@/lib/db';
 import { money } from '@/lib/format';
@@ -6,6 +8,8 @@ import { BankTools } from '@/components/BankTools';
 import { BankTransfer } from '@/components/BankTransfer';
 
 export default async function Bank() {
+  const user = await requirePage('bank.read');
+  const W = can(user.role, 'bank.write');
   const db = await getDb();
   const banks = await db.q(`select b.id, b.bank_name, b.account_no, b.account_name, a.code,
       (select coalesce(sum(l.debit-l.credit),0) from journal_lines l where l.account_id=b.account_id) ledger
@@ -19,8 +23,8 @@ export default async function Bank() {
     <>
       <div className="top"><div><h1>ธนาคารและกระทบยอด</h1>
         <p className="sub">นำเข้ารายการเดินบัญชี แล้วจับคู่กับรายการในสมุดบัญชี</p></div>
-        {transferAccts.length > 1 && <BankTransfer accounts={transferAccts} />}</div>
-      <BankTools banks={banks.map(b => ({ id: b.id, label: `${b.bank_name} ${b.account_no}` }))} />
+        {W && transferAccts.length > 1 && <BankTransfer accounts={transferAccts} />}</div>
+      {W && <BankTools banks={banks.map(b => ({ id: b.id, label: `${b.bank_name} ${b.account_no}` }))} />}
       <Group title="บัญชีธนาคาร" color="var(--teal)" count={banks.length}>
         {banks.length === 0 ? <div className="empty">ยังไม่มีบัญชีธนาคาร เพิ่มด้านบน</div> : (
           <table><thead><tr><th>บัญชี</th><th className="num">ยอดในสมุดบัญชี</th><th className="num">ยอดตาม statement</th>

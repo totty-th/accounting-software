@@ -1,3 +1,5 @@
+import { can } from '@/lib/permissions';
+import { requirePage } from '@/lib/auth';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDb } from '@/lib/db';
@@ -5,6 +7,7 @@ import { money, dateIso } from '@/lib/format';
 import { ReconcileBoard } from '@/components/ReconcileBoard';
 
 export default async function Reconcile({ params, searchParams }: { params: { id: string }; searchParams: { batch?: string } }) {
+  const user = await requirePage('bank.read');
   const db = await getDb();
   const b = (await db.q(`select b.id, b.bank_name, b.account_no, a.code from bank_accounts b join accounts a on a.id=b.account_id where b.id=$1`, [params.id]))[0];
   if (!b) notFound();
@@ -30,7 +33,7 @@ export default async function Reconcile({ params, searchParams }: { params: { id
       </div>
       {batches.length > 1 && (
         <p className="sub">ชุดข้อมูล: <Link href={`/bank/${b.id}`}>ทั้งหมด</Link>{batches.map(x => <span key={x.id}> · <Link href={`/bank/${b.id}?batch=${x.id}`}>{x.file_name ?? 'ไม่มีชื่อ'} ({x.n})</Link></span>)}</p>)}
-      <ReconcileBoard
+      <ReconcileBoard readOnly={!can(user.role, 'bank.write')}
         lines={lines.map(l => ({ id: l.id, date: dateIso(l.line_date), description: l.description ?? '', amount: Number(l.amount), matched: !!l.group_id, hasDiff: !!l.has_diff }))}
         items={items.map(i => ({ id: i.journal_line_id, date: dateIso(i.voucher_date), no: i.voucher_no, memo: i.memo ?? '', amount: Number(i.amount), matched: !!i.group_id }))}
         accounts={accts.map(a => ({ code: a.code, label: `${a.code} ${a.name}`, type: a.type }))} />

@@ -1,3 +1,4 @@
+import { requirePage } from '@/lib/auth';
 import { notFound } from 'next/navigation';
 import { AdjustForm } from '@/components/AdjustForm';
 import { loadView } from '@/lib/doc-view';
@@ -6,6 +7,7 @@ import { createSalesDoc } from '@/lib/actions';
 import { DOC_TYPE } from '@/lib/status';
 
 export default async function Adjust({ searchParams }: { searchParams: { type?: string; ref?: string } }) {
+  await requirePage('sales.write');
   const type = searchParams.type === 'DN' ? 'DN' : 'CN';
   const v = searchParams.ref ? await loadView(searchParams.ref) : null;
   if (!v || v.doc.doc_type !== 'INV' || v.doc.status === 'cancelled') return notFound();

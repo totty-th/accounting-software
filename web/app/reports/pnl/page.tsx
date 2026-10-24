@@ -1,8 +1,10 @@
+import { requirePage } from '@/lib/auth';
 import { getDb, today, monthStart } from '@/lib/db';
 import { money } from '@/lib/format';
 import { Group } from '@/components/Board';
 
 export default async function Pnl({ searchParams }: { searchParams: { from?: string; to?: string } }) {
+  await requirePage('reports.read');
   const from = searchParams.from || monthStart(), to = searchParams.to || today();
   const db = await getDb();
   const rows = await db.q(`select * from income_statement($1::date,$2::date)`, [from, to]);

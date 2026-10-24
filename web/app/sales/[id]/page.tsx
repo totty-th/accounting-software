@@ -11,12 +11,16 @@ import { SalesActions } from '@/components/SalesActions';
 import { ActionButton } from '@/components/ActionButton';
 import { CopyBox, PrintButton } from '@/components/ShareTools';
 import { createShareLink, revokeShareLink } from '@/lib/actions';
+import { requirePage, canViewSalesDoc } from '@/lib/auth';
+import { can } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SalesDetail({ params }: { params: { id: string } }) {
+  const user = await requirePage(['sales.read', 'quote.own']);
   const v = await loadView(params.id);
-  if (!v) notFound();
+  if (!v || !(await canViewSalesDoc(user, v.doc.id))) notFound();
+  const canWrite = can(user.role, 'sales.write') || can(user.role, 'quote.own');
   const db = await getDb();
   const tok = (await db.q<{ t: string | null }>('select share_token as t from sales_docs where id=$1', [v.doc.id]))[0]?.t;
   const h = headers(), host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
@@ -35,7 +39,7 @@ export default async function SalesDetail({ params }: { params: { id: string } }
           <PrintButton />
           <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf`}>ดาวน์โหลด PDF</a>
           <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a>
-          <SalesActions d={v.doc} />
+          <SalesActions d={v.doc} role={user.role} />
         </div>
       </div>
       <div className="detail">
@@ -49,13 +53,13 @@ export default async function SalesDetail({ params }: { params: { id: string } }
                 <CopyBox text={link} />
                 <div className="acts" style={{ justifyContent: 'flex-start', marginTop: 8 }}>
                   <a className="btn sm ghost" href={link} target="_blank" rel="noreferrer">เปิดหน้าที่ลูกค้าเห็น</a>
-                  <ActionButton label="ยกเลิกลิงก์" variant="danger" confirmText="c" action={revokeShareLink.bind(null, v.doc.id)} />
+                  {canWrite && <ActionButton label="ยกเลิกลิงก์" variant="danger" confirmText="c" action={revokeShareLink.bind(null, v.doc.id)} />}
                 </div>
               </>
             ) : (
               <>
                 <p className="sub">ยังไม่มีลิงก์ สร้างเพื่อส่งให้ลูกค้าเปิดดูเอกสารออนไลน์</p>
-                <ActionButton label="สร้างลิงก์แชร์" action={createShareLink.bind(null, v.doc.id)} />
+                {canWrite ? <ActionButton label="สร้างลิงก์แชร์" action={createShareLink.bind(null, v.doc.id)} /> : <p className="sub">ไม่มีสิทธิ์สร้างลิงก์</p>}
               </>
             )}
           </section>

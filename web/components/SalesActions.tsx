@@ -1,22 +1,24 @@
 import { ActionButton } from '@/components/ActionButton';
 import * as A from '@/lib/actions';
+import { can, type Role } from '@/lib/permissions';
 
 // ปุ่มต่อยอด/เปลี่ยนสถานะของเอกสารขาย (ใช้ทั้งหน้ารายการและหน้ารายละเอียด)
-export function SalesActions({ d }: { d: any }) {
+export function SalesActions({ d, role }: { d: any; role: Role }) {
+  const W = can(role, 'sales.write');
   const b = (label: string, fn: () => Promise<any>, v: '' | 'ghost' | 'danger' = 'ghost', confirmText?: string) =>
     <ActionButton key={label} label={label} variant={v} confirmText={confirmText} action={fn} />;
   const cancel = b('ยกเลิก', A.cancelSalesDoc.bind(null, d.id), 'danger', 'c');
   const s = d.status as string;
   const out: React.ReactNode[] = [];
-  if (d.doc_type === 'INV' && (s === 'awaiting_payment' || s === 'split_paid')) out.push(b('สร้างใบเสร็จ', A.createReceipt.bind(null, d.id), ''));
-  if (d.doc_type === 'INV' && s === 'awaiting_payment' && d.doc_no) {
+  if (can(role, 'receipts.write') && d.doc_type === 'INV' && (s === 'awaiting_payment' || s === 'split_paid')) out.push(b('สร้างใบเสร็จ', A.createReceipt.bind(null, d.id), ''));
+  if (W && d.doc_type === 'INV' && s === 'awaiting_payment' && d.doc_no) {
     out.push(<a key="dn" className="btn sm ghost" href={`/sales/adjust?type=DN&ref=${d.doc_no}`}>ออกใบเพิ่มหนี้</a>);
     out.push(<a key="cn" className="btn sm ghost" href={`/sales/adjust?type=CN&ref=${d.doc_no}`}>ออกใบลดหนี้</a>);
   }
-  if (d.doc_type === 'QT' && s === 'pending_approval') out.push(b('อนุมัติ', A.approveQuote.bind(null, d.id), ''));
-  if (d.doc_type === 'QT' && s === 'approved') out.push(b('สร้างใบแจ้งหนี้', A.quoteToInvoice.bind(null, d.id), ''));
-  if (d.doc_type === 'CA' && s === 'pending_collect') out.push(b('เก็บเงิน', A.collectCash.bind(null, d.id), ''));
-  if (d.doc_type === 'CA' && s === 'collected') out.push(b('รีเซ็ต', A.resetCash.bind(null, d.id)));
-  if (s !== 'cancelled' && s !== 'converted') out.push(cancel);
+  if (can(role, 'sales.approve') && d.doc_type === 'QT' && s === 'pending_approval') out.push(b('อนุมัติ', A.approveQuote.bind(null, d.id), ''));
+  if (W && d.doc_type === 'QT' && s === 'approved') out.push(b('สร้างใบแจ้งหนี้', A.quoteToInvoice.bind(null, d.id), ''));
+  if (W && d.doc_type === 'CA' && s === 'pending_collect') out.push(b('เก็บเงิน', A.collectCash.bind(null, d.id), ''));
+  if (W && d.doc_type === 'CA' && s === 'collected') out.push(b('รีเซ็ต', A.resetCash.bind(null, d.id)));
+  if ((W || (can(role, 'quote.own') && d.doc_type === 'QT')) && s !== 'cancelled' && s !== 'converted') out.push(cancel);
   return <div className="acts">{out}</div>;
 }

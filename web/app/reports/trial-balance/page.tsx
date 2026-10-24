@@ -1,8 +1,10 @@
+import { requirePage } from '@/lib/auth';
 import { getDb, today, monthStart } from '@/lib/db';
 import { money } from '@/lib/format';
 import { Group } from '@/components/Board';
 
 export default async function TB({ searchParams }: { searchParams: { from?: string; to?: string; zero?: string } }) {
+  await requirePage('reports.read');
   const from = searchParams.from || monthStart(), to = searchParams.to || today(), zero = searchParams.zero === '1';
   const db = await getDb();
   const rows = await db.q(`select * from trial_balance($1::date,$2::date,$3)`, [from, to, zero]);

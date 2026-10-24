@@ -14,7 +14,7 @@ const TAGS_UP: [string, string][] = [['ดอกเบี้ยรับ', '4901
 const TAGS_DOWN: [string, string][] = [['ค่าธรรมเนียมธนาคาร', '53211'], ['ค่าใช้จ่ายเบ็ดเตล็ด', '59910']];
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-export function ReconcileBoard({ lines, items, accounts }: { lines: Line[]; items: Item[]; accounts: Acct[] }) {
+export function ReconcileBoard({ lines, items, accounts, readOnly = false }: { lines: Line[]; items: Item[]; accounts: Acct[]; readOnly?: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [sl, setSl] = useState<Set<string>>(new Set());
@@ -65,8 +65,8 @@ export function ReconcileBoard({ lines, items, accounts }: { lines: Line[]; item
   return (
     <>
       <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="btn ghost" disabled={pending} onClick={() => setSug(sug ? null : suggestMatches(lines, items))}>
-          {sug ? 'ซ่อนคำแนะนำ' : 'แนะนำจับคู่อัตโนมัติ'}</button>
+        {!readOnly && <button className="btn ghost" disabled={pending} onClick={() => setSug(sug ? null : suggestMatches(lines, items))}>
+          {sug ? 'ซ่อนคำแนะนำ' : 'แนะนำจับคู่อัตโนมัติ'}</button>}
         <span className="sub" style={{ margin: 0 }}>เทียบยอดเงิน วันที่ และข้อความของรายการที่ยังไม่จับคู่ · ต้องกดยืนยันเองทุกครั้ง</span>
       </div>
       {sug && (
@@ -99,7 +99,7 @@ export function ReconcileBoard({ lines, items, accounts }: { lines: Line[]; item
             <table style={{ minWidth: 0 }}><thead><tr><th /><th>วันที่</th><th>รายละเอียด</th><th className="num">จำนวนเงิน</th></tr></thead>
               <tbody>{lines.map(l => (
                 <tr key={l.id} style={{ opacity: l.matched && !sl.has(l.id) ? 0.6 : 1 }}>
-                  <td><input type="checkbox" aria-label="เลือกรายการธนาคาร" checked={sl.has(l.id)} disabled={pending || (unmatchMode && !l.matched) || (!unmatchMode && l.matched && sl.size > 0)}
+                  <td><input type="checkbox" aria-label="เลือกรายการธนาคาร" checked={sl.has(l.id)} disabled={readOnly || pending || (unmatchMode && !l.matched) || (!unmatchMode && l.matched && sl.size > 0)}
                     onChange={() => tog(sl, setSl, l.id)} /></td>
                   <td>{dateTh(l.date)}</td><td>{l.description}{l.matched && <span style={{ marginLeft: 6, color: 'var(--green)', fontSize: 12.5 }}>✓ จับคู่แล้ว</span>}</td>
                   <td className="num" style={{ color: l.amount < 0 ? 'var(--red)' : 'var(--green)' }}>{money(l.amount)}</td></tr>))}</tbody></table>)}
@@ -110,7 +110,7 @@ export function ReconcileBoard({ lines, items, accounts }: { lines: Line[]; item
             <table style={{ minWidth: 0 }}><thead><tr><th /><th>วันที่</th><th>เลขที่</th><th>คำอธิบาย</th><th className="num">จำนวนเงิน</th></tr></thead>
               <tbody>{items.map(i => (
                 <tr key={i.id} style={{ opacity: i.matched ? 0.6 : 1 }}>
-                  <td><input type="checkbox" aria-label="เลือกรายการสมุดบัญชี" checked={si.has(i.id)} disabled={pending || i.matched || unmatchMode}
+                  <td><input type="checkbox" aria-label="เลือกรายการสมุดบัญชี" checked={si.has(i.id)} disabled={readOnly || pending || i.matched || unmatchMode}
                     onChange={() => tog(si, setSi, i.id)} /></td>
                   <td>{dateTh(i.date)}</td><td className="no">{i.no}</td><td>{i.memo}{i.matched && <span style={{ marginLeft: 6, color: 'var(--green)' }}>✓</span>}</td>
                   <td className="num" style={{ color: i.amount < 0 ? 'var(--red)' : undefined }}>{money(i.amount)}</td></tr>))}</tbody></table>)}

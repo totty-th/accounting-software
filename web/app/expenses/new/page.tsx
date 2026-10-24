@@ -1,9 +1,11 @@
+import { requirePage } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { ExpenseForm } from '@/components/DocForm';
 import { createExpense } from '@/lib/actions';
 import { partyName } from '@/lib/format';
 
 export default async function NewExpense() {
+  await requirePage('expenses.write');
   const db = await getDb();
   const vendors = (await db.q(`select id, business_name, contact_name from contacts where not is_cash_default order by business_name nulls last`))
     .map(c => ({ id: c.id as string, label: partyName(c) }));

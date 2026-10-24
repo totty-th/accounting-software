@@ -1,3 +1,4 @@
+import { requirePage } from '@/lib/auth';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDb } from '@/lib/db';
@@ -8,6 +9,7 @@ import { buildReconcileReport, monthEnd } from '@/lib/bank-report';
 
 // รายงานกระทบยอดธนาคาร (Bank Reconciliation Statement) สำหรับพิมพ์ A4
 export default async function ReconcileReport({ params, searchParams }: { params: { id: string }; searchParams: { batch?: string; month?: string } }) {
+  await requirePage('bank.read');
   const db = await getDb();
   const b = (await db.q(`select b.id, b.bank_name, b.account_no, b.account_name, a.code from bank_accounts b join accounts a on a.id=b.account_id where b.id=$1`, [params.id]))[0];
   if (!b) notFound();

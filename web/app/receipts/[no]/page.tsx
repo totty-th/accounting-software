@@ -1,3 +1,4 @@
+import { requirePage } from '@/lib/auth';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDb } from '@/lib/db';
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic';
 
 // หน้ารายละเอียดใบเสร็จรับเงิน (เปิดด้วยเลขที่ใบเสร็จ) พิมพ์เป็น A4 ได้จากเบราว์เซอร์
 export default async function ReceiptDetail({ params }: { params: { no: string } }) {
+  await requirePage('receipts.read');
   const db = await getDb();
   const key = decodeURIComponent(params.no);
   const id = (await db.q<{ id: string }>('select id from receipts where receipt_no=$1', [key]))[0]?.id;

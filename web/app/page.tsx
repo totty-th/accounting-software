@@ -1,3 +1,4 @@
+import { requirePage } from '@/lib/auth';
 import Link from 'next/link';
 import { getDb, today, monthStart } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
@@ -6,6 +7,7 @@ import { Group } from '@/components/Board';
 import { DOC_TYPE } from '@/lib/status';
 
 export default async function Home() {
+  await requirePage('dash.view');
   const db = await getDb();
   const from = monthStart(), to = today();
   const bal = async (code: string) =>

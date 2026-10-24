@@ -1,3 +1,5 @@
+import { can } from '@/lib/permissions';
+import { requirePage } from '@/lib/auth';
 import Link from 'next/link';
 import { getDb } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
@@ -8,6 +10,8 @@ import { RECEIPT_KIND } from '@/lib/status';
 import * as A from '@/lib/actions';
 
 export default async function Receipts() {
+  const user = await requirePage('receipts.read');
+  const W = can(user.role, 'receipts.write');
   const db = await getDb();
   const rows = await db.q(`select r.*, c.business_name, c.contact_name from receipts r join contacts c on c.id=r.contact_id order by r.receipt_date desc, r.receipt_no desc`);
   const sets: [string, string, string][] = [['pending', 'รอเก็บเงิน', 'var(--orange)'], ['collected', 'เก็บเงินแล้ว', 'var(--green)'], ['cancelled', 'ยกเลิก', 'var(--grey)']];
@@ -24,9 +28,9 @@ export default async function Receipts() {
                 <tr key={r.id}><td className="no"><Link href={`/receipts/${r.receipt_no}`}>{r.receipt_no}</Link></td><td>{RECEIPT_KIND[r.kind]}</td><td>{partyName(r)}</td><td>{dateTh(r.receipt_date)}</td>
                   <td className="num">{money(r.amount)}</td><td className="num">{Number(r.wht) ? money(r.wht) : '-'}</td><td><Pill s={r.status} /></td>
                   <td><div className="acts">
-                    {r.status === 'pending' && <ActionButton label="เก็บเงิน" action={A.collectReceipt.bind(null, r.id)} />}
-                    {r.status === 'collected' && <ActionButton label="รีเซ็ต" variant="ghost" action={A.resetReceipt.bind(null, r.id)} />}
-                    {r.status !== 'cancelled' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={A.cancelReceipt.bind(null, r.id)} />}
+                    {W && r.status === 'pending' && <ActionButton label="เก็บเงิน" action={A.collectReceipt.bind(null, r.id)} />}
+                    {W && r.status === 'collected' && <ActionButton label="รีเซ็ต" variant="ghost" action={A.resetReceipt.bind(null, r.id)} />}
+                    {W && r.status !== 'cancelled' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={A.cancelReceipt.bind(null, r.id)} />}
                   </div></td></tr>))}</tbody></table>
           </Group>);
       })}

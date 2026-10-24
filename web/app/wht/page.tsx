@@ -1,3 +1,5 @@
+import { can } from '@/lib/permissions';
+import { requirePage } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
@@ -9,6 +11,8 @@ const CATS: [string, string][] = [['1', '1. เงินเดือน ค่�
 const CONDS: [string, string][] = [['withhold', 'หัก ณ ที่จ่าย'], ['forever', 'ออกให้ตลอดไป'], ['once', 'ออกให้ครั้งเดียว'], ['other', 'อื่น ๆ']];
 
 export default async function Wht() {
+  const user = await requirePage('wht.read');
+  const W = can(user.role, 'wht.write');
   const db = await getDb();
   const rows = await db.q(`select w.*, e.exp_no, c.id contact_id, c.business_name, c.contact_name, c.tax_id, c.address, c.person_kind,
       (select d->'missing' from (select wht_cert_data(w.id) d where w.status='active') x) missing
@@ -35,15 +39,15 @@ export default async function Wht() {
             {s === 'active' && rs.map(r => (
               <details key={r.id} className="panel" style={{ margin: '8px 0', padding: 12 }}>
                 <summary>{r.cert_no} · รายละเอียดในแบบ{r.missing?.length ? ` · ขาด: ${r.missing.join(', ')}` : ''}</summary>
-                <form action={A.saveContactTax} style={{ display: 'grid', gap: 6, margin: '10px 0' }}>
+                <form action={A.saveContactTax}><fieldset disabled={!W} style={{ display: 'grid', gap: 6, margin: '10px 0', border: 0, padding: 0, minWidth: 0 }}>
                   <b>ผู้ถูกหัก: {partyName(r)}</b><input type="hidden" name="id" value={r.contact_id} />
                   <label>เลขประจำตัวผู้เสียภาษี 13 หลัก <input name="tax_id" defaultValue={r.tax_id ?? ''} pattern="[0-9]{13}" /></label>
                   <label>ที่อยู่ <input name="address" defaultValue={r.address ?? ''} /></label>
                   <label>ประเภทบุคคล <select name="person_kind" defaultValue={r.person_kind ?? ''}><option value="">-</option>
                     <option value="juristic">นิติบุคคล</option><option value="individual">บุคคลธรรมดา</option></select></label>
-                  <button className="btn">บันทึกข้อมูลผู้ถูกหัก</button>
-                </form>
-                <form action={A.saveCertDetails} style={{ display: 'grid', gap: 6 }}>
+                  {W && <button className="btn">บันทึกข้อมูลผู้ถูกหัก</button>}
+                </fieldset></form>
+                <form action={A.saveCertDetails}><fieldset disabled={!W} style={{ display: 'grid', gap: 6, border: 0, padding: 0, minWidth: 0 }}>
                   <input type="hidden" name="id" value={r.id} />
                   <label>เล่มที่ <input name="book_no" defaultValue={r.book_no ?? ''} /></label>
                   <label>เลขที่ในเล่ม <input name="run_no" defaultValue={r.run_no ?? ''} /></label>
@@ -51,8 +55,8 @@ export default async function Wht() {
                   <label>ประเภทเงินได้ <select name="income_category" defaultValue={r.income_category}>{CATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
                   <label>ผู้จ่ายเงิน <select name="payer_condition" defaultValue={r.payer_condition}>{CONDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
                   <label>เงินสมทบประกันสังคม <input name="fund_sso" type="number" step="0.01" min="0" defaultValue={+r.fund_sso || ''} /></label>
-                  <button className="btn">บันทึกรายละเอียดในแบบ</button>
-                </form>
+                  {W && <button className="btn">บันทึกรายละเอียดในแบบ</button>}
+                </fieldset></form>
               </details>))}
           </Group>);
       })}

@@ -1,8 +1,10 @@
+import { requirePage } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { money, qty, dateTh } from '@/lib/format';
 import { Group } from '@/components/Board';
 
 export default async function Stock() {
+  await requirePage('stock.read');
   const db = await getDb();
   const prods = await db.q(`select p.id, p.code, p.name, p.base_unit, p.block_negative,
       coalesce(s.qty,0) q, coalesce(s.value,0) v, case when coalesce(s.qty,0) > 0 then round(s.value/s.qty,2) else coalesce(s.last_avg,p.purchase_price) end avg
