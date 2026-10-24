@@ -1,12 +1,12 @@
 'use client';
 import { useState, useTransition } from 'react';
-import { createGoodsReceipt } from '@/lib/actions';
 
 interface Opt { id: string; label: string; price?: number }
 interface Row { product_id: string; qty: string; unit_price: string }
 
 // ใบรับสินค้าใหม่: ผู้ขาย + รายการสินค้านับสต็อก (ราคาไม่รวม VAT 7%)
-export function RiForm({ vendors, products, today }: { vendors: Opt[]; products: Opt[]; today: string }) {
+export function RiForm({ vendors, products, today, action, title = 'ใบรับสินค้าใหม่' }:
+  { vendors: Opt[]; products: Opt[]; today: string; action: (p: { date: string; contact: string; lines: any[] }) => Promise<{ error?: string }>; title?: string }) {
   const [date, setDate] = useState(today);
   const [vendor, setVendor] = useState('');
   const [rows, setRows] = useState<Row[]>([{ product_id: '', qty: '1', unit_price: '' }]);
@@ -16,13 +16,13 @@ export function RiForm({ vendors, products, today }: { vendors: Opt[]; products:
   const pick = (i: number, id: string) => set(i, { product_id: id, unit_price: String(products.find(p => p.id === id)?.price ?? '') });
   const ok = vendor && rows.every(r => r.product_id && Number(r.qty) > 0 && r.unit_price !== '');
   const save = () => start(async () => {
-    const r = await createGoodsReceipt({ date, contact: vendor,
+    const r = await action({ date, contact: vendor,
       lines: rows.map(x => ({ product_id: x.product_id, qty: Number(x.qty), unit_price: Number(x.unit_price) })) });
-    setMsg(r.error ?? 'บันทึกใบรับสินค้าแล้ว');
+    setMsg(r.error ?? 'บันทึกแล้ว');
     if (!r.error) setRows([{ product_id: '', qty: '1', unit_price: '' }]);
   });
   return (
-    <details className="panel"><summary>+ ใบรับสินค้าใหม่</summary>
+    <details className="panel"><summary>+ {title}</summary>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 6, margin: '8px 0' }}>
         <input aria-label="วันที่" type="date" value={date} onChange={e => setDate(e.target.value)} />
         <select aria-label="ผู้จำหน่าย" value={vendor} onChange={e => setVendor(e.target.value)}>

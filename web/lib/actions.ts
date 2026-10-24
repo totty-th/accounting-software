@@ -167,3 +167,23 @@ export async function bankUnmatch(line: string, diffAction?: 'cancel' | 'keep') 
 export async function bankTransfer(p: { from: string; to: string; date: string; amount: number; fee: number }) {
   return run(call('select bank_transfer($1,$2,$3::date,$4,$5)', p.from, p.to, p.date || today(), p.amount, p.fee || 0), [...BANK, ...ALL], 'bank.write');
 }
+
+// ใบสั่งซื้อ (PO)
+const PO = [...ALL, '/purchases/orders', '/purchases'];
+export async function createPurchaseOrder(p: { date: string; contact: string; lines: any[] }) {
+  return run(call('select create_purchase_order($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), PO, 'expenses.write');
+}
+export const approvePurchaseOrder = async (id: string) => run(call('select approve_purchase_order($1)', id), PO, 'expenses.approve');
+export const rejectPurchaseOrder = async (id: string) => run(call('select reject_purchase_order($1)', id), PO, 'expenses.approve');
+export const resetPurchaseOrder = async (id: string) => run(call('select reset_purchase_order($1)', id), PO, 'expenses.write');
+export const cancelPurchaseOrder = async (id: string) => run(call('select cancel_purchase_order($1)', id), PO, 'expenses.write');
+export const upgradePoToRi = async (id: string) => run(call('select upgrade_po_to_ri($1)', id), PO, 'expenses.write');
+// ใบเตรียมจ่าย
+const SLIP = [...ALL, '/payments', '/purchases'];
+export async function createPaymentSlip(p: { date: string; due: string; docs: { type: string; id: string }[]; preparer?: string; requester?: string; approver?: string; reason?: string }) {
+  return run(call('select create_payment_slip($1::date,$2::date,$3::jsonb,$4,$5,$6,$7)', p.date, p.due || null, JSON.stringify(p.docs),
+    p.preparer || null, p.requester || null, p.approver || null, p.reason || null), SLIP, 'expenses.write');
+}
+export const payPaymentSlipVendor = async (slip: string, contact: string, payments?: PurchasePay[]) =>
+  run(call('select pay_payment_slip_vendor($1,$2,$3::date,$4::jsonb)', slip, contact, today(), payJson(payments)), SLIP, 'expenses.write');
+export const cancelPaymentSlip = async (id: string) => run(call('select cancel_payment_slip($1)', id), SLIP, 'expenses.write');

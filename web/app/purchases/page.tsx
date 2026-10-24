@@ -34,16 +34,16 @@ export default async function Purchases() {
     <>
       <div className="top"><div><h1>ใบรับสินค้า</h1>
         <p className="sub">บันทึกแล้วสินค้าเข้าสต็อกและตั้งเจ้าหนี้ทันที · ไม่อนุมัติ = กลับรายการและถอนสต็อก</p></div></div>
-      {W && <RiForm vendors={vendors} products={products} today={today()} />}
+      {W && <RiForm vendors={vendors} products={products} today={today()} action={A.createGoodsReceipt} />}
       {MW && <><CardForm /><PettyForm /></>}
       {rows.length === 0 && <div className="panel empty">ยังไม่มีใบรับสินค้า</div>}
       {sets.map(([s, title, color]) => {
         const rs = rows.filter(r => r.status === s); if (!rs.length) return null;
         return (
           <Group key={s} title={title} color={color} count={rs.length}>
-            <table><thead><tr><th>เลขที่</th><th>ผู้ขาย</th><th>รายการ</th><th>วันที่</th><th className="num">ยอดรวม</th><th>สถานะ</th><th /></tr></thead>
+            <table><thead><tr><th>เลขที่</th><th>ผู้ขาย</th><th>รายการ</th><th>วันที่</th><th>อ้างอิง</th><th className="num">ยอดรวม</th><th>สถานะ</th><th /></tr></thead>
               <tbody>{rs.map(r => (
-                <tr key={r.id}><td className="no">{r.ri_no}</td><td>{partyName(r)}</td><td>{r.items}</td><td>{dateTh(r.ri_date)}</td>
+                <tr key={r.id}><td className="no">{r.ri_no}</td><td>{partyName(r)}</td><td>{r.items}</td><td>{dateTh(r.ri_date)}</td><td>{r.ref_no ?? '-'}</td>
                   <td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td>
                   <td><div className="acts">
                     {AP && r.status === 'unpaid' && <ActionButton label="อนุมัติ" variant="ghost" action={A.approveGoodsReceipt.bind(null, r.id)} />}
