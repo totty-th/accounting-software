@@ -65,6 +65,16 @@ export async function saveQuotation(id: string | null, header: Record<string, un
   }, id ? [...ALL, `/sales/${id}`] : ALL, async u => can(u.role, 'sales.write') || (can(u.role, 'quote.own') && (!id || (await ownQuote(u, id)))));
   return { ...r, id: out };
 }
+/** สร้างใบแจ้งหนี้เต็มรูปแบบ (ส่วนลด/ภาษี/หัก ณ ที่จ่ายต่อบรรทัด) */
+export async function saveInvoice(header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
+  let out: string | undefined;
+  const r = await run(async u => {
+    out = (await (await getDb()).q<any>(`select create_invoice_full($2::jsonb,$3::jsonb) as id from (select set_config('app.user_id',$1,true)) s`,
+      [u.id, JSON.stringify(header), JSON.stringify(lines)]))[0].id;
+  }, ALL, 'sales.write');
+  return { ...r, id: out };
+}
+export const duplicateInvoice = async (id: string) => run(u => callAs(u.id, 'duplicate_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
 export const quoteToInvoice = async (id: string) => run(call('select quotation_to_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
 export const collectCash = async (id: string) => run(call('select collect_cash_sale($1,$2::date)', id, today()), ALL, 'sales.write');
 export const resetCash = async (id: string) => run(call('select reset_cash_sale($1)', id), ALL, 'sales.write');

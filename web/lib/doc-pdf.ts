@@ -4,7 +4,7 @@ import { PDFDocument, PDFFont, PDFPage, rgb, degrees } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { DOC_TITLE, type DocView } from './doc-view';
 import { bahtText } from './wht-pdf';
-import { docSummary, lineTaxLabel, lineWhtLabel, SIGNERS } from './doc-calc';
+import { docSummary, isFull, lineTaxLabel, lineWhtLabel, SIGNERS } from './doc-calc';
 
 const ASSETS = () => { const a = path.join(process.cwd(), 'assets'); return fs.existsSync(a) ? a : path.join(process.cwd(), 'web/assets'); };
 const fmt = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -15,7 +15,7 @@ const isThai = (c: string) => /[฀-๿]/.test(c);
 export type PdfMode = 'original' | 'copy' | 'both';
 
 export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promise<Uint8Array> {
-  const qt = v.doc.doc_type === 'QT', showTax = v.doc.doc_type !== 'BL';
+  const qt = v.doc.doc_type === 'QT', full = isFull(v), showTax = v.doc.doc_type !== 'BL';
   const dir = ASSETS();
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
@@ -66,12 +66,13 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
     let cy = y - 27;
     for (const ln of wrap(v.contact.address ?? '', 9.5, 270)) { draw(page, ln, L, cy, 9.5); cy -= 12; }
     if (v.contact.tax_id) { draw(page, `เลขประจำตัวผู้เสียภาษี ${v.contact.tax_id}`, L, cy, 9.5); cy -= 12; }
-    const meta: [string, string][] = [['เลขที่', v.doc.doc_no], ['วันที่', thDate(v.doc.doc_date)]];
-    const credit = qt ? (v.doc.term_mode === 'cash' ? 0 : Number(v.doc.credit_days ?? 0)) : v.contact.credit_days;
+    const meta: [string, string][] = [['เลขที่', v.doc.doc_no], ['วันที่', v.doc.doc_type === 'INV' && full && v.doc.term_mode === 'credit_nodate' ? '................................' : thDate(v.doc.doc_date)]];
+    const nodate = v.doc.doc_type === 'INV' && full && v.doc.term_mode === 'credit_nodate';
+    const credit = full ? (v.doc.term_mode === 'cash' || nodate ? 0 : Number(v.doc.credit_days ?? 0)) : v.contact.credit_days;
     if (credit > 0) meta.push(['เครดิต', `${credit} วัน`]);
-    if (v.doc.due_date && !qt) meta.push(['ครบกำหนด', thDate(v.doc.due_date)]);
-    if (qt && v.doc.ref_no) meta.push(['เลขที่อ้างอิง', v.doc.ref_no]);
-    if (qt && v.doc.project) meta.push(['โปรเจกต์', v.doc.project]);
+    if (v.doc.due_date && !qt && !nodate) meta.push(['ครบกำหนด', thDate(v.doc.due_date)]);
+    if (full && v.doc.ref_no) meta.push(['เลขที่อ้างอิง', v.doc.ref_no]);
+    if (full && v.doc.project) meta.push(['โปรเจกต์', v.doc.project]);
     if (v.doc.salesperson) meta.push(['พนักงานขาย', v.doc.salesperson]);
     if (v.ref && (v.doc.doc_type === 'CN' || v.doc.doc_type === 'DN')) meta.push(['วันที่อ้างอิง', thDate(v.ref.doc_date)]);
     if (v.ref) meta.push(['อ้างอิง', v.ref.doc_no]);
@@ -84,9 +85,9 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
     const w = rgb(1, 1, 1);
     draw(page, '#', L + 6, y, 10, { bold: true, color: w }); draw(page, 'รายละเอียด', L + 28, y, 10, { bold: true, color: w });
     draw(page, 'จำนวน', 300, y, 10, { bold: true, color: w, right: true });
-    draw(page, 'ราคาต่อหน่วย', qt ? 366 : 372, y, 10, { bold: true, color: w, right: true });
-    if (qt) draw(page, 'ส่วนลด', 410, y, 10, { bold: true, color: w, right: true });
-    if (showTax) { draw(page, 'ภาษี', qt ? 445 : 414, y, 10, { bold: true, color: w, right: true }); draw(page, 'หัก ณ ที่จ่าย', qt ? 498 : 482, y, 10, { bold: true, color: w, right: true }); }
+    draw(page, 'ราคาต่อหน่วย', full ? 366 : 372, y, 10, { bold: true, color: w, right: true });
+    if (full) draw(page, 'ส่วนลด', 410, y, 10, { bold: true, color: w, right: true });
+    if (showTax) { draw(page, 'ภาษี', full ? 445 : 414, y, 10, { bold: true, color: w, right: true }); draw(page, 'หัก ณ ที่จ่าย', full ? 498 : 482, y, 10, { bold: true, color: w, right: true }); }
     draw(page, 'มูลค่า', R - 6, y, 10, { bold: true, color: w, right: true });
     return y - 22;
   };
@@ -103,9 +104,9 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
       if (y - h < 200) { ({ page, y } = sheet(label)); y = tableHead(page, y); }
       draw(page, String(l.line_no), L + 6, y, 10);
       desc.forEach((ln, i) => draw(page, ln, L + 28, y - i * 13, 10));
-      draw(page, qtyFmt(l.qty) + (l.unit ? ` ${l.unit}` : ''), 300, y, 10, { right: true }); draw(page, fmt(l.unit_price), qt ? 366 : 372, y, 10, { right: true });
-      if (qt && Number(l.discount) > 0) draw(page, fmt(l.discount), 410, y, 10, { right: true });
-      if (showTax) { draw(page, lineTaxLabel(v, l), qt ? 445 : 414, y, 10, { right: true }); draw(page, lineWhtLabel(v, l), qt ? 498 : 482, y, 10, { right: true }); }
+      draw(page, qtyFmt(l.qty) + (l.unit ? ` ${l.unit}` : ''), 300, y, 10, { right: true }); draw(page, fmt(l.unit_price), full ? 366 : 372, y, 10, { right: true });
+      if (full && Number(l.discount) > 0) draw(page, fmt(l.discount), 410, y, 10, { right: true });
+      if (showTax) { draw(page, lineTaxLabel(v, l), full ? 445 : 414, y, 10, { right: true }); draw(page, lineWhtLabel(v, l), full ? 498 : 482, y, 10, { right: true }); }
       draw(page, fmt(l.amount), R - 6, y, 10, { right: true });
       page.drawLine({ start: { x: L, y: y - 8 }, end: { x: R, y: y - 8 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
       y -= h;
@@ -125,7 +126,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
     if (sum.wht.length) { y -= 4; page.drawLine({ start: { x: 330, y: y + 10 }, end: { x: R, y: y + 10 }, thickness: 0.4, color: rgb(0.8, 0.8, 0.84) }); put(sum.wht); }
     y -= 6;
     const noteTxt = v.doc.reason || v.doc.note;
-    if (qt && v.doc.description) { draw(page, 'รายละเอียด', L, y, 9.5, { color: col }); const dl = wrap(v.doc.description, 10, 500); dl.forEach((ln, i) => draw(page, ln, L, y - 13 - i * 12, 10)); y -= 13 + dl.length * 12 + 4; }
+    if (full && v.doc.description) { draw(page, 'รายละเอียด', L, y, 9.5, { color: col }); const dl = wrap(v.doc.description, 10, 500); dl.forEach((ln, i) => draw(page, ln, L, y - 13 - i * 12, 10)); y -= 13 + dl.length * 12 + 4; }
     if (noteTxt) { draw(page, 'หมายเหตุ', L, y, 9.5, { color: col }); wrap(noteTxt, 10, 500).forEach((ln, i) => draw(page, ln, L, y - 13 - i * 12, 10)); }
     // ลายเซ็น (ในนาม + ช่องเซ็น + วันที่)
     const sy = 84;

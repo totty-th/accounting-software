@@ -18,13 +18,15 @@ export const SIGNERS: Record<string, [string, string]> = {
 };
 
 type Ln = DocView['lines'][number];
+/** เอกสารแบบเต็มรูปแบบ (ส่วนลด/ภาษี/หัก ณ ที่จ่ายต่อบรรทัด): ใบเสนอราคาทุกใบ และใบแจ้งหนี้ที่สร้างด้วยฟอร์มใหม่ (ทุกบรรทัดมี vat_rate) */
+export const isFull = (v: DocView) => v.doc.doc_type === 'QT' || (v.doc.doc_type === 'INV' && v.lines.length > 0 && v.lines.every(l => l.vat_rate != null));
 export function lineTaxLabel(v: DocView, l?: Ln): string {
   if (v.doc.doc_type === 'BL') return '';
-  if (v.doc.doc_type === 'QT' && l) return l.vat_exempt ? 'ยกเว้น' : `${Number(l.vat_rate ?? 7)} %`;
+  if (isFull(v) && l) return l.vat_exempt ? 'ยกเว้น' : `${Number(l.vat_rate ?? 7)} %`;
   return c(v.doc.vat) > 0 ? `${Number(v.doc.vat_rate)} %` : 'ไม่มี';
 }
 export function lineWhtLabel(v: DocView, l?: Ln): string {
-  const r = Number(v.doc.doc_type === 'QT' && l ? l.wht_rate ?? 0 : (v.doc as any).wht_rate ?? 0);
+  const r = Number(isFull(v) && l ? l.wht_rate ?? 0 : (v.doc as any).wht_rate ?? 0);
   return r > 0 ? `${r} %` : 'ไม่หัก';
 }
 
@@ -32,7 +34,7 @@ export function docSummary(v: DocView): { rows: SumRow[]; wht: SumRow[]; total: 
   const d = v.doc, t = d.doc_type;
   const sub = c(d.subtotal), vat = c(d.vat), total = c(d.total);
   const rows: SumRow[] = [];
-  if (t === 'QT') {   // ใบเสนอราคาเต็มรูปแบบ: ส่วนลด / ไม่มี-ยกเว้นภาษี / หัก ณ ที่จ่ายต่อบรรทัด
+  if (isFull(v)) {   // ใบเสนอราคา/ใบแจ้งหนี้เต็มรูปแบบ: ส่วนลด / ไม่มี-ยกเว้นภาษี / หัก ณ ที่จ่ายต่อบรรทัด
     const disc = c(d.discount_total);
     const noTax = v.lines.reduce((s, l) => s + (l.vat_exempt || Number(l.vat_rate ?? 7) === 0 ? c(l.amount) : 0), 0);
     rows.push({ label: 'รวมเป็นเงิน', value: m(sub + disc) });

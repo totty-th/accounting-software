@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveQuotation, quickCreateCustomer, quickCreateSaleProduct } from '@/lib/actions';
+import { saveQuotation, saveInvoice, quickCreateCustomer, quickCreateSaleProduct } from '@/lib/actions';
 
 export interface Cust { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
 export interface QProd { id: string; code: string; name: string; unit: string; price: number; kind: 'service' | 'goods_nostock' | 'goods_stock'; onhand: number; description: string }
@@ -12,17 +12,19 @@ const WHT = ['0', '0.5', '0.75', '1', '1.5', '2', '3', '5', '10', '15'];
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
 const hasContent = (l: Line) => !!(l.product_id || l.name.trim());
 const KIND_ICON: Record<string, string> = { service: '🛎', goods_nostock: '📦', goods_stock: '🏷' };
 const KIND_LABEL: Record<string, string> = { service: 'บริการ', goods_nostock: 'สินค้าไม่นับสต็อก', goods_stock: 'สินค้านับสต็อก' };
 
-/** ใบเสนอราคา: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — สร้างและแก้ไข (เฉพาะรออนุมัติ) */
-export function QtForm({ id, customers: c0, products, warehouses, people, today, salesperson, init, canCreateCustomer, canCreateProduct }: {
-  id: string | null; customers: Cust[]; products: QProd[]; warehouses: Wh[]; people: string[]; today: string; salesperson: string;
+/** ใบเสนอราคา/ใบแจ้งหนี้: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — QT สร้างและแก้ไข (เฉพาะรออนุมัติ) · INV สร้างอย่างเดียว */
+export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses, people, today, salesperson, init, canCreateCustomer, canCreateProduct }: {
+  docType?: 'QT' | 'INV'; id: string | null; customers: Cust[]; products: QProd[]; warehouses: Wh[]; people: string[]; today: string; salesperson: string;
   init?: { header: Record<string, any>; lines: Line[] }; canCreateCustomer: boolean; canCreateProduct: boolean;
 }) {
   const router = useRouter();
-  const back = '/sales?type=QT';
+  const isInv = docType === 'INV';
+  const back = `/sales?type=${docType}`;
   const [customers, setCustomers] = useState(c0);
   const [prods, setProds] = useState(products);
   const [np, setNp] = useState<{ row: number; kind: string; name: string; code: string; unit: string; price: string; description: string } | null>(null);
@@ -68,9 +70,10 @@ export function QtForm({ id, customers: c0, products, warehouses, people, today,
   const ok = h.contact && lines.some(hasContent) && lines.filter(hasContent).every(l => Number(l.qty) > 0 && l.unit_price !== '');
   const submit = () => start(async () => {
     setErr(null);
-    const r = await saveQuotation(id, { ...h, credit_days: Number(h.credit_days) || 0 },
-      lines.filter(hasContent).map(l => ({ product_id: l.product_id || undefined, description: l.name, detail: l.detail, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
-        discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 })));
+    const payload = lines.filter(hasContent).map(l => ({ product_id: l.product_id || undefined, description: l.name, detail: l.detail, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
+        discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 }));
+    const head = { ...h, credit_days: Number(h.credit_days) || 0 };
+    const r = isInv ? await saveInvoice({ ...head, due_date: h.term_mode === 'credit' ? h.due_date : undefined }, payload) : await saveQuotation(id, head, payload);
     if (r.error) return setErr(r.error);
     router.push(r.id ? `/sales/${r.id}` : back); router.refresh();
   });
@@ -103,9 +106,11 @@ export function QtForm({ id, customers: c0, products, warehouses, people, today,
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignContent: 'start' }}>
             {lbl('วันที่', <input type="date" value={h.date} onChange={e => set({ date: e.target.value, due_date: addDays(e.target.value, Number(h.credit_days) || 0) })} />)}
             {lbl('เงื่อนไขชำระ', <select aria-label="เงื่อนไขชำระ" value={h.term_mode} onChange={e => set({ term_mode: e.target.value, ...(e.target.value === 'cash' ? { credit_days: '0', due_date: h.date } : {}) })}>
-              <option value="credit">เครดิต (วัน)</option><option value="cash">เงินสด</option><option value="credit_nodate">เครดิต (ไม่แสดงวันที่)</option></select>)}
+              <option value="credit">เครดิต (วัน)</option>{!isInv && <option value="cash">เงินสด</option>}<option value="credit_nodate">เครดิต (ไม่แสดงวันที่)</option></select>)}
             {credit && lbl('เครดิต (วัน)', <input aria-label="เครดิตวัน" inputMode="numeric" value={h.credit_days} onChange={e => set({ credit_days: e.target.value, due_date: addDays(h.date, Number(e.target.value) || 0) })} />)}
-            {h.term_mode === 'credit' && lbl('ครบกำหนด', <input type="date" value={h.due_date} disabled />)}
+            {h.term_mode === 'credit' && lbl('ครบกำหนด', isInv
+              ? <input aria-label="ครบกำหนด" type="date" value={h.due_date} min={h.date} onChange={e => e.target.value && set({ due_date: e.target.value, credit_days: String(Math.max(0, daysBetween(h.date, e.target.value))) })} />
+              : <input type="date" value={h.due_date} disabled />)}
             {lbl('พนักงานขาย', <select aria-label="พนักงานขาย" value={h.salesperson} onChange={e => set({ salesperson: e.target.value })}>
               {[...new Set([h.salesperson, ...people].filter(Boolean))].map(n => <option key={n} value={n}>{n}</option>)}</select>)}
             {lbl('สกุลเงิน', <input value="THB - ไทย" disabled />)}

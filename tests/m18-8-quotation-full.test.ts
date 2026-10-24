@@ -108,14 +108,14 @@ describe('M18.8 ใบเสนอราคาเต็มรูปแบบ', (
     expect([b.doc_no === a.doc_no, b.status, b.doc_date.toISOString().slice(0, 10), b.credit_days, b.project, b.note, +b.total, +b.wht_total, +b.discount_total])
       .toEqual([false, 'pending_approval', '2026-10-20', 7, 'P', 'น', +a.total, +a.wht_total, +a.discount_total]);
   });
-  it('แปลงเป็นใบแจ้งหนี้: กันเมื่อมีส่วนลด/ภาษีไม่ใช่ 7%/หัก ณ ที่จ่าย', async () => {
+  it('แปลงเป็นใบแจ้งหนี้: มีส่วนลด/ภาษี 0%·ยกเว้น/หัก ณ ที่จ่ายก็แปลงได้ (M18.9 ใบแจ้งหนี้รองรับแล้ว)', async () => {
     for (const x of [{ discount_type: 'percent', discount_value: 5 }, { vat: '0' }, { vat: 'exempt' }, { wht_rate: 3 }]) {
       const id = await qt({}, [L(x)]);
       await db.query('select approve_quotation($1)', [id]);
-      expect(await err(db.query('select quotation_to_invoice($1,$2::date)', [id, D]))).toMatch(/ยังไม่รองรับ/);
-      expect((await get(id)).status).toBe('approved');
+      await db.query('select quotation_to_invoice($1,$2::date)', [id, D]);
+      expect((await get(id)).status).toBe('converted');
     }
-    expect(+(await one<any>(`select count(*) c from sales_docs where doc_type='INV'`)).c).toBe(0);
+    expect(+(await one<any>(`select count(*) c from sales_docs where doc_type='INV'`)).c).toBe(4);
   });
   it('มุมมองเอกสาร (sales_doc_view) ส่งฟิลด์ใหม่ครบ', async () => {
     const id = await qt({ term_mode: 'cash', salesperson: 'ส', note: 'ห' }, [L({ discount_type: 'percent', discount_value: 10, wht_rate: 3, unit: 'แผ่น' })]);
@@ -139,7 +139,8 @@ describe('M18.8 ใบเสนอราคาเต็มรูปแบบ', (
     expect((await one<any>('select detail from sales_doc_lines where doc_id=$1', [cp])).detail).toBe('บรรทัดที่หนึ่ง\nบรรทัดที่สอง');
     await db.query('select approve_quotation($1)', [id]);
     const inv = (await one<any>('select quotation_to_invoice($1,$2::date) id', [id, D])).id;
-    expect((await one<any>('select description from sales_doc_lines where doc_id=$1', [inv])).description).toBe('ตะแกรง A\nบรรทัดที่หนึ่ง\nบรรทัดที่สอง');
+    const il = await one<any>('select description, detail from sales_doc_lines where doc_id=$1', [inv]);   // M18.9: ใบแจ้งหนี้มีช่อง detail เอง
+    expect([il.description, il.detail]).toEqual(['ตะแกรง A', 'บรรทัดที่หนึ่ง\nบรรทัดที่สอง']);
   });
   it('สินค้ามีรายละเอียด (products.description)', async () => {
     await db.query(`update products set description='รายละเอียดจากสินค้า' where id=$1`, [prod]);

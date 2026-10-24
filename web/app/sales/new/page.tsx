@@ -14,11 +14,13 @@ export default async function NewDoc({ searchParams }: { searchParams: { type?: 
   const ownOnly = !can(user.role, 'sales.write');                // ฝ่ายขายสร้างได้เฉพาะใบเสนอราคา
   const type = ownOnly ? 'QT' : ['QT', 'INV', 'CA'].includes(searchParams.type ?? '') ? searchParams.type! : 'INV';
   if (ownOnly && searchParams.type && searchParams.type !== 'QT') redirect('/sales/new?type=QT');
-  if (type === 'QT') {
+  if (type === 'QT' || type === 'INV') {
     const d = await qtFormData();
     return (<>
-      <div className="top"><div><h1>สร้างใบเสนอราคา</h1><p className="sub">ไม่ลงบัญชีและไม่ขยับสต็อก · อนุมัติแล้วจึงสร้างใบแจ้งหนี้ได้</p></div></div>
-      <QtForm id={null} {...d} today={today()} salesperson={user.displayName || user.username} canCreateCustomer={can(user.role, 'contact.create')} canCreateProduct={can(user.role, 'master.write') || can(user.role, 'quote.own')} />
+      <div className="top"><div>{type === 'QT'
+        ? <><h1>สร้างใบเสนอราคา</h1><p className="sub">ไม่ลงบัญชีและไม่ขยับสต็อก · อนุมัติแล้วจึงสร้างใบแจ้งหนี้ได้</p></>
+        : <><h1>สร้างใบแจ้งหนี้</h1><p className="sub">ลงลูกหนี้/รายได้/ภาษีขายทันที · ตัดสต็อกสินค้านับสต็อก · หัก ณ ที่จ่ายไปลงตอนรับชำระ</p></>}</div></div>
+      <QtForm docType={type} id={null} {...d} today={today()} salesperson={user.displayName || user.username} canCreateCustomer={can(user.role, 'contact.create')} canCreateProduct={can(user.role, 'master.write') || can(user.role, 'quote.own')} />
     </>);
   }
   const db = await getDb();
