@@ -1,4 +1,5 @@
 'use client';
+import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import { Nav } from '@/components/Nav';
 import { RoleProvider } from '@/components/Can';
@@ -14,7 +15,7 @@ export function Shell({ children, user }: { children: React.ReactNode; user: { n
       <div className="shell">
         <aside className="side noprint">
           <div className="brand"><span className="logo">฿</span>ระบบบัญชี</div>
-          <Nav />
+          <Suspense fallback={null}><Nav /></Suspense>
           <form action={logoutAction} style={{ marginTop: 'auto', padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,.12)', fontSize: 13 }}>
             <div style={{ opacity: .85 }}>{user.name}</div>
             <div style={{ opacity: .6, fontSize: 12, marginBottom: 8 }}>{ROLE_LABEL[user.role]}</div>
