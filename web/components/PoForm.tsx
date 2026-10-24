@@ -74,9 +74,9 @@ export function PoForm({ id, vendors: v0, products: p0, warehouses, today, purch
   const lbl = (t: string, c: React.ReactNode) => <label className="f">{t}{c}</label>;
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div className="wide" style={{ display: 'grid', gap: 12 }}>
       <section className="panel" style={{ padding: 16 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 24 }}>
           <div style={{ display: 'grid', gap: 8, alignContent: 'start' }}>
             {lbl('ชื่อผู้จำหน่าย', <select aria-label="ผู้จำหน่าย" value={h.contact} onChange={e => pickVendor(e.target.value)}>
               <option value="">เลือกผู้จำหน่าย</option>{vendors.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}</select>)}
@@ -108,22 +108,22 @@ export function PoForm({ id, vendors: v0, products: p0, warehouses, today, purch
       </section>
 
       <section className="panel" style={{ padding: 12, overflowX: 'auto' }}>
-        <table style={{ minWidth: 900 }}><thead><tr><th>#</th><th>ชื่อสินค้า / รายละเอียด</th><th>จำนวน</th><th>หน่วย</th><th>ราคาต่อหน่วย</th>
-          <th>ส่วนลด <select aria-label="ชนิดส่วนลด" value={lines[0]?.dtype} onChange={e => setLines(ls => ls.map(l => ({ ...l, dtype: e.target.value as any })))}>
+        <table style={{ minWidth: 1000, width: '100%', tableLayout: 'fixed' }}><colgroup><col style={{ width: 34 }} /><col /><col style={{ width: 90 }} /><col style={{ width: 90 }} /><col style={{ width: 120 }} /><col style={{ width: 110 }} /><col style={{ width: 100 }} /><col style={{ width: 120 }} /><col style={{ width: 120 }} /><col style={{ width: 64 }} /></colgroup><thead><tr><th>#</th><th>ชื่อสินค้า / รายละเอียด</th><th>จำนวน</th><th>หน่วย</th><th>ราคาต่อหน่วย</th>
+          <th>ส่วนลด <select aria-label="ชนิดส่วนลด" style={{ width: 64, padding: "2px 4px" }} value={lines[0]?.dtype} onChange={e => setLines(ls => ls.map(l => ({ ...l, dtype: e.target.value as any })))}>
             <option value="percent">%</option><option value="amount">฿</option></select></th><th>ภาษี</th><th>หัก ณ ที่จ่าย</th><th className="num">ราคารวม</th><th /></tr></thead>
           <tbody>{lines.map((l, i) => { const p = products.find(x => x.id === l.product_id); return (
             <tr key={i} style={{ verticalAlign: 'top' }}><td>{i + 1}</td>
-              <td style={{ minWidth: 260 }}>
+              <td>
                 <select aria-label={`สินค้า ${i + 1}`} value={l.product_id} onChange={e => pickProduct(i, e.target.value)}>
                   <option value="">เลือกสินค้า</option>{products.map(x => <option key={x.id} value={x.id}>{x.code} {x.name} (คงเหลือ {x.onhand})</option>)}</select>
                 {p && <div className="sub">คงเหลือ {p.onhand} {p.unit} · {p.code}</div>}
                 <textarea aria-label={`รายละเอียด ${i + 1}`} rows={1} placeholder="รายละเอียด (Shift+Enter ขึ้นบรรทัดใหม่)" value={l.description} onChange={e => setL(i, { description: e.target.value })} style={{ width: '100%' }} />
                 {canCreateProduct && <button type="button" className="btn sm ghost" onClick={() => setNp({ row: i, code: '', name: '', unit: 'ชิ้น', buy: '' })}>+ เพิ่มสินค้าใหม่</button>}
               </td>
-              <td><input aria-label={`จำนวน ${i + 1}`} inputMode="decimal" value={l.qty} onChange={e => setL(i, { qty: e.target.value })} style={{ width: 70 }} /></td>
-              <td><input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} style={{ width: 70 }} /></td>
-              <td><input aria-label={`ราคา ${i + 1}`} inputMode="decimal" value={l.unit_price} onChange={e => setL(i, { unit_price: e.target.value })} style={{ width: 100 }} /></td>
-              <td><input aria-label={`ส่วนลด ${i + 1}`} inputMode="decimal" value={l.dval} onChange={e => setL(i, { dval: e.target.value })} style={{ width: 80 }} /></td>
+              <td><input aria-label={`จำนวน ${i + 1}`} inputMode="decimal" value={l.qty} onChange={e => setL(i, { qty: e.target.value })} /></td>
+              <td><input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} /></td>
+              <td><input aria-label={`ราคา ${i + 1}`} inputMode="decimal" value={l.unit_price} onChange={e => setL(i, { unit_price: e.target.value })} /></td>
+              <td><input aria-label={`ส่วนลด ${i + 1}`} inputMode="decimal" value={l.dval} onChange={e => setL(i, { dval: e.target.value })} /></td>
               <td><select aria-label={`ภาษี ${i + 1}`} value={l.vat} onChange={e => setL(i, { vat: e.target.value })}><option value="0">0%</option><option value="7">7%</option><option value="exempt">ยกเว้น</option></select></td>
               <td><select aria-label={`หัก ณ ที่จ่าย ${i + 1}`} value={l.wht} onChange={e => setL(i, { wht: e.target.value })}>{WHT.map(w => <option key={w} value={w}>{w === '0' ? 'ไม่หัก' : `${w}%`}</option>)}</select></td>
               <td className="num">{fmt(calc.per[i].total)}</td>

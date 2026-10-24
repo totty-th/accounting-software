@@ -139,3 +139,10 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:-1px}
   .sheet{box-shadow:none;border-radius:0;padding:0;border-top-width:6px}
   @page{size:A4;margin:12mm}
 }
+
+/* หน้ากรอกเอกสารซื้อ: ขยายเต็มหน้าจอเหมือน FA */
+.panel.wide,.wide .panel{max-width:none}
+.wide table{width:100%}
+.wide .main-grid{display:grid;gap:12px}
+.wide td input:not([type=checkbox]),.wide td select,.wide td textarea{width:100%;min-width:0;box-sizing:border-box}
+.wide-main{max-width:none}
