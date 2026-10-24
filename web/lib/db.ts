@@ -14,7 +14,8 @@ export function getDb(): Promise<Db> { return (g.__db ??= init()); }
 async function init(): Promise<Db> {
   if (process.env.DATABASE_URL) {
     const { Pool } = await import('pg');
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    // Supabase pooler (transaction mode) บน serverless: จำกัดการเชื่อมต่อต่อ instance (TLS ตามที่กำหนดใน DATABASE_URL)
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
     return { q: async (s, p) => (await pool.query(s, p as any[])).rows };
   }
   // บน Vercel ระบบไฟล์เขียนได้เฉพาะ /tmp (เดโมเท่านั้น: ข้อมูลรีเซ็ตเมื่อ instance เริ่มใหม่)
