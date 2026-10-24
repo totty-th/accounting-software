@@ -21,10 +21,10 @@ export function AdjustForm({ type, refId, contactId, refNo, refTotal, refSubtota
   const hasGoods = lines.some(l => l.item_kind === 'goods');
   const [group, setGroup] = useState<'goods' | 'service'>(hasGoods ? 'goods' : 'service');
   const opts = ADJUST_REASONS[type][group];
-  const [reason, setReason] = useState(opts[0].label);
+  const [reason, setReason] = useState('');
   const [other, setOther] = useState('');
   const set = (i: number, p: Partial<(typeof rows)[number]>) => setRows(rs => rs.map((r, k) => (k === i ? { ...r, ...p } : r)));
-  const pickGroup = (g: 'goods' | 'service') => { setGroup(g); setReason(ADJUST_REASONS[type][g][0].label); };
+  const pickGroup = (g: 'goods' | 'service') => { setGroup(g); setReason(''); };
 
   const t = useMemo(() => {
     const gross = lines.reduce((s, _, i) => s + (rows[i].on ? r2((+rows[i].qty || 0) * (+rows[i].price || 0)) : 0), 0);
@@ -42,6 +42,7 @@ export function AdjustForm({ type, refId, contactId, refNo, refTotal, refSubtota
       ? [{ description: l.description, kind: l.item_kind, qty: +rows[i].qty, unit_price: +rows[i].price || 0,
           product_id: l.product_id, stock_action: l.is_stock ? rows[i].stock : null }] : []);
     if (!ls.length) return setErr('ติ๊กเลือกรายการอย่างน้อย 1 บรรทัด');
+    if (!reason) return setErr('กรุณาระบุสาเหตุในการออกเอกสาร');
     const text = isOther ? `${reason}: ${other.trim()}` : reason;
     if (isOther && !other.trim()) return setErr('ระบุสาเหตุเพิ่มเติม');
     const r = await action({ type, date, contact: contactId, mode, lines: ls, reason: text, ref: refId });
@@ -59,7 +60,7 @@ export function AdjustForm({ type, refId, contactId, refNo, refTotal, refSubtota
           <select value={group} onChange={e => pickGroup(e.target.value as any)}><option value="goods">สินค้า</option><option value="service">บริการ</option></select>
         </label>
         <label className="f">สาเหตุ
-          <select value={reason} onChange={e => setReason(e.target.value)}>{opts.map(o => <option key={o.label}>{o.label}</option>)}</select>
+          <select value={reason} onChange={e => setReason(e.target.value)}><option value="">-- กรุณาระบุเหตุผลในการออกเอกสาร --</option>{opts.map(o => <option key={o.label}>{o.label}</option>)}</select>
         </label>
         {isOther && <label className="f">ระบุสาเหตุ<input value={other} onChange={e => setOther(e.target.value)} /></label>}
       </div>

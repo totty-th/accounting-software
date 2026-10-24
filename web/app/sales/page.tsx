@@ -47,8 +47,7 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
   return (
     <>
       <div className="top"><div><h1>{name}</h1><p className="sub">เอกสารขาย › {name} › {PERIODS.find(p => p[0] === period)![1]}</p></div>
-        {!canNew || type === 'CN' || type === 'DN' || type === 'BL' ? null : <Link className="btn" href={`/sales/new?type=${type}`}>+ สร้าง{name}ใหม่</Link>}</div>
-      {type === 'CN' || type === 'DN' ? <div className="notice">{name}สร้างจากใบแจ้งหนี้: เปิดใบแจ้งหนี้ที่รอเก็บเงินแล้วกด "ออก{name}"</div> : null}
+        {!canNew || type === 'BL' ? null : <Link className="btn" href={type === 'CN' || type === 'DN' ? `/sales/adjust?type=${type}` : `/sales/new?type=${type}`}>+ สร้าง{name}ใหม่</Link>}</div>
       {type === 'BL' ? <div className="notice">ใบวางบิลสร้างจากใบแจ้งหนี้ (กำลังเพิ่มปุ่มในหน้านี้)</div> : null}
       <form className="row-inline" method="get">
         <input type="hidden" name="type" value={type} />
