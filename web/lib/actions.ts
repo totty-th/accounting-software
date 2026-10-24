@@ -187,3 +187,21 @@ export async function createPaymentSlip(p: { date: string; due: string; docs: { 
 export const payPaymentSlipVendor = async (slip: string, contact: string, payments?: PurchasePay[]) =>
   run(call('select pay_payment_slip_vendor($1,$2,$3::date,$4::jsonb)', slip, contact, today(), payJson(payments)), SLIP, 'expenses.write');
 export const cancelPaymentSlip = async (id: string) => run(call('select cancel_payment_slip($1)', id), SLIP, 'expenses.write');
+
+// ---- M18.4 ใบกำกับภาษีที่ได้รับ · WT อิสระ · ลิงก์แชร์ PO/RI/PAY ----
+const PURCHASE_PATHS = ['/purchases', '/purchases/orders', '/payments', '/expenses', '/reports/purchase-tax'];
+export async function savePurchaseTaxInvoice(f: FormData): Promise<void> {
+  const d: Record<string, string | undefined> = {};
+  for (const k of ['invoice_no', 'invoice_date', 'vat_form', 'vendor_name', 'vendor_tax_id', 'branch', 'base_amount', 'vat_amount']) d[k] = str(f, k);
+  await run(call('select set_purchase_tax_invoice($1,$2,$3::jsonb)', str(f, 'doc_type'), str(f, 'doc_id'), JSON.stringify(d)), PURCHASE_PATHS, 'expenses.write');
+}
+export const clearPurchaseTaxInvoice = async (type: string, id: string) =>
+  run(call('select clear_purchase_tax_invoice($1,$2)', type, id), PURCHASE_PATHS, 'expenses.write');
+
+export async function createStandaloneWht(p: { date: string; contact: string; form: string; category: string; lines: { income_type: string; rate?: number | null; amount: number; vat_mode?: string; wht?: number }[] }) {
+  return run(call('select create_standalone_wht($1::date,$2,$3,$4::jsonb,$5)', p.date, p.contact, p.form, JSON.stringify(p.lines), p.category), ['/wht'], 'wht.write');
+}
+export const cancelWhtCert = async (id: string) => run(call('select cancel_wht_cert($1)', id), ['/wht'], 'wht.write');
+
+export const sharePurchaseDoc = async (kind: string, id: string) => run(call('select ensure_purchase_share_token($1,$2)', kind, id), PURCHASE_PATHS, 'expenses.write');
+export const unsharePurchaseDoc = async (kind: string, id: string) => run(call('select revoke_purchase_share_token($1,$2)', kind, id), PURCHASE_PATHS, 'expenses.write');

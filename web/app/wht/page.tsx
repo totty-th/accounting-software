@@ -1,9 +1,11 @@
 import { can } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
-import { getDb } from '@/lib/db';
+import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
 import { Group } from '@/components/Board';
+import { WhtForm } from '@/components/WhtForm';
+import { ActionButton } from '@/components/ActionButton';
 import * as A from '@/lib/actions';
 
 const CATS: [string, string][] = [['1', '1. เงินเดือน ค่าจ้าง 40(1)'], ['2', '2. ค่านายหน้า 40(2)'], ['3', '3. ค่าลิขสิทธิ์ 40(3)'],
@@ -16,26 +18,29 @@ export default async function Wht() {
   const db = await getDb();
   const rows = await db.q(`select w.*, e.exp_no, c.id contact_id, c.business_name, c.contact_name, c.tax_id, c.address, c.person_kind,
       (select d->'missing' from (select wht_cert_data(w.id) d where w.status='active') x) missing
-    from wht_certs w join expenses e on e.id=w.expense_id join contacts c on c.id=e.contact_id
+    from wht_certs w left join expenses e on e.id=w.expense_id join contacts c on c.id=w.contact_id
     order by w.created_at desc, w.cert_no desc`);
+  const vendors = (await db.q(`select id, business_name, contact_name from contacts where not is_cash_default order by business_name nulls last, contact_name`)).map(c => ({ id: c.id as string, label: partyName(c) }));
   const company = (await db.q('select * from company_profile'))[0];
   return (
     <>
       <div className="top"><div><h1>หนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ)</h1>
         <p className="sub">ออกอัตโนมัติเมื่อจ่ายเงิน พิมพ์ลงแบบมาตรฐานกรมสรรพากร · ต้องมีข้อมูลบริษัทและผู้ถูกหักครบจึงออก PDF ได้</p></div>
         <a className="btn ghost" href="/settings/company">{company ? 'ข้อมูลบริษัทผู้จ่าย' : '⚠ ตั้งค่าข้อมูลบริษัท'}</a></div>
-      {rows.length === 0 && <div className="panel empty">ยังไม่มีหนังสือรับรอง (จ่ายค่าใช้จ่ายที่มีหัก ณ ที่จ่ายแล้วจะขึ้นที่นี่)</div>}
+      {W && <WhtForm today={today()} vendors={vendors} />}
+      {rows.length === 0 && <div className="panel empty">ยังไม่มีหนังสือรับรอง (จ่ายค่าใช้จ่ายที่มีหัก ณ ที่จ่ายแล้วจะขึ้นที่นี่ หรือสร้างใบอิสระด้านบน)</div>}
       {[['active', 'ใช้งานอยู่', 'var(--green)'], ['cancelled', 'ยกเลิก', 'var(--grey)']].map(([s, title, color]) => {
         const rs = rows.filter(r => r.status === s); if (!rs.length) return null;
         return (
           <Group key={s} title={title} color={color} count={rs.length}>
             <table><thead><tr><th>เลขที่</th><th>ผู้ถูกหัก</th><th>ค่าใช้จ่าย</th><th>วันที่จ่าย</th><th className="num">ฐานภาษี</th><th className="num">ภาษีที่หัก</th><th>สถานะ</th><th /></tr></thead>
               <tbody>{rs.map(r => (
-                <tr key={r.id}><td className="no">{r.cert_no}</td><td>{partyName(r)}</td><td>{r.exp_no}</td><td>{dateTh(r.pay_date)}</td>
+                <tr key={r.id}><td className="no">{r.cert_no}</td><td>{partyName(r)}</td><td>{r.exp_no ?? 'ออกอิสระ'}</td><td>{dateTh(r.pay_date)}</td>
                   <td className="num">{money(r.base_amount)}</td><td className="num">{money(r.wht_amount)}</td><td><Pill s={r.status === 'active' ? 'paid' : 'cancelled'} /></td>
                   <td>{r.status === 'active' && (r.missing?.length
                     ? <span title={r.missing.join(' · ')} style={{ color: 'var(--orange)' }}>⚠ ข้อมูลไม่ครบ ({r.missing.length})</span>
-                    : <a className="btn" href={`/wht/${r.id}/pdf`} target="_blank">PDF 50 ทวิ</a>)}</td></tr>))}</tbody></table>
+                    : <a className="btn" href={`/wht/${r.id}/pdf`} target="_blank">PDF 50 ทวิ</a>)}
+                    {W && r.status === 'active' && !r.expense_id && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={A.cancelWhtCert.bind(null, r.id)} />}</td></tr>))}</tbody></table>
             {s === 'active' && rs.map(r => (
               <details key={r.id} className="panel" style={{ margin: '8px 0', padding: 12 }}>
                 <summary>{r.cert_no} · รายละเอียดในแบบ{r.missing?.length ? ` · ขาด: ${r.missing.join(', ')}` : ''}</summary>

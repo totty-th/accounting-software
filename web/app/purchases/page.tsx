@@ -5,6 +5,8 @@ import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
 import { Group } from '@/components/Board';
 import { ActionButton } from '@/components/ActionButton';
+import { PurchaseDocTools } from '@/components/PurchaseDocTools';
+import { TaxInvoiceBox } from '@/components/TaxInvoiceBox';
 import { PayForm } from '@/components/PayForm';
 import { CardForm, PettyForm } from '@/components/CardForm';
 import { RiForm } from '@/components/RiForm';
@@ -14,7 +16,8 @@ export default async function Purchases() {
   const user = await requirePage('expenses.read');
   const W = can(user.role, 'expenses.write'), AP = can(user.role, 'expenses.approve'), MW = can(user.role, 'master.write');
   const db = await getDb();
-  const rows = await db.q(`select g.*, c.business_name, c.contact_name,
+  const taxInv: Record<string, any> = Object.fromEntries((await db.q(`select * from purchase_tax_invoices where doc_type='RI'`)).map(t => [t.doc_id, t]));
+  const rows = await db.q(`select g.*, c.business_name, c.contact_name, c.tax_id,
       (select string_agg(p.code || ' ×' || trim(trailing '.' from trim(trailing '0' from l.qty::text)), ', ' order by l.line_no)
          from goods_receipt_lines l join products p on p.id=l.product_id where l.ri_id=g.id) items
     from goods_receipts g join contacts c on c.id=g.contact_id order by g.ri_date desc, g.ri_no desc`);
@@ -46,6 +49,8 @@ export default async function Purchases() {
                 <tr key={r.id}><td className="no">{r.ri_no}</td><td>{partyName(r)}</td><td>{r.items}</td><td>{dateTh(r.ri_date)}</td><td>{r.ref_no ?? '-'}</td>
                   <td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td>
                   <td><div className="acts">
+                    <PurchaseDocTools kind="RI" id={r.id} token={r.share_token ?? null} canWrite={W} />
+                    {r.status !== 'rejected' && r.status !== 'cancelled' && <TaxInvoiceBox type="RI" id={r.id} inv={taxInv[r.id]} canWrite={W} vendor={{ name: partyName(r), tax_id: r.tax_id }} />}
                     {AP && r.status === 'unpaid' && <ActionButton label="อนุมัติ" variant="ghost" action={A.approveGoodsReceipt.bind(null, r.id)} />}
                     {AP && (r.status === 'unpaid' || r.status === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={A.rejectGoodsReceipt.bind(null, r.id)} />}
                     {W && (r.status === 'unpaid' || r.status === 'approved') && (

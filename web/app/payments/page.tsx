@@ -4,6 +4,7 @@ import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { Group } from '@/components/Board';
 import { ActionButton } from '@/components/ActionButton';
+import { PurchaseDocTools } from '@/components/PurchaseDocTools';
 import { PayForm } from '@/components/PayForm';
 import { SlipForm } from '@/components/SlipForm';
 import * as A from '@/lib/actions';
@@ -57,6 +58,7 @@ export default async function Payments() {
                     <b className="no">{s.pay_no}</b><span>{dateTh(s.pay_date)}</span>
                     <span className="sub">ชำระภายใน {s.due_date ? dateTh(s.due_date) : '-'} · ผู้จัดเตรียม {s.preparer ?? '-'} · ผู้ขอ {s.requester ?? '-'} · ผู้อนุมัติ {s.approver ?? '-'}{s.reason ? ` · ${s.reason}` : ''}</span>
                     <span style={{ flex: 1 }} />
+                    <PurchaseDocTools kind="PAY" id={s.id} token={s.share_token ?? null} canWrite={W} />
                     {W && s.status === 'active' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={A.cancelPaymentSlip.bind(null, s.id)} />}
                   </div>
                   <p className="sub">{byVendor.length} ผู้จำหน่าย · {its.length} เอกสาร · รวม {money(its.reduce((a, i) => a + Number(i.net), 0))}</p>

@@ -7,6 +7,7 @@ import { Pill } from '@/components/Pill';
 import { Group } from '@/components/Board';
 import { ActionButton } from '@/components/ActionButton';
 import * as A from '@/lib/actions';
+import { TaxInvoiceBox } from '@/components/TaxInvoiceBox';
 import { PayForm } from '@/components/PayForm';
 import { CardForm, PettyForm } from '@/components/CardForm';
 
@@ -14,7 +15,8 @@ export default async function Expenses() {
   const user = await requirePage('expenses.read');
   const W = can(user.role, 'expenses.write'), AP = can(user.role, 'expenses.approve');
   const db = await getDb();
-  const rows = await db.q(`select e.*, c.business_name, c.contact_name,
+  const taxInv: Record<string, any> = Object.fromEntries((await db.q(`select * from purchase_tax_invoices where doc_type='EXP'`)).map(t => [t.doc_id, t]));
+  const rows = await db.q(`select e.*, c.business_name, c.contact_name, c.tax_id,
       (select string_agg(description, ', ' order by line_no) from expense_lines l where l.expense_id=e.id) items
     from expenses e join contacts c on c.id=e.contact_id order by e.exp_date desc, e.exp_no desc`);
   const banks = (await db.q(`select b.id, b.bank_name, b.account_no from bank_accounts b where b.is_active order by b.bank_name`))
@@ -41,6 +43,7 @@ export default async function Expenses() {
                 <tr key={r.id}><td className="no">{r.exp_no}</td><td>{partyName(r)}</td><td>{r.items}</td><td>{dateTh(r.exp_date)}</td>
                   <td className="num">{money(r.total)}</td><td className="num">{Number(r.wht_total) ? money(r.wht_total) : '-'}</td><td><Pill s={r.status} /></td>
                   <td><div className="acts">
+                    {r.status !== 'rejected' && r.status !== 'cancelled' && <TaxInvoiceBox type="EXP" id={r.id} inv={taxInv[r.id]} canWrite={W} vendor={{ name: partyName(r), tax_id: r.tax_id }} />}
                     {AP && r.status === 'pending' && <ActionButton label="อนุมัติ" variant="ghost" action={A.approveExpense.bind(null, r.id)} />}
                     {AP && (r.status === 'pending' || r.status === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={A.rejectExpense.bind(null, r.id)} />}
                     {W && (r.status === 'pending' || r.status === 'approved') && (

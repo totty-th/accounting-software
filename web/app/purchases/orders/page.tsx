@@ -5,6 +5,7 @@ import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
 import { Group } from '@/components/Board';
 import { ActionButton } from '@/components/ActionButton';
+import { PurchaseDocTools } from '@/components/PurchaseDocTools';
 import { RiForm } from '@/components/RiForm';
 import * as A from '@/lib/actions';
 
@@ -38,6 +39,7 @@ export default async function PurchaseOrders() {
                 <tr key={r.id}><td className="no">{r.po_no}</td><td>{partyName(r)}</td><td>{r.items}</td><td>{dateTh(r.po_date)}</td><td>{r.ri_no ?? '-'}</td>
                   <td className="num">{money(r.total)}</td><td><Pill s={r.status === 'pending' ? 'pending_approval' : r.status} /></td>
                   <td><div className="acts">
+                    <PurchaseDocTools kind="PO" id={r.id} token={r.share_token ?? null} canWrite={W} />
                     {AP && r.status === 'pending' && <ActionButton label="อนุมัติ" variant="ghost" action={A.approvePurchaseOrder.bind(null, r.id)} />}
                     {W && (r.status === 'pending' || r.status === 'approved') && <ActionButton label="สร้างใบรับสินค้า" action={A.upgradePoToRi.bind(null, r.id)} />}
                     {AP && (r.status === 'pending' || r.status === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={A.rejectPurchaseOrder.bind(null, r.id)} />}
