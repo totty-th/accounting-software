@@ -13,6 +13,10 @@ import { CopyBox, PrintButton } from '@/components/ShareTools';
 import { createShareLink, revokeShareLink } from '@/lib/actions';
 import { requirePage, canViewSalesDoc } from '@/lib/auth';
 import { can } from '@/lib/permissions';
+import { NoteBox, FileUpload, FileRemove, WhtPick } from '@/components/DocExtras';
+import { STATUS } from '@/lib/status';
+
+const EV: Record<string, string> = { created: 'สร้างเอกสาร', status: 'เปลี่ยนสถานะ', note: 'แก้ไขโน้ตภายใน', file_added: 'แนบไฟล์', file_removed: 'ลบไฟล์แนบ', wht: 'เปลี่ยนอัตราหัก ณ ที่จ่าย' };
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +30,12 @@ export default async function SalesDetail({ params }: { params: { id: string } }
   const h = headers(), host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
   const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
   const link = tok ? `${proto}://${host}/s/${tok}` : null;
+  const x = (await db.q<any>('select internal_note, wht_rate from sales_docs where id=$1', [v.doc.id]))[0];
+  const files = await db.q<any>('select id, filename, size from sales_doc_files where doc_id=$1 order by created_at', [v.doc.id]);
+  const events = await db.q<any>(`select e.event, e.detail, e.at, u.display_name from doc_events e left join app_users u on u.id=e.actor_id
+    where e.doc_id=$1 order by e.id desc`, [v.doc.id]);
+  const evText = (e: any) => e.event === 'status' ? `${EV.status}: ${String(e.detail).split('>').map((t: string) => STATUS[t]?.[0] ?? t).join(' → ')}`
+    : e.event === 'wht' ? `${EV.wht}: ${String(e.detail).replace('>', '% → ')}%` : e.detail && e.event.startsWith('file') ? `${EV[e.event]}: ${e.detail}` : EV[e.event] ?? e.event;
   const title = DOC_TITLE[v.doc.doc_type].title;
   const subject = `เอกสารเลขที่ ${v.doc.doc_no} จาก ${v.company?.name ?? ''}`;
   const body = `เรียน ${v.contact.name}\n\n${v.company?.name ?? ''} ขอส่ง${title} เลขที่ ${v.doc.doc_no} ยอดรวม ${money(v.doc.total)} บาท` +
@@ -72,6 +82,30 @@ export default async function SalesDetail({ params }: { params: { id: string } }
               <CopyBox text={body} label="คัดลอกข้อความ" />
               <a className="btn sm ghost" href={`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}>เปิดในโปรแกรมอีเมล</a>
             </div>
+          </section>
+          {v.doc.doc_type === 'DN' && (
+            <section className="panel">
+              <h3>หัก ณ ที่จ่าย</h3>
+              <p className="sub">ลูกค้าหักเรา คิดจากมูลค่าก่อน VAT ของใบนี้ แก้ได้ก่อนมีใบเสร็จ</p>
+              <WhtPick id={v.doc.id} rate={Number(x.wht_rate)} canEdit={can(user.role, 'sales.write') && v.doc.status !== 'cancelled'} />
+            </section>)}
+          <section className="panel">
+            <h3>โน้ตภายในบริษัท</h3>
+            <NoteBox id={v.doc.id} note={x.internal_note ?? ''} canEdit={canWrite} />
+          </section>
+          <section className="panel">
+            <h3>ไฟล์แนบ</h3>
+            <ul className="rel">
+              {files.map((f: any) => <li key={f.id}><a href={`/sales/file/${f.id}`}>{f.filename}</a> <span className="sub">{Math.ceil(f.size / 1024)} KB</span> {canWrite && <FileRemove docId={v.doc.id} fileId={f.id} />}</li>)}
+              {!files.length && <li className="sub">ยังไม่มีไฟล์แนบ</li>}
+            </ul>
+            {canWrite && <FileUpload id={v.doc.id} />}
+          </section>
+          <section className="panel">
+            <h3>ประวัติเอกสาร</h3>
+            <ul className="rel">
+              {events.map((e: any, i: number) => <li key={i}>{evText(e)} <span className="sub">{new Date(e.at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' })} · {e.display_name ?? 'ระบบ'}</span></li>)}
+            </ul>
           </section>
           <section className="panel">
             <h3>เอกสารที่เกี่ยวข้อง</h3>

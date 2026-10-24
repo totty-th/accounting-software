@@ -34,7 +34,24 @@ export async function createSalesDoc(p: { type: string; date: string; contact: s
     u.id, p.type, p.date, p.contact || null, JSON.stringify(p.lines), p.mode, p.ref || null, p.reason || null)(), ALL,
     u => can(u.role, 'sales.write') || (can(u.role, 'quote.own') && p.type === 'QT'));
 }
-export const cancelSalesDoc = async (id: string) => run(call('select cancel_sales_doc($1)', id), ALL, salesDocGate(id));
+/** เรียกฟังก์ชันพร้อมตั้งผู้ทำรายการ (app.user_id) ในคำสั่งเดียวกัน เพื่อให้ประวัติเอกสารรู้ว่าใครทำ */
+const callAs = (uid: string, fn: string, ...p: unknown[]) =>
+  call(`select ${fn.replace(/\$(\d+)/g, (_, n) => '$' + (Number(n) + 1))} from (select set_config('app.user_id',$1,true)) s`, uid, ...p)();
+export const cancelSalesDoc = async (id: string) => run(u => callAs(u.id, 'cancel_sales_doc($1)', id), ALL, salesDocGate(id));
+export const restoreSalesDoc = async (id: string) => run(u => callAs(u.id, 'restore_sales_doc($1)', id), ALL, 'sales.write');
+export const saveSalesNote = async (id: string, note: string) =>
+  run(u => callAs(u.id, 'set_sales_doc_note($1,$2)', id, note), [`/sales/${id}`], salesDocGate(id));
+export const setDnWht = async (id: string, rate: number) =>
+  run(u => callAs(u.id, 'set_debit_note_wht($1,$2)', id, rate), ALL.concat(`/sales/${id}`), 'sales.write');
+export async function uploadSalesFile(f: FormData): Promise<Result> {
+  const id = String(f.get('id') ?? ''); const file = f.get('file') as File | null;
+  if (!file || !file.size) return { error: 'กรุณาเลือกไฟล์' };
+  if (file.size > 5 * 1024 * 1024) return { error: 'ไฟล์ใหญ่เกิน 5 MB' };
+  const b64 = Buffer.from(await file.arrayBuffer()).toString('base64');
+  return run(u => callAs(u.id, "add_sales_doc_file($1,$2,$3,decode($4,'base64'))", id, file.name, file.type, b64), [`/sales/${id}`], salesDocGate(id));
+}
+export const removeSalesFile = async (docId: string, fileId: string) =>
+  run(u => callAs(u.id, 'remove_sales_doc_file($1)', fileId), [`/sales/${docId}`], salesDocGate(docId));
 export const approveQuote = async (id: string) => run(call('select approve_quotation($1)', id), ALL, 'sales.approve');
 export const quoteToInvoice = async (id: string) => run(call('select quotation_to_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
 export const collectCash = async (id: string) => run(call('select collect_cash_sale($1,$2::date)', id, today()), ALL, 'sales.write');

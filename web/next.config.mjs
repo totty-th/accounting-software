@@ -5,6 +5,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 /** @type {import('next').NextConfig} */
 export default {
   experimental: {
+    serverActions: { bodySizeLimit: '8mb' },
     serverComponentsExternalPackages: ['@electric-sql/pglite', 'pg'],
     outputFileTracingIncludes: {
       '/wht/[id]/pdf': ['./assets/**/*'],
