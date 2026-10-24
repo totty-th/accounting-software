@@ -3,7 +3,7 @@ import { getDb } from './db';
 export interface DocView {
   doc: { id: string; doc_type: string; doc_no: string; doc_date: string; due_date: string | null; status: string; price_mode: string;
     vat_rate: string | number; subtotal: string | number; vat: string | number; total: string | number; reason: string | null;
-    is_deposit: boolean; deposit_net: string | number; deposit_vat: string | number; wht_rate?: string | number };
+    is_deposit: boolean; deposit_net: string | number; deposit_vat: string | number; wht_rate?: string | number; salesperson?: string | null };
   contact: { id: string; name: string; address: string | null; tax_id: string | null; credit_days: number };
   company: { name: string; address: string | null; tax_id: string | null } | null;
   lines: { line_no: number; description: string; item_kind: string; qty: string | number; unit_price: string | number; amount: string | number }[];
@@ -22,8 +22,14 @@ export async function loadView(key: string): Promise<DocView | null> {
     if (!r) return null;
     id = r.id;
   }
-  try { return (await (await getDb()).q<{ v: DocView }>('select sales_doc_view($1) as v', [id]))[0].v; }
-  catch { return null; }
+  try {
+    const db = await getDb();
+    const v = (await db.q<{ v: DocView }>('select sales_doc_view($1) as v', [id]))[0].v;
+    // พนักงานขาย = ผู้ใช้ที่ล็อกอินสร้างเอกสาร (sales_docs.created_by) ไม่ให้เลือกเอง
+    v.doc.salesperson = (await db.q<{ n: string | null }>(
+      'select u.display_name as n from sales_docs d left join app_users u on u.id = d.created_by where d.id = $1', [id]))[0]?.n ?? null;
+    return v;
+  } catch { return null; }
 }
 export async function loadViewByToken(token: string): Promise<DocView | null> {
   if (!/^[0-9a-f]{26}$/.test(token)) return null;

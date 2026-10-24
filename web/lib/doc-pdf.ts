@@ -68,6 +68,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original'): Promi
     const meta: [string, string][] = [['เลขที่', v.doc.doc_no], ['วันที่', thDate(v.doc.doc_date)]];
     if (v.contact.credit_days > 0) meta.push(['เครดิต', `${v.contact.credit_days} วัน`]);
     if (v.doc.due_date && v.doc.doc_type !== 'QT') meta.push(['ครบกำหนด', thDate(v.doc.due_date)]);
+    if (v.doc.salesperson) meta.push(['พนักงานขาย', v.doc.salesperson]);
     if (v.ref && (v.doc.doc_type === 'CN' || v.doc.doc_type === 'DN')) meta.push(['วันที่อ้างอิง', thDate(v.ref.doc_date)]);
     if (v.ref) meta.push(['อ้างอิง', v.ref.doc_no]);
     meta.forEach(([k, val], i) => { draw(page, k, 360, y - i * 14, 10, { color: grey }); draw(page, val, R, y - i * 14, 10, { right: true }); });

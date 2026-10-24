@@ -37,6 +37,7 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
           {credit > 0 && <><dt>เครดิต</dt><dd>{credit} วัน</dd></>}
           {v.doc.due_date && ty !== 'QT' && <><dt>ครบกำหนด</dt><dd>{dateTh(v.doc.due_date)}</dd></>}
           {v.ref && (ty === 'CN' || ty === 'DN') && <><dt>วันที่อ้างอิง</dt><dd>{dateTh(v.ref.doc_date)}</dd></>}
+          {v.doc.salesperson && <><dt>พนักงานขาย</dt><dd>{v.doc.salesperson}</dd></>}
           {v.ref && <><dt>อ้างอิง</dt><dd>{v.ref.doc_no}</dd></>}
         </dl>
       </section>
