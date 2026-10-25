@@ -2,7 +2,7 @@
 import { useState } from 'react';
 
 /** ปุ่มดาวน์โหลด Excel / พิมพ์รายงาน — อ่านตารางที่แสดงอยู่ (รวมแถวที่ขยายไว้) แล้วส่งไปสร้างไฟล์ */
-export function ReportTools({ title, meta = [] }: { title: string; meta?: [string, string][] }) {
+export function ReportTools({ title, meta = [], exportBase, modes }: { title: string; meta?: [string, string][]; exportBase?: string; modes?: [string, string][] }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const xlsx = async () => {
@@ -22,7 +22,11 @@ export function ReportTools({ title, meta = [] }: { title: string; meta?: [strin
   };
   return (
     <div className="noprint" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '0 0 10px', flexWrap: 'wrap' }}>
-      <button className="btn sm ghost" disabled={busy} onClick={xlsx}>⬇ ดาวน์โหลด Excel</button>
+      {exportBase
+        ? (modes ?? [['', 'ดาวน์โหลด Excel']]).map(([m, l]) => <button key={m} className="btn sm ghost" onClick={() => {
+            const u = new URL(window.location.href); const q = new URLSearchParams(u.search); if (m) q.set('mode', m); else q.delete('mode'); q.delete('view'); q.delete('doc');
+            window.location.href = `${exportBase}?${q}`; }}>⬇ {l}</button>)
+        : <button className="btn sm ghost" disabled={busy} onClick={xlsx}>⬇ ดาวน์โหลด Excel</button>}
       <button className="btn sm" onClick={() => window.print()}>🖨 พิมพ์รายงาน</button>
       {err && <span style={{ color: 'var(--red)' }}>{err}</span>}
     </div>

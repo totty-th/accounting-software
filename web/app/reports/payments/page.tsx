@@ -55,7 +55,7 @@ export default async function PaymentReport({ searchParams }: { searchParams: Sp
           <div><div className="sub">ยอดชำระสุทธิ</div><strong>{money(totPaid)}</strong></div>
         </div>
       </div>
-      <ReportTools title="รายงานการชำระเงิน" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
+      <ReportTools exportBase="/reports/payments/export" title="รายงานการชำระเงิน" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
       <div data-report className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 4 }}>
         {rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : <PayGroups groups={[...groups.values()]} />}
       </div>

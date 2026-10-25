@@ -3,7 +3,7 @@ import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
 import { periodRange } from '@/lib/period';
-import { reportPeriod, pickStatuses, pgArr } from '@/lib/report-filter';
+import { reportPeriod, pickStatuses, pgArr, PURCHASE_BUCKETS } from '@/lib/report-filter';
 import { ReportFilter } from '@/components/ReportFilter';
 import { DocRows } from '@/components/DocRows';
 import { requirePage } from '@/lib/auth';
@@ -11,7 +11,7 @@ import { ReportTools } from '@/components/ReportTools';
 
 export const dynamic = 'force-dynamic';
 type Sp = { view?: string; period?: string; from?: string; to?: string; kind?: string; doc?: string; st?: string | string[] };
-const ST_BUCKETS: Record<string, string[]> = { pend: ['pending', 'unpaid'], appr: ['approved'], paid: ['paid'], cancelled: ['rejected', 'cancelled'] };
+const ST_BUCKETS = PURCHASE_BUCKETS;
 const ST_OPTS: [string, string][] = [['pend', 'รออนุมัติ/รอดำเนินการ'], ['appr', 'อนุมัติแล้ว'], ['paid', 'ชำระเงินแล้ว'], ['cancelled', 'ยกเลิก/ไม่อนุมัติ (แสดงแต่ไม่นับยอด)']];
 // รายงานซื้อและค่าใช้จ่าย: ใบรับสินค้า (RI → สินค้าคงเหลือ) + ใบค่าใช้จ่าย (EXP → บัญชีค่าใช้จ่ายของแต่ละบรรทัด)
 // นับรออนุมัติ/รอชำระ (บัญชีลงตั้งแต่สร้างเอกสาร) ไม่นับไม่อนุมัติ/ยกเลิก · แสดงมูลค่าก่อน VAT แยก VAT ซื้อ
@@ -102,7 +102,7 @@ export default async function PurchaseReport({ searchParams }: { searchParams: S
           <div className="sub" style={{ marginTop: 8 }}>ค่าใช้จ่าย/ต้นทุนที่ลงบัญชีโดยไม่ผ่านใบรับสินค้า-ค่าใช้จ่าย (ไม่รวมในยอดข้างบน)</div>
           <ul className="rel">{rc.gl.other_expense.map((o: any) => <li key={o.source + o.code}>{o.source} · {o.code} {o.name} · {money(o.amount)}</li>)}</ul></>}
       </div>}
-      <ReportTools title="รายงานซื้อและค่าใช้จ่าย" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
+      <ReportTools exportBase="/reports/purchases/export" modes={[['summary', 'Excel (สรุป)'], ['detail', 'Excel (แบบละเอียด)']]} title="รายงานซื้อและค่าใช้จ่าย" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
       <div data-report className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 4 }}>
         {isAcct ? (acct.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> :
           <table><thead><tr><th>เลขที่เอกสาร</th><th>วันที่</th><th>รายละเอียด</th><th className="num">มูลค่า</th><th>สถานะ</th></tr></thead>

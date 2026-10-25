@@ -4,7 +4,7 @@ import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
 import { DOC_TYPE } from '@/lib/status';
 import { periodRange } from '@/lib/period';
-import { reportPeriod, pickStatuses, pgArr } from '@/lib/report-filter';
+import { reportPeriod, pickStatuses, pgArr, SALES_BUCKETS } from '@/lib/report-filter';
 import { ReportFilter } from '@/components/ReportFilter';
 import { DocRows } from '@/components/DocRows';
 import { requirePage } from '@/lib/auth';
@@ -12,8 +12,7 @@ import { ReportTools } from '@/components/ReportTools';
 
 export const dynamic = 'force-dynamic';
 type Sp = { view?: string; period?: string; from?: string; to?: string; type?: string; st?: string | string[] };
-const ST_BUCKETS: Record<string, string[]> = { wait: ['awaiting_payment', 'pending_collect'], done: ['collected', 'paid'], rcpt: ['receipt_opened'], split: ['split_paid'],
-  ok: ['approved', 'active'], cancelled: ['cancelled'] };
+const ST_BUCKETS = SALES_BUCKETS;
 const ST_OPTS: [string, string][] = [['wait', 'รอเก็บเงิน'], ['done', 'เก็บเงินแล้ว'], ['rcpt', 'เปิดใบเสร็จแล้ว'], ['split', 'แบ่งจ่าย'], ['ok', 'อนุมัติแล้ว/ใช้งาน (ใบลดหนี้/ใบเพิ่มหนี้)'], ['cancelled', 'ยกเลิก (แสดงแต่ไม่นับยอด)']];
 // รายงานสรุปยอดขาย: INV + ขายสด + ใบเพิ่มหนี้ เป็นบวก, ใบลดหนี้เป็นลบ · ไม่รวมใบเสนอราคา/ใบวางบิล/เอกสารที่ยกเลิก/ใบมัดจำ (มัดจำไม่ใช่รายได้)
 // ยอดต้องตรงบัญชีรายได้หมวด 41 — มีแผงกระทบยอดด้านล่าง (sales_revenue_reconcile)
@@ -85,7 +84,7 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
           <div className="sub" style={{ marginTop: 8 }}>รายการบัญชีรายได้ที่ลงตรง (ไม่ผ่านเอกสารขาย เช่น ใบสำคัญทั่วไป) รวม {money(rc.gl.manual)} · ไม่นับในยอดขายข้างบน</div>
           <ul className="rel">{rc.gl.manual_items.map((m: any) => <li key={m.voucher_no + m.code}>{m.voucher_no} {dateTh(m.date)} · {m.code} {m.name} · {money(m.amount)}</li>)}</ul></>}
       </div>}
-      <ReportTools title="รายงานขาย" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
+      <ReportTools exportBase="/reports/sales/export" modes={[['summary', 'Excel (สรุป)'], ['detail', 'Excel (แบบละเอียด)']]} title="รายงานขาย" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
       <div data-report className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 4 }}>
         {rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : view === 'summary' ? (
           <DocRows partyLabel="ลูกค้า" vatLabel="ภาษีมูลค่าเพิ่ม" rows={rows.map(r => ({ key: r.id, href: `/sales/${r.doc_no}`, no: r.doc_no, date: dateTh(r.doc_date), party: partyName(r),
