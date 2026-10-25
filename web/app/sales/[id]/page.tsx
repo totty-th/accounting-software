@@ -34,7 +34,15 @@ export default async function SalesDetail({ params }: { params: { id: string } }
   const files = await db.q<any>('select id, filename, size from sales_doc_files where doc_id=$1 order by created_at', [v.doc.id]);
   const events = await db.q<any>(`select e.event, e.detail, e.at, u.display_name from doc_events e left join app_users u on u.id=e.actor_id
     where e.doc_id=$1 order by e.id desc`, [v.doc.id]);
-  const evText = (e: any) => e.event === 'delivery' ? (e.detail === 'pickup' ? 'ข้อมูลจัดส่ง: ลูกค้ามารับเอง' : e.detail === 'ship' ? 'ข้อมูลจัดส่ง: ส่งให้ลูกค้า' : 'ล้างข้อมูลจัดส่ง') : e.event === 'status' ? `${EV.status}: ${String(e.detail).split('>').map((t: string) => STATUS[t]?.[0] ?? t).join(' → ')}`
+  const editText = (raw: string) => { try { const x = JSON.parse(raw); const b = x.before, a = x.after; const ch: string[] = [];
+      if (Number(b.total) !== Number(a.total)) ch.push(`ยอดรวม ${money(b.total)} → ${money(a.total)}`);
+      if (String(b.date).slice(0, 10) !== String(a.date).slice(0, 10)) ch.push(`วันที่ ${dateTh(b.date)} → ${dateTh(a.date)}`);
+      if (b.contact !== a.contact) ch.push(`ลูกค้า ${b.contact} → ${a.contact}`);
+      if (JSON.stringify(b.lines) !== JSON.stringify(a.lines)) ch.push(`รายการ ${b.lines.length} → ${a.lines.length} บรรทัด`);
+      for (const [k, t] of [['ref_no', 'เลขอ้างอิง'], ['project', 'โปรเจ็ค'], ['description', 'รายละเอียด'], ['note', 'หมายเหตุ'], ['internal_note', 'โน้ตภายใน'], ['salesperson', 'พนักงานขาย']] as const)
+        if ((b[k] ?? '') !== (a[k] ?? '')) ch.push(`${t} "${b[k] ?? ''}" → "${a[k] ?? ''}"`);
+      return `แก้ไขเอกสาร: ${ch.join(' · ') || 'ข้อมูลทั่วไป'}`; } catch { return 'แก้ไขเอกสาร'; } };
+  const evText = (e: any) => e.event === 'edit' ? editText(e.detail) : e.event === 'delivery' ? (e.detail === 'pickup' ? 'ข้อมูลจัดส่ง: ลูกค้ามารับเอง' : e.detail === 'ship' ? 'ข้อมูลจัดส่ง: ส่งให้ลูกค้า' : 'ล้างข้อมูลจัดส่ง') : e.event === 'status' ? `${EV.status}: ${String(e.detail).split('>').map((t: string) => STATUS[t]?.[0] ?? t).join(' → ')}`
     : e.event === 'wht' ? `${EV.wht}: ${String(e.detail).replace('>', '% → ')}%` : e.detail && e.event.startsWith('file') ? `${EV[e.event]}: ${e.detail}` : EV[e.event] ?? e.event;
   const dlvOk = (v.doc.doc_type === 'QT' && ['approved', 'converted'].includes(v.doc.status)) || (v.doc.doc_type === 'INV' && v.doc.status !== 'cancelled');
   const bill = v.doc.doc_type === 'QT' ? (await db.q<any>('select quotation_billing_summary($1) as s', [v.doc.id]))[0].s : null;

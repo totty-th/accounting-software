@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveQuotation, saveInvoice, quickCreateCustomer, quickCreateSaleProduct } from '@/lib/actions';
+import { saveQuotation, saveInvoice, updateSalesDoc, quickCreateCustomer, quickCreateSaleProduct } from '@/lib/actions';
 
 export interface Cust { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
 export interface QProd { id: string; code: string; name: string; unit: string; price: number; kind: 'service' | 'goods_nostock' | 'goods_stock'; onhand: number; description: string }
@@ -73,7 +73,7 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
     const payload = lines.filter(hasContent).map(l => ({ product_id: l.product_id || undefined, description: l.name, detail: l.detail, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
         discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 }));
     const head = { ...h, credit_days: Number(h.credit_days) || 0 };
-    const r = isInv ? await saveInvoice({ ...head, due_date: h.term_mode === 'credit' ? h.due_date : undefined }, payload) : await saveQuotation(id, head, payload);
+    const r = isInv && id ? await updateSalesDoc(id, { ...head, due_date: h.term_mode === 'credit' ? h.due_date : undefined }, payload).then(x => ({ ...x, id })) : isInv ? await saveInvoice({ ...head, due_date: h.term_mode === 'credit' ? h.due_date : undefined }, payload) : await saveQuotation(id, head, payload);
     if (r.error) return setErr(r.error);
     router.push(r.id ? `/sales/${r.id}` : back); router.refresh();
   });

@@ -20,6 +20,7 @@ export function SalesActions({ d, role, detail = false }: { d: any; role: Role; 
   if (can(role, 'sales.approve') && d.doc_type === 'QT' && (['rejected','approved','partial','converted'].includes(s))) out.push(b('รีเซ็ต', A.resetQuote.bind(null, d.id)));
   if ((W || can(role, 'quote.own')) && d.doc_type === 'QT' && s === 'pending_approval' && d.doc_no)
     out.push(<a key="qe" className="btn sm ghost" href={`/sales/${d.doc_no}/edit`}>แก้ไข</a>);
+  if (W && d.doc_type === 'INV' && s !== 'cancelled' && d.doc_no && !d.is_deposit) out.push(<a key="ie" className="btn sm ghost" href={`/sales/${d.doc_no}/edit`}>แก้ไข</a>);
   if ((W || can(role, 'quote.own')) && d.doc_type === 'QT') out.push(b('สร้างซ้ำ', A.duplicateQuote.bind(null, d.id)));
   if (W && d.doc_type === 'INV' && s !== 'cancelled') out.push(b('สร้างซ้ำ', A.duplicateInvoice.bind(null, d.id)));
   if (W && d.doc_type === 'QT' && ['pending_approval', 'approved', 'partial'].includes(s)) {   // M18.11: ข้ามการอนุมัติได้ (ตาม FA)

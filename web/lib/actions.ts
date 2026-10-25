@@ -82,6 +82,14 @@ export async function saveInvoice(header: Record<string, unknown>, lines: any[])
   }, ALL, 'sales.write');
   return { ...r, id: out };
 }
+/** แก้ไขใบแจ้งหนี้ที่บันทึกแล้ว (M23): ยังไม่มีเอกสารผูก = แก้ได้ทุกช่อง แก้ทับใบสำคัญเดิม · มีเอกสารผูก = แก้ได้เฉพาะข้อมูลทั่วไป */
+export async function updateSalesDoc(id: string, header: Record<string, unknown>, lines: any[]): Promise<Result> {
+  return run(async u => {
+    const old = (await (await getDb()).q<any>('select salesperson from sales_docs where id=$1', [id]))[0]?.salesperson;
+    await (await getDb()).q(`select update_sales_doc($2,$3::jsonb,$4::jsonb) from (select set_config('app.user_id',$1,true)) s`,
+      [u.id, id, JSON.stringify(await forceSalesperson(u, header, old)), JSON.stringify(lines)]);
+  }, [...ALL, `/sales/${id}`], 'sales.write');
+}
 export const duplicateInvoice = async (id: string) => run(u => callAs(u.id, 'duplicate_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
 /** เรียกเก็บเงินจากใบเสนอราคา: kind INV|CA|BL · mode all|percent|amount|qty */
 export async function billQuotation(id: string, kind: 'INV' | 'CA' | 'BL', mode: 'all' | 'percent' | 'amount' | 'qty' = 'all',
