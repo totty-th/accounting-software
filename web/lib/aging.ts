@@ -9,7 +9,7 @@ export const BUCKET_LABEL = ['ยังไม่ถึงกำหนด', '1-30
 
 export interface Group { contact_id: string; name: string; rows: any[]; tot: Record<string, number> }
 
-export type Sp = { asof?: string; contact?: string; coa?: string; bl?: string };
+export type Sp = { asof?: string; contact?: string; coa?: string; bl?: string; mode?: string };
 export const accountsOf = (k: Kind) => (k === 'ar' ? AR_ACCOUNTS : AP_ACCOUNTS);
 
 export async function loadAging(kind: Kind, sp: Sp) {
@@ -17,6 +17,12 @@ export async function loadAging(kind: Kind, sp: Sp) {
   const db = await getDb();
   const rows = await db.q(`select * from (select * from ${kind}_aging($1::date,$2::uuid)
       ${kind === 'ar' && sp.bl === '1' ? 'union all select * from ar_aging_bl($1::date,$2::uuid)' : ''}) x order by contact_name, due_date, doc_no`, [asof, contact]);
+  if (sp.mode === 'doc') {  // วิเคราะห์อายุตามวันที่เอกสาร (ตัวเลือกแบบ FA): แบ่งช่วงจากวันที่เอกสารแทนวันครบกำหนด
+    const bk = await db.q<any>(`select r.doc_id, aging_bucket($1::date, r.doc_date) b from jsonb_to_recordset($2::jsonb) as r(doc_id uuid, doc_date date)`,
+      [asof, JSON.stringify(rows.map((r: any) => ({ doc_id: r.doc_id, doc_date: r.doc_date instanceof Date ? r.doc_date.toISOString().slice(0, 10) : String(r.doc_date).slice(0, 10) })))]);
+    const m = new Map(bk.map((x: any) => [x.doc_id, x.b]));
+    for (const r of rows as any[]) for (const b of BUCKETS) r[b] = m.get(r.doc_id) === b ? r.outstanding : 0;
+  }
   const contacts = await db.q(`select id, contact_label(id) as label from contacts order by 2`).catch(() => [] as any[]);
   const accs = accountsOf(kind).map(a => a[0]);
   const keys = ['outstanding', ...BUCKETS, ...accs];

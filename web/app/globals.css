@@ -223,7 +223,24 @@ tr.dl-sub td{background:rgba(127,127,127,.06);font-size:13px}
 tr.ratesub td{padding-top:0;color:var(--muted);font-size:12px}
 @media print{.dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 
-.ghead{cursor:pointer;font-weight:600}.ghead:hover{background:var(--hover,#f3f6fa)}
+.agrp-head{cursor:pointer;font-weight:600}.agrp-head:hover{background:var(--hover,#f3f6fa)}
 .grp .chev{display:inline-block;transition:transform .15s}.grp:not(.closed) .chev{transform:rotate(90deg)}
 .grp.closed .grow{display:none}.cnt{background:#e6ebf2;border-radius:10px;padding:0 7px;font-size:12px;font-weight:500}
 .grow .dot{margin-right:6px}
+/* รายงานลูกหนี้/เจ้าหนี้ตามเอกสาร (แบบ FA) */
+.aging-filter{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+.aging-filter .f{min-width:180px}.aging-filter .chk .chk-row{display:flex;align-items:center;gap:6px;height:36px}.aging-filter .chk input{width:auto}
+.aging-go{margin-left:auto}
+.aging-head{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:12px}
+.aging-co{margin:0 0 6px;color:var(--blue,#2b8ac0);font-size:20px}.aging-meta td{padding:1px 24px 1px 0;font-size:13px}
+.aging-sum{text-align:right}.aging-sum span{display:block;font-size:13px}.aging-sum b{font-size:26px;color:var(--blue,#2b8ac0);font-weight:500}
+.aging-scroll{overflow-x:auto}.aging-tbl{min-width:1180px;border-collapse:collapse;width:100%}
+.aging-tbl th{border-top:3px solid #c9ced6;font-weight:600;white-space:nowrap;padding:10px 12px;background:#fff}
+.aging-tbl td{padding:8px 12px;border-bottom:1px solid #eef0f3;white-space:nowrap}
+.aging-tbl th.b-green{border-top-color:#4caf50;color:#4caf50}.aging-tbl th.b-sky1,.aging-tbl th.b-sky2,.aging-tbl th.b-sky3{border-top-color:#4fc3f7;color:#4fc3f7}.aging-tbl th.b-blue{border-top-color:#1e88b8;color:#1e88b8}
+.b-green-bg{background:#f3f8f3}.b-sky1-bg{background:#f4fafd}.b-sky2-bg{background:#e9f5fb}.b-sky3-bg{background:#e2f0f9}.b-blue-bg{background:#f6f7f9}
+.aging-total td{background:#e4e8ee;font-weight:700;border-top:1px solid #c9ced6}
+.aging-tbl .grow td.no{padding-left:36px}
+.xl-menu{position:relative}.xl-menu summary{list-style:none;cursor:pointer}.xl-menu summary::-webkit-details-marker{display:none}
+.xl-body{position:absolute;right:0;top:100%;margin-top:4px;background:var(--panel,#fff);border:1px solid #d5d9e0;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);z-index:20;min-width:260px;display:flex;flex-direction:column}
+.xl-body a{padding:10px 14px;color:inherit;text-decoration:none}.xl-body a:hover{background:#f3f6fa}

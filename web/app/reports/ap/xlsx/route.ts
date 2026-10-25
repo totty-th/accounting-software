@@ -6,5 +6,5 @@ export async function GET(req: Request) {
   const au = await apiUser('reports.read'); if (au instanceof Response) return au;
   const u = new URL(req.url).searchParams;
   const asof = u.get('asof') || undefined;
-  return xlsxResponse(await buildXlsx('ap', { asof, contact: u.get('contact') || undefined, coa: u.get('coa') || undefined }), `ap-aging-${asof ?? 'today'}${u.get('coa') === '1' ? '-coa' : ''}`);
+  return xlsxResponse(await buildXlsx('ap', { asof, contact: u.get('contact') || undefined, coa: u.get('coa') || undefined, mode: u.get('mode') || undefined }), `ap-aging-${asof ?? 'today'}${u.get('coa') === '1' ? '-coa' : ''}`);
 }
