@@ -29,7 +29,7 @@ export function faFormat(ws: ExcelJS.Worksheet, widths: number[], dateCols: numb
 /** ชีต "Accounting Document": ใบสำคัญ JV ที่แตะบัญชีหมวดนั้น (ค่าใช้จ่าย/รายได้) · ใบกลับรายการติดลบและยกเลิก ไม่นับยอด */
 export async function acctDocs(db: { q: <T = any>(sql: string, a?: unknown[]) => Promise<T[]> }, kind: 'expense' | 'revenue', range: [string, string] | null) {
   const sign = kind === 'expense' ? 'l.debit - l.credit' : 'l.credit - l.debit';
-  return db.q<any>(`select v.voucher_no no, v.voucher_date dt, v.memo, a.code, a.name, sum(${sign}) val,
+  return db.q<any>(`select v.voucher_no no, v.voucher_date dt, v.memo, a.code, a.name, sum(${sign}) val, (select display_name from app_users u where u.id = v.created_by) by_user,
       case when v.reverses_id is not null or exists (select 1 from journal_vouchers r where r.reverses_id = v.id) then 'cancelled' else 'approved' end status
     from journal_vouchers v join journal_lines l on l.voucher_id = v.id join accounts a on a.id = l.account_id
     where v.voucher_no ~ '^JV' and a.type = $3 and ($1::date is null or v.voucher_date >= $1::date) and ($2::date is null or v.voucher_date <= $2::date)
@@ -39,7 +39,7 @@ export function addAcctSheet(wb: ExcelJS.Workbook, title: string, co: { name: st
   const ws = faSheet(wb, 'Accounting Document', title, co, period, 12, blankAfter);
   faHead(ws, ['ลำดับที่', 'เลขที่เอกสาร', 'วัน/เดือน/ปี', 'ผู้ติดต่อ', 'คำอธิบาย', 'เลขที่อ้างอิง', 'ชื่อบัญชี', 'มูลค่า', 'สถานะ', 'ผู้ทำรายการ', 'หมายเหตุ', 'โน้ต (สำหรับใช้ภายในบริษัท)']);
   let tot = 0;
-  rows.forEach((r, i) => { ws.addRow([i + 1, r.no, d(r.dt), '', r.memo ?? '', '', `${r.code} / ${r.name}`, Number(r.val), r.status === 'cancelled' ? 'ยกเลิก' : 'อนุมัติ', '', '', '']); if (r.status !== 'cancelled') tot += Number(r.val); });
+  rows.forEach((r, i) => { ws.addRow([i + 1, r.no, d(r.dt), '', r.memo ?? '', '', `${r.code} / ${r.name}`, Number(r.val), r.status === 'cancelled' ? 'ยกเลิก' : 'อนุมัติ', r.by_user ?? '', '', '']); if (r.status !== 'cancelled') tot += Number(r.val); });
   const t = ws.addRow([null, null, null, null, null, 'ยอดรวมทั้งหมด', null, tot]); t.font = { bold: true };
   faFormat(ws, [9, 20, 13, 14, 44, 18, 32, 14, 12, 18, 14, 22], [3], [8]);
   return ws;

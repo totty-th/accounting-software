@@ -1,5 +1,6 @@
 'use server';
 import { revalidatePath } from 'next/cache';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { getDb, today } from './db';
 import { currentUser, type AuthUser } from './auth';
 import { can, type Perm } from './permissions';
@@ -9,12 +10,13 @@ export type Result = { error?: string; ok?: true };
 // ตรวจสิทธิ์ที่ฝั่งเซิร์ฟเวอร์ทุกครั้ง (การซ่อนปุ่มบนหน้าจอเป็นแค่ความสะดวก) แล้วตัดข้อความ error ของ Postgres ให้อ่านรู้เรื่อง
 type Gate = Perm | Perm[] | ((u: AuthUser) => boolean | Promise<boolean>);
 const NO_PERM = 'ไม่มีสิทธิ์ทำรายการนี้';
+const who = new AsyncLocalStorage<string>();
 async function run(fn: (u: AuthUser) => Promise<unknown>, paths: string[], gate: Gate): Promise<Result> {
   const u = await currentUser();
   if (!u) return { error: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' };
   const ok = typeof gate === 'function' ? await gate(u) : ([] as Perm[]).concat(gate).some(p => can(u.role, p));
   if (!ok) return { error: NO_PERM };
-  try { await fn(u); } catch (e: any) {
+  try { await who.run(u.id, () => fn(u)); } catch (e: any) {
     const m = String(e?.message ?? e).replace(/^error:\s*/i, '').replace(/^PERIOD_LOCKED:\s*/, '');
     return { error: m };
   }
@@ -22,7 +24,13 @@ async function run(fn: (u: AuthUser) => Promise<unknown>, paths: string[], gate:
   return { ok: true };
 }
 const ALL = ['/', '/sales', '/receipts', '/expenses', '/reports/trial-balance', '/reports/pnl', '/stock'];
-const call = (sql: string, ...p: unknown[]) => async () => (await getDb()).q(sql, p);
+// ถ้าเป็นคำสั่ง `select f(...)` ที่ไม่มี from และรู้ผู้ใช้ปัจจุบัน → ตั้ง app.user_id ในคำสั่งเดียวกัน (ให้ trigger บันทึกผู้ทำรายการของใบสำคัญ/เอกสาร)
+const call = (sql: string, ...p: unknown[]) => async () => {
+  const uid = who.getStore();
+  if (uid && /^\s*select\s/i.test(sql) && !/\sfrom\s/i.test(sql) && !/set_config\('app\.user_id'/.test(sql))
+    return (await getDb()).q(`${sql} from (select set_config('app.user_id',$${p.length + 1},true)) _u`, [...p, uid]);
+  return (await getDb()).q(sql, p);
+};
 /** ฝ่ายขาย (quote.own) ทำได้เฉพาะใบเสนอราคาที่ตัวเองสร้าง */
 const ownQuote = async (u: AuthUser, id: string) =>
   (await (await getDb()).q(`select 1 from sales_docs where id=$1 and doc_type='QT' and created_by=$2`, [id, u.id])).length > 0;

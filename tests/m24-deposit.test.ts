@@ -121,3 +121,19 @@ describe('M25.1 ตัวกรองสถานะรายงานตาม�
     expect(+p.rows[0].s).toBe(500);
   });
 });
+
+describe('M25.2 ผู้ทำรายการของใบสำคัญ', () => {
+  it('ตั้ง created_by จาก app.user_id · ใบกลับรายการก็ลงชื่อ · ไม่ตั้ง = ว่าง', async () => {
+    const u = (await one<{ id: string }>(`select app_user_create('tester','วริศร ทดสอบ','owner') as id`)).id;
+    await call(`select set_config('app.user_id',$1,false)`, [u]);
+    const v = (await one<{ id: string }>(`select post_voucher('JV',$1::date,'ทดสอบ',null,null,
+      '[{"account":"11112","debit":10},{"account":"49990","credit":10}]'::jsonb) as id`, [D])).id;
+    expect((await one('select created_by from journal_vouchers where id=$1', [v])).created_by).toBe(u);
+    const r = (await one<{ id: string }>('select reverse_voucher($1) as id', [v])).id;
+    expect((await one('select created_by from journal_vouchers where id=$1', [r])).created_by).toBe(u);
+    await call(`select set_config('app.user_id','',false)`);
+    const v2 = (await one<{ id: string }>(`select post_voucher('JV',$1::date,'x',null,null,
+      '[{"account":"11112","debit":5},{"account":"49990","credit":5}]'::jsonb) as id`, [D])).id;
+    expect((await one('select created_by from journal_vouchers where id=$1', [v2])).created_by).toBeNull();
+  });
+});
