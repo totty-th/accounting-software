@@ -20,7 +20,7 @@ export default async function NewDoc({ searchParams }: { searchParams: { type?: 
       <div className="top"><div>{type === 'QT'
         ? <><h1>สร้างใบเสนอราคา</h1><p className="sub">ไม่ลงบัญชีและไม่ขยับสต็อก · อนุมัติแล้วจึงสร้างใบแจ้งหนี้ได้</p></>
         : <><h1>สร้างใบแจ้งหนี้</h1><p className="sub">ลงลูกหนี้/รายได้/ภาษีขายทันที · ตัดสต็อกสินค้านับสต็อก · หัก ณ ที่จ่ายไปลงตอนรับชำระ</p></>}</div></div>
-      <QtForm docType={type} id={null} {...d} today={today()} salesperson={user.displayName || user.username} canCreateCustomer={can(user.role, 'contact.create')} canCreateProduct={can(user.role, 'master.write') || can(user.role, 'quote.own')} />
+      <QtForm canPickSalesperson={user.role === 'super_admin'} docType={type} id={null} {...d} today={today()} salesperson={user.displayName || user.username} canCreateCustomer={can(user.role, 'contact.create')} canCreateProduct={can(user.role, 'master.write') || can(user.role, 'quote.own')} />
     </>);
   }
   const db = await getDb();

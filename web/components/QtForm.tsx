@@ -18,8 +18,8 @@ const KIND_ICON: Record<string, string> = { service: '🛎', goods_nostock: '�
 const KIND_LABEL: Record<string, string> = { service: 'บริการ', goods_nostock: 'สินค้าไม่นับสต็อก', goods_stock: 'สินค้านับสต็อก' };
 
 /** ใบเสนอราคา/ใบแจ้งหนี้: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — QT สร้างและแก้ไข (เฉพาะรออนุมัติ) · INV สร้างอย่างเดียว */
-export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses, people, today, salesperson, init, canCreateCustomer, canCreateProduct }: {
-  docType?: 'QT' | 'INV'; id: string | null; customers: Cust[]; products: QProd[]; warehouses: Wh[]; people: string[]; today: string; salesperson: string;
+export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses, people, today, salesperson, canPickSalesperson, init, canCreateCustomer, canCreateProduct }: {
+  docType?: 'QT' | 'INV'; id: string | null; customers: Cust[]; products: QProd[]; warehouses: Wh[]; people: string[]; today: string; salesperson: string; canPickSalesperson?: boolean;
   init?: { header: Record<string, any>; lines: Line[] }; canCreateCustomer: boolean; canCreateProduct: boolean;
 }) {
   const router = useRouter();
@@ -111,8 +111,10 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
             {h.term_mode === 'credit' && lbl('ครบกำหนด', isInv
               ? <input aria-label="ครบกำหนด" type="date" value={h.due_date} min={h.date} onChange={e => e.target.value && set({ due_date: e.target.value, credit_days: String(Math.max(0, daysBetween(h.date, e.target.value))) })} />
               : <input type="date" value={h.due_date} disabled />)}
-            {lbl('พนักงานขาย', <select aria-label="พนักงานขาย" value={h.salesperson} onChange={e => set({ salesperson: e.target.value })}>
-              {[...new Set([h.salesperson, ...people].filter(Boolean))].map(n => <option key={n} value={n}>{n}</option>)}</select>)}
+            {lbl('พนักงานขาย', canPickSalesperson
+              ? <select aria-label="พนักงานขาย" value={h.salesperson} onChange={e => set({ salesperson: e.target.value })}>
+                {[...new Set([h.salesperson, ...people].filter(Boolean))].map(n => <option key={n} value={n}>{n}</option>)}</select>
+              : <input aria-label="พนักงานขาย" value={h.salesperson} disabled />)}
             {lbl('สกุลเงิน', <input value="THB - ไทย" disabled />)}
           </div>
         </div>

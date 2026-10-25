@@ -59,11 +59,17 @@ export const rejectQuote = async (id: string) => run(u => callAs(u.id, 'reject_q
 export const resetQuote = async (id: string) => run(u => callAs(u.id, 'reset_quotation($1)', id), ALL, 'sales.approve');
 export const duplicateQuote = async (id: string) => run(u => callAs(u.id, 'duplicate_quotation($1,$2::date)', id, today()), ALL, salesDocGate(id));
 /** สร้าง (id=null) หรือแก้ไข (เฉพาะรออนุมัติ) ใบเสนอราคาเต็มรูปแบบ */
+/** พนักงานขายยึดตามบัญชีที่ล็อกอิน (ฝั่งเซิร์ฟเวอร์บังคับ) · super_admin เลือกเองได้ · ตอนแก้ใบเดิมคงพนักงานเดิมไว้ */
+async function forceSalesperson(u: AuthUser, header: Record<string, unknown>, existing?: string | null) {
+  if (u.role === 'super_admin') return header;
+  return { ...header, salesperson: existing || u.displayName || u.username };
+}
 export async function saveQuotation(id: string | null, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
   let out: string | undefined;
   const r = await run(async u => {
+    const old = id ? (await (await getDb()).q<any>('select salesperson from sales_docs where id=$1', [id]))[0]?.salesperson : null;
     out = (await (await getDb()).q<any>(`select save_quotation($2,$3::jsonb,$4::jsonb) as id from (select set_config('app.user_id',$1,true)) s`,
-      [u.id, id, JSON.stringify(header), JSON.stringify(lines)]))[0].id;
+      [u.id, id, JSON.stringify(await forceSalesperson(u, header, old)), JSON.stringify(lines)]))[0].id;
   }, id ? [...ALL, `/sales/${id}`] : ALL, async u => can(u.role, 'sales.write') || (can(u.role, 'quote.own') && (!id || (await ownQuote(u, id)))));
   return { ...r, id: out };
 }
@@ -72,7 +78,7 @@ export async function saveInvoice(header: Record<string, unknown>, lines: any[])
   let out: string | undefined;
   const r = await run(async u => {
     out = (await (await getDb()).q<any>(`select create_invoice_full($2::jsonb,$3::jsonb) as id from (select set_config('app.user_id',$1,true)) s`,
-      [u.id, JSON.stringify(header), JSON.stringify(lines)]))[0].id;
+      [u.id, JSON.stringify(await forceSalesperson(u, header)), JSON.stringify(lines)]))[0].id;
   }, ALL, 'sales.write');
   return { ...r, id: out };
 }

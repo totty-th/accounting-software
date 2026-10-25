@@ -22,7 +22,7 @@ export default async function EditQt({ params }: { params: { id: string } }) {
     dtype: l.discount_type, dval: Number(l.discount_value) ? n(l.discount_value) : '', vat: l.vat_exempt ? 'exempt' : n(l.vat_rate ?? 7), wht: n(l.wht_rate) }));
   return (<>
     <div className="top"><div><h1>แก้ไขใบเสนอราคา {o.doc_no}</h1></div></div>
-    <QtForm id={o.id} {...d} today={today()} salesperson={o.salesperson ?? user.displayName ?? ''} init={{ header, lines: lines as any }}
+    <QtForm canPickSalesperson={user.role === 'super_admin'} id={o.id} {...d} today={today()} salesperson={o.salesperson ?? user.displayName ?? ''} init={{ header, lines: lines as any }}
       canCreateCustomer={can(user.role, 'contact.create')} canCreateProduct={can(user.role, 'master.write') || can(user.role, 'quote.own')} />
   </>);
 }
