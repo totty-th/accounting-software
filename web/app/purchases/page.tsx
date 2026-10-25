@@ -6,6 +6,7 @@ import { CardForm, PettyForm } from '@/components/CardForm';
 import Link from 'next/link';
 import * as A from '@/lib/actions';
 
+import { related } from '@/lib/related';
 import { DocList, type DocRow } from '@/components/DocList';
 import { STATUS } from '@/lib/status';
 
@@ -21,8 +22,10 @@ export default async function Purchases() {
     .map(c => ({ id: c.id as string, label: partyName(c) }));
   const products = (await db.q(`select id, code, name, purchase_price from products where kind='goods_stock' order by code`))
     .map(p => ({ id: p.id as string, label: `${p.code} ${p.name}`, price: Number(p.purchase_price) }));
+  const relMap = await related(db, 'ri', rows.map((r: any) => r.id));
   const list: DocRow[] = rows.map(r => ({ id: r.id, href: `/purchases/ri/${r.id}`, date: dateTh(r.ri_date), no: r.ri_no, party: partyName(r), detail: r.items ?? '',
     due: r.due_date ? dateTh(r.due_date) : '-', total: Number(r.total), status: r.status, label: STATUS[r.status]?.[0] ?? r.status, tone: STATUS[r.status]?.[1] ?? 'grey',
+    rel: relMap.get(r.id),
     flag: r.ref_no ? `· อ้างอิง ${r.ref_no}` : undefined }));
   return (
     <>

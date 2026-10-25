@@ -1,3 +1,5 @@
+import { related } from '@/lib/related';
+import { RelPop } from '@/components/TaxBits';
 import Link from 'next/link';
 import { ClickRow } from '@/components/ClickRow';
 import { redirect } from 'next/navigation';
@@ -36,14 +38,15 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
     from sales_docs d join contacts c on c.id=d.contact_id where ${where}
     order by d.doc_date desc, d.doc_no desc limit ${pp} offset ${(page - 1) * pp}`, args);
   const pages = Math.max(1, Math.ceil(n / pp));
+  const relMap = await related(db, 'sales', rows.map((r: any) => r.id));
   let qtRows: QtRow[] = [];
   if (type === 'QT' && rows.length) {
     const ids = rows.map((r: any) => r.id);
-    const rel = await db.q(`select ref_doc_id, doc_no, doc_type, status from sales_docs where ref_doc_id = any($1::uuid[]) and status<>'cancelled' order by doc_no`, [ids]);
+    const rel = await related(db, 'sales', ids);
     qtRows = await Promise.all(rows.map(async (r: any) => {
       const billing = ['partial', 'converted', 'deposit_paid'].includes(r.status) ? (await db.q(`select quotation_billing_summary($1) s`, [r.id]))[0]?.s : null;
       return { rate: Number(r.vat_rate), subtotal: Number(r.subtotal), id: r.id, doc_no: r.doc_no, date: dateIso(r.doc_date), status: r.status, total: Number(r.total), customer: partyName(r), project: r.project,
-        related: rel.filter((x: any) => x.ref_doc_id === r.id).map((x: any) => ({ doc_no: x.doc_no, doc_type: x.doc_type, status: x.status })),
+        rel: rel.get(r.id) ?? [],
         billing: billing && r.status === 'deposit_paid' ? (() => {
           const ds = (billing.docs ?? []).filter((d: any) => d.is_deposit && d.status !== 'cancelled'), paid = ds.reduce((a: number, d: any) => a + Number(d.total), 0);
           return { deposit: true, total: Number(billing.total), billed: paid, closed: 0, remaining: Math.max(Number(billing.total) - paid, 0),
@@ -87,7 +90,7 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
             <tbody>{rows.map(r => (
               <ClickRow key={r.id} href={`/sales/${r.doc_no}`} style={r.status === 'cancelled' ? { opacity: .55 } : undefined}>
                 <td>{dateTh(r.doc_date)}</td>
-                <td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link>{r.is_deposit ? ' (มัดจำ)' : ''}</td>
+                <td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link>{r.is_deposit ? ' (มัดจำ)' : ''}<RelPop rel={relMap.get(r.id) ?? []} /></td>
                 <td>{partyName(r)}</td>{!noDue && <td>{dateTh(r.due_date)}</td>}
                 <td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td><td><SalesActions d={r} role={user.role} /></td></ClickRow>))}</tbody></table>
         </div>)}

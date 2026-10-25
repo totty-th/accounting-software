@@ -6,16 +6,16 @@ export function Dot({ s }: { s: string }) {
   const [label, tone] = STATUS[s] ?? [s, 'grey'];
   return <span className={`dot dot-${tone}`} title={label} />;
 }
-/** ไอคอน "เอกสารที่เกี่ยวข้อง" — กดแล้วขึ้นรายการลิงก์ (FA ขึ้นเมื่อชี้เมาส์) */
+/** ไอคอน "เอกสารที่เกี่ยวข้อง" ข้างเลขที่เอกสาร — ชี้เมาส์ (หรือแตะ/โฟกัส) แล้วขึ้นป๊อปอัปทันทีแบบ FA · ไม่มีเอกสารเชื่อมโยง = ไม่แสดงไอคอน */
 export function RelPop({ rel, extra }: { rel: { no: string; kind: string; href: string }[]; extra?: string }) {
   if (!rel.length && !extra) return null;
   return (
-    <details className="relpop noprint"><summary title="เอกสารที่เกี่ยวข้อง">📄</summary>
-      <div className="relpop-body"><b>เอกสารที่เกี่ยวข้อง</b>
-        {rel.length > 0 && <div className="sub">เอกสารอ้างอิง</div>}
-        {rel.map(r => <div key={r.no}><Link href={r.href}>↗ {r.no}</Link></div>)}
-        {extra && <><div className="sub" style={{ marginTop: 6 }}>แบบยื่นภาษี</div><div>{extra}</div></>}
-      </div></details>
+    <span className="relpop noprint" tabIndex={0} aria-label="เอกสารที่เกี่ยวข้อง"><span className="relpop-ico" aria-hidden>🗎</span>
+      <span className="relpop-body" role="tooltip"><b>เอกสารที่เกี่ยวข้อง</b>
+        {rel.length > 0 && <span className="sub">เอกสารอ้างอิง</span>}
+        {rel.map(r => <Link key={r.no} href={r.href} target="_blank" title={r.kind}>↗ {r.no}</Link>)}
+        {extra && <><span className="sub">แบบยื่นภาษี</span><span>{extra}</span></>}
+      </span></span>
   );
 }
 /** ปุ่ม "…" ท้ายแถว: พิมพ์เอกสาร / ดาวน์โหลด */

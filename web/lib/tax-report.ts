@@ -1,5 +1,6 @@
 // ข้อมูลรายงานภาษี 3 ฉบับ (ภาษีขายตามเอกสาร / ภาษีซื้อ / หัก ณ ที่จ่าย) ใช้ร่วมกันระหว่างหน้าจอและไฟล์ Excel แบบ FA
 import { pgArr } from './report-filter';
+import { related } from './related';
 type Db = { q: <T = any>(sql: string, a?: unknown[]) => Promise<T[]> };
 
 export const SALES_TAX_TYPES = ['CA', 'INV', 'DN', 'CN'];
@@ -33,14 +34,7 @@ export async function salesTaxRows(db: Db, range: [string, string] | null, statu
     where d.doc_type = any($4::text[]) and ($1::date is null or d.doc_date >= $1::date) and ($2::date is null or d.doc_date <= $2::date)
       and ${withCancel ? 'true' : `d.status <> 'cancelled'`} and (cardinality($3::text[]) = 0 or d.status = any($3::text[]))
     order by ${TYPE_ORDER}, d.doc_no`, [range?.[0] ?? null, range?.[1] ?? null, pgArr(statuses), pgArr(SALES_TAX_TYPES)]);
-  const rel = rows.length ? await db.q<any>(`select x.id, x.no, x.kind, x.href from (
-      select d.id, r.doc_no no, r.doc_type kind, '/sales/' || r.doc_no href from sales_docs d join sales_docs r on r.id = d.ref_doc_id
-      union all select d.id, ch.doc_no, ch.doc_type, '/sales/' || ch.doc_no from sales_docs d join sales_docs ch on ch.ref_doc_id = d.id
-      union all select ri.doc_id, rc.receipt_no, 'RE', '/receipts/' || rc.receipt_no from receipt_items ri join receipts rc on rc.id = ri.receipt_id where rc.status <> 'cancelled'
-      union all select b.invoice_id, bl.doc_no, 'BL', '/sales/' || bl.doc_no from billing_note_items b join sales_docs bl on bl.id = b.billing_id where bl.status <> 'cancelled') x
-    where x.id = any($1::uuid[]) order by x.no`, [`{${rows.map(r => r.id).join(',')}}`]) : [];
-  const m = new Map<string, any[]>();
-  for (const r of rel) { const l = m.get(r.id) ?? []; if (!l.some(y => y.no === r.no)) l.push(r); m.set(r.id, l); }
+  const m = await related(db, 'sales', rows.map(r => r.id));
   return rows.map(r => ({ ...r, branch: branchLabel(r), sub: Number(r.sub), vat: Number(r.vat), rel: m.get(r.id) ?? [] }));
 }
 export const totals = (rows: { status: string; sub: number; vat: number }[]) =>
@@ -59,13 +53,7 @@ export async function purchaseTaxRows(db: Db, range: [string, string] | null, st
     where d.vat > 0 and ($1::date is null or d.date >= $1::date) and ($2::date is null or d.date <= $2::date)
       and ${withCancel ? 'true' : `d.status not in ('rejected','cancelled')`} and (cardinality($3::text[]) = 0 or d.status = any($3::text[]))
     order by d.kind desc, d.no`, [range?.[0] ?? null, range?.[1] ?? null, pgArr(statuses)]);
-  const ids = `{${rows.map(r => r.id).join(',')}}`;
-  const rel = rows.length ? await db.q<any>(`select x.id, x.no, x.kind, x.href from (
-      select w.expense_id id, w.cert_no no, 'WT' kind, '/wht' href from wht_certs w where w.expense_id is not null and w.status = 'active'
-      union all select x.doc_id, s.pay_no, 'PAY', '/payments' from payment_slip_items x join payment_slips s on s.id = x.slip_id where s.status = 'active') x
-    where x.id = any($1::uuid[]) order by x.no`, [ids]) : [];
-  const m = new Map<string, any[]>();
-  for (const r of rel) m.set(r.id, [...(m.get(r.id) ?? []), r]);
+  const m = new Map<string, any[]>([...(await related(db, 'exp', rows.filter(r => r.kind === 'EXP').map(r => r.id))), ...(await related(db, 'ri', rows.filter(r => r.kind === 'RI').map(r => r.id)))]);
   return rows.map(r => ({ ...r, branch: branchLabel(r), sub: Number(r.sub), vat: Number(r.vat), rel: m.get(r.id) ?? [],
     href: r.kind === 'EXP' ? `/expenses/${r.id}` : `/purchases/ri/${r.id}` }));
 }

@@ -1,9 +1,10 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { RelPop } from '@/components/TaxBits';
 
 export interface DocRow { id: string; href: string; date: string; no: string; party: string; detail?: string; due?: string; total: number;
-  status: string; label: string; tone: string; pdf?: string; flag?: string }
+  status: string; label: string; tone: string; pdf?: string; flag?: string; rel?: { no: string; kind: string; href: string }[] }
 const TONE: Record<string, string> = { green: 'var(--green)', orange: 'var(--orange)', blue: 'var(--blue)', purple: 'var(--purple)', red: 'var(--red)', grey: 'var(--grey)', teal: 'var(--teal)' };
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -31,10 +32,10 @@ export function DocList({ rows, partyLabel = 'ผู้จำหน่าย', d
           <table><thead><tr><th>วันที่</th><th>เลขที่เอกสาร</th><th>{partyLabel}</th><th>{detailLabel}</th>{showDue && <th>ครบกำหนด</th>}<th className="num">ยอดรวมสุทธิ</th><th>สถานะ</th></tr></thead>
             <tbody>{view.map(r => (
               <tr key={r.id} className="clickable" tabIndex={0} style={r.status === 'cancelled' ? { opacity: .55 } : undefined}
-                onClick={e => { if ((e.target as HTMLElement).closest('a,button,input')) return; router.push(r.href); }}
+                onClick={e => { if ((e.target as HTMLElement).closest('a,button,input,.relpop')) return; router.push(r.href); }}
                 onKeyDown={e => { if (e.key === 'Enter') router.push(r.href); }}>
                 <td>{r.date}</td>
-                <td className="no"><span className="dot" style={{ background: TONE[r.tone] ?? 'var(--grey)' }} />{r.no}{r.flag ? <span className="sub"> {r.flag}</span> : null}</td>
+                <td className="no"><span className="dot" style={{ background: TONE[r.tone] ?? 'var(--grey)' }} />{r.no}<RelPop rel={r.rel ?? []} />{r.flag ? <span className="sub"> {r.flag}</span> : null}</td>
                 <td>{r.party}</td><td style={{ maxWidth: 280, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.detail}</td>
                 {showDue && <td>{r.due ?? '-'}</td>}
                 <td className="num">{fmt(r.total)}</td>

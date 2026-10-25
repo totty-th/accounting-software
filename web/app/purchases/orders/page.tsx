@@ -4,6 +4,7 @@ import { requirePage } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { dateTh, partyName } from '@/lib/format';
 import { STATUS } from '@/lib/status';
+import { related } from '@/lib/related';
 import { DocList, type DocRow } from '@/components/DocList';
 
 export default async function PurchaseOrders() {
@@ -15,9 +16,11 @@ export default async function PurchaseOrders() {
          from purchase_order_lines l join products p on p.id=l.product_id where l.po_id=o.id) items
     from purchase_orders o join contacts c on c.id=o.contact_id left join goods_receipts r on r.id=o.ri_id
     order by o.po_date desc, o.po_no desc`);
+  const relMap = await related(db, 'po', rows.map((r: any) => r.id));
   const list: DocRow[] = rows.map(r => { const k = r.status === 'pending' ? 'pending_approval' : r.status;
     return { id: r.id, href: `/purchases/orders/${r.id}`, date: dateTh(r.po_date), no: r.po_no, party: partyName(r), detail: r.items ?? '',
       due: r.due_date ? dateTh(r.due_date) : '-', total: Number(r.total), status: r.status, label: STATUS[k]?.[0] ?? r.status, tone: STATUS[k]?.[1] ?? 'grey',
+      rel: relMap.get(r.id),
       flag: r.ri_no ? `→ ${r.ri_no}` : undefined }; });
   return (
     <>

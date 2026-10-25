@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
+import { related } from '../web/lib/related';
 import { salesTaxRows, totals, filingInfo, whtRows } from '../web/lib/tax-report';
 
 const dir = new URL('../supabase/migrations/', import.meta.url);
@@ -46,5 +47,19 @@ describe('M25.2 รายงานภาษีขายตามเอกสา�
   });
   it('รายงานหัก ณ ที่จ่ายว่างเมื่อไม่มีใบ', async () => {
     expect(await whtRows(sdb, null, [])).toEqual([]);
+  });
+});
+
+describe('M25.4 เอกสารที่เกี่ยวข้อง (hover popover)', () => {
+  it('INV ได้ทั้ง CN/DN ที่ออกต่อ · CN เห็นต้นทาง INV · เอกสารที่ไม่มีความเกี่ยวข้อง = ไม่มีรายการ', async () => {
+    const i1 = await mk('INV', '2026-10-10', 1000), lone = await mk('INV', '2026-10-10', 10);
+    const cn = await mk('CN', '2026-10-12', 100, i1), dn = await mk('DN', '2026-10-12', 50, i1);
+    const m = await related(sdb, 'sales', [i1, cn, dn, lone]);
+    expect(m.get(i1)!.map(x => x.kind).sort()).toEqual(['CN', 'DN']);
+    expect(m.get(cn)!.map(x => x.kind)).toEqual(['INV']);
+    expect(m.get(dn)!.map(x => x.kind)).toEqual(['INV']);
+    expect(m.has(lone)).toBe(false);
+    expect(m.get(i1)![0].href).toMatch(/^\/sales\//);
+    expect((await related(sdb, 'sales', [])).size).toBe(0);
   });
 });

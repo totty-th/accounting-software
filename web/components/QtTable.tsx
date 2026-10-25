@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import * as A from '@/lib/actions';
 import { STATUS } from '@/lib/status';
+import { RelPop } from '@/components/TaxBits';
 
 export type QtRow = {
   rate: number; subtotal: number;
   id: string; doc_no: string; date: string; status: string; total: number; customer: string; project: string | null;
-  related: { doc_no: string; doc_type: string; status: string }[];
+  rel: { no: string; kind: string; href: string }[];
   billing: { deposit?: boolean; total: number; billed: number; closed: number; remaining: number; percent: number;
     docs: { doc_no: string; doc_date: string; subtotal: number; total: number; status: string }[] } | null;
 };
@@ -112,8 +113,7 @@ export function QtTable({ rows, canWrite, canApprove, canOwn, exportHref }: { ro
                   <td className="c-chk"><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} aria-label={`เลือก ${r.doc_no}`} /></td>
                   <td className="c-date">{dth(r.date)}</td>
                   <td className="no c-no"><span style={{ color: toneColor[tone], marginRight: 4 }}>●</span><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link>
-                    {r.related.length > 0 && <Menu align="left" trigger={<span title="เอกสารที่เกี่ยวข้อง" style={{ marginLeft: 6 }}>📎</span>} onRun={() => {}}
-                      items={r.related.map(d => ({ label: `${d.doc_no}${d.status === 'cancelled' ? ' (ยกเลิก)' : ''}`, href: `/sales/${d.doc_no}` }))} />}
+                    <RelPop rel={r.rel} />
                   </td>
                   <td className="c-cust">{r.customer}{r.project ? <div className="sub">{r.project}</div> : null}</td>
                   <td className="num c-total">{fmt(r.total)}
