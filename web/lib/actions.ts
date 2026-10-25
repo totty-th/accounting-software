@@ -104,6 +104,8 @@ export async function billQuotation(id: string, kind: 'INV' | 'CA' | 'BL', mode:
 export const closeQuotation = async (id: string) => run(u => callAs(u.id, 'close_quotation($1)', id), [...ALL, `/sales/${id}`], 'sales.write');
 export const reopenQuotation = async (id: string) => run(u => callAs(u.id, 'reopen_quotation($1)', id), [...ALL, `/sales/${id}`], 'sales.write');
 export const quoteToInvoice = async (id: string) => run(call('select quotation_to_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
+export const createDeposit = async (id: string, net: number) => run(u => callAs(u.id, 'create_deposit_invoice($1,$2::date,$3::numeric)', id, today(), net), ALL, 'sales.write');
+export const createFinalInvoice = async (id: string) => run(u => callAs(u.id, 'create_final_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
 export const collectCash = async (id: string) => run(call('select collect_cash_sale($1,$2::date)', id, today()), ALL, 'sales.write');
 export const resetCash = async (id: string) => run(call('select reset_cash_sale($1)', id), ALL, 'sales.write');
 

@@ -32,7 +32,7 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
   const page = Math.max(1, Number(searchParams.page) || 1);
   const [{ n, sum }] = await db.q(`select count(*)::int n, coalesce(sum(d.total) filter (where d.status not in ('cancelled','rejected')),0) sum
     from sales_docs d join contacts c on c.id=d.contact_id where ${where}`, args);
-  const rows = await db.q(`select d.id, d.doc_type, d.doc_no, d.doc_date, d.due_date, d.status, d.total, d.is_deposit, d.project, c.business_name, c.contact_name
+  const rows = await db.q(`select d.id, d.doc_type, d.doc_no, d.doc_date, d.due_date, d.status, d.total, d.is_deposit, d.project, d.vat_rate, d.subtotal, c.business_name, c.contact_name
     from sales_docs d join contacts c on c.id=d.contact_id where ${where}
     order by d.doc_date desc, d.doc_no desc limit ${pp} offset ${(page - 1) * pp}`, args);
   const pages = Math.max(1, Math.ceil(n / pp));
@@ -41,11 +41,20 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
     const ids = rows.map((r: any) => r.id);
     const rel = await db.q(`select ref_doc_id, doc_no, doc_type, status from sales_docs where ref_doc_id = any($1::uuid[]) and status<>'cancelled' order by doc_no`, [ids]);
     qtRows = await Promise.all(rows.map(async (r: any) => {
-      const billing = ['partial', 'converted'].includes(r.status) ? (await db.q(`select quotation_billing_summary($1) s`, [r.id]))[0]?.s : null;
-      return { id: r.id, doc_no: r.doc_no, date: dateIso(r.doc_date), status: r.status, total: Number(r.total), customer: partyName(r), project: r.project,
+      const billing = ['partial', 'converted', 'deposit_paid'].includes(r.status) ? (await db.q(`select quotation_billing_summary($1) s`, [r.id]))[0]?.s : null;
+      return { rate: Number(r.vat_rate), subtotal: Number(r.subtotal), id: r.id, doc_no: r.doc_no, date: dateIso(r.doc_date), status: r.status, total: Number(r.total), customer: partyName(r), project: r.project,
         related: rel.filter((x: any) => x.ref_doc_id === r.id).map((x: any) => ({ doc_no: x.doc_no, doc_type: x.doc_type, status: x.status })),
-        billing: billing && Number(billing.billed) + Number(billing.closed) > 0 ? { total: Number(billing.total), billed: Number(billing.billed), closed: Number(billing.closed), remaining: Number(billing.remaining),
-          percent: Number(billing.percent), docs: (billing.docs ?? []).filter((d: any) => d.status !== 'cancelled') } : null } as QtRow;
+        billing: billing && r.status === 'deposit_paid' ? (() => {
+          const ds = (billing.docs ?? []).filter((d: any) => d.is_deposit && d.status !== 'cancelled'), paid = ds.reduce((a: number, d: any) => a + Number(d.total), 0);
+          return { deposit: true, total: Number(billing.total), billed: paid, closed: 0, remaining: Math.max(Number(billing.total) - paid, 0),
+            percent: Number(billing.total) > 0 ? Math.round(paid * 10000 / Number(billing.total)) / 100 : 0, docs: ds };
+        })() : billing && Number(billing.billed) + Number(billing.closed) > 0 ? (() => {
+          const docs = (billing.docs ?? []).filter((d: any) => d.status !== 'cancelled');
+          const dep = docs.filter((d: any) => d.is_deposit).reduce((a: number, d: any) => a + Number(d.total), 0);   // มัดจำที่รับแล้วนับเป็นยอดเรียกเก็บ (INV ฉบับสุดท้ายหักมัดจำออกแล้ว)
+          const billed = Number(billing.billed) + dep, tot = Number(billing.total);
+          return { total: tot, billed, closed: Number(billing.closed), remaining: Math.max(tot - billed - Number(billing.closed), 0),
+            percent: tot > 0 ? Math.round((billed + Number(billing.closed)) * 10000 / tot) / 100 : 0, docs };
+        })() : null } as QtRow;
     }));
   }
   const canNew = can(user.role, 'sales.write') || own;
