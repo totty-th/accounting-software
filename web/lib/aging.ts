@@ -9,13 +9,14 @@ export const BUCKET_LABEL = ['ยังไม่ถึงกำหนด', '1-30
 
 export interface Group { contact_id: string; name: string; rows: any[]; tot: Record<string, number> }
 
-export type Sp = { asof?: string; contact?: string; coa?: string };
+export type Sp = { asof?: string; contact?: string; coa?: string; bl?: string };
 export const accountsOf = (k: Kind) => (k === 'ar' ? AR_ACCOUNTS : AP_ACCOUNTS);
 
 export async function loadAging(kind: Kind, sp: Sp) {
   const asof = sp.asof || today(), contact = sp.contact || null;
   const db = await getDb();
-  const rows = await db.q(`select * from ${kind}_aging($1::date,$2::uuid) order by contact_name, due_date, doc_no`, [asof, contact]);
+  const rows = await db.q(`select * from (select * from ${kind}_aging($1::date,$2::uuid)
+      ${kind === 'ar' && sp.bl === '1' ? 'union all select * from ar_aging_bl($1::date,$2::uuid)' : ''}) x order by contact_name, due_date, doc_no`, [asof, contact]);
   const contacts = await db.q(`select id, contact_label(id) as label from contacts order by 2`).catch(() => [] as any[]);
   const accs = accountsOf(kind).map(a => a[0]);
   const keys = ['outstanding', ...BUCKETS, ...accs];

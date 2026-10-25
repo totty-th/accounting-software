@@ -22,7 +22,7 @@ export async function AgingReport({ kind, sp }: { kind: Kind; sp: Sp }) {
     if (ids.length) for (const x of await db.q<any>(`select id, status from ${t} where id = any($1::uuid[])`, [`{${ids.join(',')}}`])) stMap.set(x.id, x.status);
   const coa = sp.coa === '1', accs = coa ? accountsOf(kind) : [];
   const ar = kind === 'ar', base = ar ? '/reports/ar' : '/reports/ap';
-  const qs = new URLSearchParams({ asof, ...(contact ? { contact } : {}), ...(coa ? { coa: '1' } : {}) }).toString();
+  const qs = new URLSearchParams({ asof, ...(contact ? { contact } : {}), ...(coa ? { coa: '1' } : {}), ...(ar && sp.bl === '1' ? { bl: '1' } : {}) }).toString();
   return (
     <>
       <div className="top"><div><h1>{ar ? 'ลูกหนี้ตามเอกสาร' : 'เจ้าหนี้ตามเอกสาร'}</h1>
@@ -34,6 +34,8 @@ export async function AgingReport({ kind, sp }: { kind: Kind; sp: Sp }) {
             {contacts.map((c: any) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
         <label className="f" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, flexDirection: 'row' }}>
           <input type="checkbox" name="coa" value="1" defaultChecked={coa} style={{ width: 'auto' }} /> แยกตามบัญชี</label>
+        {ar && <label className="f" title="แสดงรวมเฉพาะใบวางบิลที่ยังไม่ได้วางบิล/ยังไม่ได้อัปเกรดเป็นเอกสารอื่น (ไม่ลงบัญชี)" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, flexDirection: 'row' }}>
+          <input type="checkbox" name="bl" value="1" defaultChecked={sp.bl === '1'} style={{ width: 'auto' }} /> แสดงเอกสารใบวางบิล/ใบแจ้งหนี้</label>}
         <button className="btn">ดูรายงาน</button>
         <a className="btn" href={`${base}/xlsx?${qs}`}>ส่งออก Excel</a>
       </form>
