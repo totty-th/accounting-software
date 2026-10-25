@@ -15,5 +15,5 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   if (dlv && !['QT', 'INV'].includes(v.doc.doc_type)) return Response.json({ error: 'ใบส่งของออกได้เฉพาะใบเสนอราคาและใบแจ้งหนี้' }, { status: 400 });
   const pdf = await buildDocPdf(v, q.get('both') === '1' ? 'both' : q.get('copy') === '1' ? 'copy' : 'original', dlv ? 'delivery' : 'doc');
   return new Response(pdf, { headers: { 'content-type': 'application/pdf',
-    'content-disposition': `inline; filename="${dlv ? 'DN-' : ''}${v.doc.doc_no}.pdf"`, 'cache-control': 'no-store' } });
+    'content-disposition': `${q.get('download') === '1' ? 'attachment' : 'inline'}; filename="${dlv ? 'DN-' : ''}${v.doc.doc_no}.pdf"`, 'cache-control': 'no-store' } });
 }
