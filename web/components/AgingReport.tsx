@@ -2,9 +2,20 @@ import { loadAging, accountsOf, BUCKETS, BUCKET_LABEL, type Kind, type Sp } from
 import { money, dateTh } from '@/lib/format';
 import { Fragment } from 'react';
 import { Group } from '@/components/Board';
+import Link from 'next/link';
+import { RelPop } from '@/components/TaxBits';
+import { related } from '@/lib/related';
+import { getDb } from '@/lib/db';
+
+const hrefOf = (r: any) => r.doc_type === 'EXP' ? `/expenses/${r.doc_id}` : r.doc_type === 'RI' ? `/purchases/ri/${r.doc_id}` : `/sales/${r.doc_no}`;
 
 export async function AgingReport({ kind, sp }: { kind: Kind; sp: Sp }) {
   const { asof, contact, groups, grand, contacts, count } = await loadAging(kind, sp);
+  const db = await getDb(), allRows = groups.flatMap(g => g.rows);
+  const pick = (t: string) => allRows.filter(r => r.doc_type === t).map(r => r.doc_id as string);
+  const relMap = new Map<string, any[]>();
+  for (const [k, ids] of [['exp', pick('EXP')], ['ri', pick('RI')], ['sales', allRows.filter(r => r.doc_type !== 'EXP' && r.doc_type !== 'RI').map(r => r.doc_id as string)]] as const)
+    if (ids.length) for (const [id, v] of await related(db, k, ids)) relMap.set(id, v);
   const coa = sp.coa === '1', accs = coa ? accountsOf(kind) : [];
   const ar = kind === 'ar', base = ar ? '/reports/ar' : '/reports/ap';
   const qs = new URLSearchParams({ asof, ...(contact ? { contact } : {}), ...(coa ? { coa: '1' } : {}) }).toString();
@@ -30,7 +41,7 @@ export async function AgingReport({ kind, sp }: { kind: Kind; sp: Sp }) {
               <Fragment key={g.contact_id}>
                 <tr style={{ fontWeight: 700 }}><td colSpan={(ar ? 11 : 10) + accs.length}>{g.name}</td></tr>
                 {g.rows.map(r => (
-                  <tr key={r.doc_id}><td className="no">{r.doc_no}</td><td>{dateTh(r.doc_date)}</td><td>{dateTh(r.due_date)}</td>
+                  <tr key={r.doc_id}><td className="no"><Link href={hrefOf(r)}>{r.doc_no}</Link> <RelPop rel={relMap.get(r.doc_id) ?? []} /></td><td>{dateTh(r.doc_date)}</td><td>{dateTh(r.due_date)}</td>
                     <td className="num">{money(r.doc_total)}</td>{ar && <td className="num">{money(r.receipted)}</td>}
                     <td className="num">{money(r.outstanding)}</td>{BUCKETS.map(b => <td key={b} className="num">{Number(r[b]) ? money(r[b]) : ''}</td>)}{accs.map(a => <td key={a[0]} className="num">{Number(r[a[0]]) ? money(r[a[0]]) : ''}</td>)}</tr>))}
                 <tr style={{ fontWeight: 600 }}><td colSpan={ar ? 5 : 4}>รวม {g.name}</td><td className="num">{money(g.tot.outstanding)}</td>
