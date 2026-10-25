@@ -3,11 +3,17 @@ import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
 import { DOC_TYPE } from '@/lib/status';
-import { PERIODS, periodRange } from '@/lib/period';
+import { periodRange } from '@/lib/period';
+import { reportPeriod, pickStatuses, pgArr } from '@/lib/report-filter';
+import { ReportFilter } from '@/components/ReportFilter';
+import { DocRows } from '@/components/DocRows';
 import { requirePage } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
-type Sp = { view?: string; period?: string; from?: string; to?: string; type?: string };
+type Sp = { view?: string; period?: string; from?: string; to?: string; type?: string; st?: string | string[] };
+const ST_BUCKETS: Record<string, string[]> = { wait: ['awaiting_payment', 'pending_collect'], done: ['collected', 'paid'], rcpt: ['receipt_opened'], split: ['split_paid'],
+  ok: ['approved', 'active'], cancelled: ['cancelled'] };
+const ST_OPTS: [string, string][] = [['wait', 'รอเก็บเงิน'], ['done', 'เก็บเงินแล้ว'], ['rcpt', 'เปิดใบเสร็จแล้ว'], ['split', 'แบ่งจ่าย'], ['ok', 'อนุมัติแล้ว/ใช้งาน (ใบลดหนี้/ใบเพิ่มหนี้)'], ['cancelled', 'ยกเลิก (แสดงแต่ไม่นับยอด)']];
 // รายงานสรุปยอดขาย: INV + ขายสด + ใบเพิ่มหนี้ เป็นบวก, ใบลดหนี้เป็นลบ · ไม่รวมใบเสนอราคา/ใบวางบิล/เอกสารที่ยกเลิก/ใบมัดจำ (มัดจำไม่ใช่รายได้)
 // ยอดต้องตรงบัญชีรายได้หมวด 41 — มีแผงกระทบยอดด้านล่าง (sales_revenue_reconcile)
 const TYPES = ['INV', 'CA', 'CN', 'DN'];
@@ -16,21 +22,30 @@ const VIEWS: [string, string][] = [['summary', 'สรุปยอดขาย']
 export default async function SalesReport({ searchParams }: { searchParams: Sp }) {
   await requirePage('reports.read');
   const view = VIEWS.some(v => v[0] === searchParams.view) ? searchParams.view! : 'summary';
-  const period = PERIODS.some(p => p[0] === searchParams.period) ? searchParams.period! : 'month';
+  const period = reportPeriod(searchParams.period);
+  const { sel: stSel, list: stList } = pickStatuses(searchParams.st, ST_BUCKETS);
+  const withCancel = stList.includes('cancelled');
   const type = TYPES.includes(searchParams.type ?? '') ? searchParams.type! : '';
   const t = today();
   const range = periodRange(period, t, searchParams.from, searchParams.to);
   const db = await getDb();
-  const args = [type, range?.[0] ?? null, range?.[1] ?? null];
+  const args = [type, range?.[0] ?? null, range?.[1] ?? null, pgArr(stList)];
   const base = `d.status<>'cancelled' and not d.is_deposit and d.doc_type = any(array['INV','CA','CN','DN']) and ($1='' or d.doc_type=$1)
-    and ($2::date is null or d.doc_date>=$2::date) and ($3::date is null or d.doc_date<=$3::date)`;
+    and ($2::date is null or d.doc_date>=$2::date) and ($3::date is null or d.doc_date<=$3::date)
+    and (cardinality($4::text[])=0 or d.status = any($4::text[]))`;
+  const rowBase = withCancel ? base.replace("d.status<>'cancelled' and ", '') : base;   // รายการเอกสารแสดงใบยกเลิกได้เมื่อเลือก (ยอดรวมไม่นับ)
   const sgn = `case when d.doc_type='CN' then -1 else 1 end`;
   const [tot] = await db.q(`select count(*)::int n, coalesce(sum(d.subtotal*(${sgn})),0) sub, coalesce(sum(d.vat*(${sgn})),0) vat, coalesce(sum(d.total*(${sgn})),0) total
     from sales_docs d where ${base}`, args);
   let rows: any[] = [];
   if (view === 'summary') rows = await db.q(`select d.doc_no, d.doc_type, d.doc_date, d.status, c.business_name, c.contact_name,
-      d.subtotal*(${sgn}) sub, d.vat*(${sgn}) vat, d.total*(${sgn}) total
-    from sales_docs d join contacts c on c.id=d.contact_id where ${base} order by d.doc_date desc, d.doc_no desc`, args);
+      d.id, d.subtotal*(${sgn}) sub, d.vat*(${sgn}) vat, d.total*(${sgn}) total
+    from sales_docs d join contacts c on c.id=d.contact_id where ${rowBase} order by d.doc_date desc, d.doc_no desc`, args);
+  let lineMap = new Map<string, any[]>();
+  if (view === 'summary' && rows.length) {
+    for (const l of await db.q<any>(`select doc_id, description, qty, unit_price, amount from sales_doc_lines where doc_id = any($1::uuid[]) order by doc_id, line_no`, [`{${rows.map(r => r.id).join(',')}}`]))
+      lineMap.set(l.doc_id, [...(lineMap.get(l.doc_id) ?? []), l]);
+  }
   if (view === 'customer') {   // ขยายดูเอกสารของลูกค้าแต่ละราย (ตามต้นแบบ) · ผลรวมกลุ่ม = ยอดขายตามเอกสาร
     const docs = await db.q(`select d.doc_no, d.doc_type, d.doc_date, d.status, coalesce(c.business_name,c.contact_name,'-') name,
         d.subtotal*(${sgn}) sub, d.vat*(${sgn}) vat, d.total*(${sgn}) total
@@ -42,20 +57,13 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
   if (view === 'employee') rows = await db.q(`select * from sales_by_salesperson($1::date,$2::date)`, [range?.[0] ?? null, range?.[1] ?? null]); // ไม่กรองตามประเภทเอกสาร (ให้ผลรวมตรงยอดบัญชีเสมอ)
   if (view === 'product') rows = await db.q(`select description name, sum(qty)::numeric(18,4) qty, sum(net) sub
     from sales_report_lines($2::date,$3::date,nullif($1,'')) group by 1 order by sub desc`, args);
-  const rc = type === '' ? (await db.q<any>('select sales_revenue_reconcile($1::date,$2::date) r', [range?.[0] ?? null, range?.[1] ?? null]))[0].r : null;
-  const q = (o: Partial<Sp>) => { const u = new URLSearchParams(); Object.entries({ view, period, type, from: searchParams.from, to: searchParams.to, ...o }).forEach(([k, v]) => v && u.set(k, String(v))); return `/reports/sales?${u}`; };
+  const rc = type === '' && stSel.length === 0 ? (await db.q<any>('select sales_revenue_reconcile($1::date,$2::date) r', [range?.[0] ?? null, range?.[1] ?? null]))[0].r : null;
+  const q = (o: Partial<Sp>) => { const u = new URLSearchParams(); Object.entries({ view, period, type, from: searchParams.from, to: searchParams.to, ...o }).forEach(([k, v]) => v && u.set(k, String(v))); stSel.forEach(v => u.append('st', v)); return `/reports/sales?${u}`; };
   return (
     <>
       <div className="top"><div><h1>รายงานขาย</h1><p className="sub">ใบลดหนี้นับเป็นลบ · ไม่รวมเอกสารที่ยกเลิก ใบเสนอราคา ใบวางบิล และใบมัดจำ</p></div></div>
       <div className="tabs">{VIEWS.map(([k, v]) => <Link key={k} href={q({ view: k })} className={view === k ? 'on' : ''}>{v}</Link>)}</div>
-      <form className="row-inline" method="get">
-        <input type="hidden" name="view" value={view} />
-        <label className="f">ช่วงเวลา<select name="period" defaultValue={period}>{PERIODS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <label className="f">ตั้งแต่<input type="date" name="from" defaultValue={searchParams.from ?? ''} /></label>
-        <label className="f">ถึง<input type="date" name="to" defaultValue={searchParams.to ?? ''} /></label>
-        <label className="f">ประเภทเอกสาร<select name="type" defaultValue={type}><option value="">ทั้งหมด</option>{TYPES.map(k => <option key={k} value={k}>{DOC_TYPE[k]}</option>)}</select></label>
-        <button className="btn" type="submit">แสดงผล</button>
-      </form>
+      <ReportFilter period={period} from={searchParams.from} to={searchParams.to} groups={[{ label: 'เอกสารขาย', options: ST_OPTS }]} selected={stSel} hidden={{ view }} selects={[{ name: 'type', label: 'ประเภทเอกสาร', value: type, options: [['', 'ทั้งหมด'], ...TYPES.map(k => [k, DOC_TYPE[k]] as [string, string])] }]} />
       <div className="panel">
         <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {tot.n} เอกสาร</div>
         <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 8 }}>
@@ -78,9 +86,9 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
       </div>}
       <div className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 14 }}>
         {rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : view === 'summary' ? (
-          <table><thead><tr><th>เลขที่เอกสาร</th><th>วันที่</th><th>ลูกค้า</th><th className="num">มูลค่า</th><th className="num">ภาษีมูลค่าเพิ่ม</th><th className="num">ยอดรวมสุทธิ</th><th>สถานะ</th></tr></thead>
-            <tbody>{rows.map(r => <tr key={r.doc_no}><td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link></td><td>{dateTh(r.doc_date)}</td><td>{partyName(r)}</td>
-              <td className="num">{money(r.sub)}</td><td className="num">{money(r.vat)}</td><td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td></tr>)}</tbody></table>
+          <DocRows partyLabel="ลูกค้า" vatLabel="ภาษีมูลค่าเพิ่ม" rows={rows.map(r => ({ key: r.id, href: `/sales/${r.doc_no}`, no: r.doc_no, date: dateTh(r.doc_date), party: partyName(r),
+            net: Number(r.sub), vat: Number(r.vat), total: Number(r.total), status: r.status, dim: r.status === 'cancelled',
+            lines: (lineMap.get(r.id) ?? []).map((l: any) => ({ d: l.description, q: `${Number(l.qty).toLocaleString('th-TH', { maximumFractionDigits: 4 })} × ${money(l.unit_price)}`, net: Number(l.amount) })) }))} />
         ) : view === 'customer' ? (
           <table><thead><tr><th>ลูกค้า</th><th className="num">จำนวนเอกสาร</th><th className="num">มูลค่า</th><th className="num">ภาษีมูลค่าเพิ่ม</th><th className="num">ยอดรวมสุทธิ</th></tr></thead>
             {rows.map(r => <tbody key={r.name}><tr><td><details><summary style={{ cursor: 'pointer' }}>{r.name}</summary>

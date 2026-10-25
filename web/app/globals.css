@@ -193,3 +193,15 @@ tr.clickable:hover,tr.clickable:focus-visible{background:color-mix(in srgb,var(-
 .sh-ship{margin:10px 0 4px;border:1px solid #d6d6dc;border-radius:4px;padding:8px 12px}
 .sh-ship dl{display:grid;gap:3px;margin:0}.sh-ship dl>div{display:grid;grid-template-columns:110px 1fr;gap:8px}.sh-ship dt{color:#6b6b75}.sh-ship dd{margin:0}
 .sh-count{margin:8px 0 0;color:#6b6b75;font-size:12.5px}
+
+/* ตัวกรองรายงาน (เลือกสถานะหลายค่า) */
+.msel{position:relative;min-width:180px}
+.msel>span{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.msel summary{list-style:none;cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:7px 10px;background:var(--panel,#fff)}
+.msel summary::-webkit-details-marker{display:none}
+.msel-pop{position:absolute;z-index:30;top:100%;left:0;min-width:230px;max-height:320px;overflow:auto;background:var(--panel,#fff);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:6px}
+.msel-pop label{display:flex;gap:8px;align-items:center;padding:5px 8px;cursor:pointer}
+.msel-h{font-size:12px;color:var(--muted);background:rgba(127,127,127,.12);padding:3px 8px;margin:4px 0}
+tr.dl-sub td{background:rgba(127,127,127,.06);font-size:13px}
+.xp{cursor:pointer;background:none;border:0;color:var(--brand);padding:0 6px 0 0;font:inherit}
+.msel-pop input{flex:none;width:auto}

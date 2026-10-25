@@ -2,6 +2,8 @@
 export const PERIODS: [string, string][] = [
   ['all', 'แสดงทั้งหมด'], ['month', 'เดือนปัจจุบัน'], ['lastmonth', 'เดือนก่อน'], ['m3', '3 เดือนที่แล้ว'], ['m6', '6 เดือนที่แล้ว'], ['y1', '1 ปีที่แล้ว'], ['year', 'ปีปัจจุบัน'], ['lastyear', 'ปีก่อน'], ['custom', 'เลือกช่วงวันที่'],
 ];
+// ช่วงเวลาของหน้ารายงาน (ตาม FA: เดือนปัจจุบัน / เดือนก่อน / เลือกช่วงวันที่ / ปีปัจจุบัน / ปีก่อน)
+export const REPORT_PERIODS: [string, string][] = [['month', 'เดือนปัจจุบัน'], ['lastmonth', 'เดือนก่อน'], ['custom', 'เลือกช่วงวันที่'], ['year', 'ปีปัจจุบัน'], ['lastyear', 'ปีก่อน']];
 const iso = (y: number, m: number, d: number) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 /** คืน [จากวันที่, ถึงวันที่] (รวมสองวัน) หรือ null = ไม่จำกัด */

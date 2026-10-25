@@ -2,11 +2,16 @@ import Link from 'next/link';
 import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
-import { PERIODS, periodRange } from '@/lib/period';
+import { periodRange } from '@/lib/period';
+import { reportPeriod, pickStatuses, pgArr } from '@/lib/report-filter';
+import { ReportFilter } from '@/components/ReportFilter';
+import { DocRows } from '@/components/DocRows';
 import { requirePage } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
-type Sp = { view?: string; period?: string; from?: string; to?: string; kind?: string };
+type Sp = { view?: string; period?: string; from?: string; to?: string; kind?: string; st?: string | string[] };
+const ST_BUCKETS: Record<string, string[]> = { pend: ['pending', 'unpaid'], appr: ['approved'], paid: ['paid'], cancelled: ['rejected', 'cancelled'] };
+const ST_OPTS: [string, string][] = [['pend', 'รออนุมัติ/รอดำเนินการ'], ['appr', 'อนุมัติแล้ว'], ['paid', 'ชำระเงินแล้ว'], ['cancelled', 'ยกเลิก/ไม่อนุมัติ (แสดงแต่ไม่นับยอด)']];
 // รายงานซื้อและค่าใช้จ่าย: ใบรับสินค้า (RI → สินค้าคงเหลือ) + ใบค่าใช้จ่าย (EXP → บัญชีค่าใช้จ่ายของแต่ละบรรทัด)
 // นับรออนุมัติ/รอชำระ (บัญชีลงตั้งแต่สร้างเอกสาร) ไม่นับไม่อนุมัติ/ยกเลิก · แสดงมูลค่าก่อน VAT แยก VAT ซื้อ
 // ยอดต้องตรงบัญชี — มีแผงกระทบยอด (purchase_expense_reconcile) และแยกการซื้อสินค้ากับค่าใช้จ่าย
@@ -17,45 +22,53 @@ const ST: Record<string, string> = { unpaid: 'pending_approval', pending: 'pendi
 export default async function PurchaseReport({ searchParams }: { searchParams: Sp }) {
   await requirePage('reports.read');
   const view = VIEWS.some(v => v[0] === searchParams.view) ? searchParams.view! : 'summary';
-  const period = PERIODS.some(p => p[0] === searchParams.period) ? searchParams.period! : 'month';
+  const period = reportPeriod(searchParams.period);
+  const { sel: stSel, list: stList } = pickStatuses(searchParams.st, ST_BUCKETS);
+  const withCancel = stList.includes('cancelled');
   const kind = KINDS.some(k => k[0] === searchParams.kind) ? searchParams.kind! : '';
   const t = today();
   const range = periodRange(period, t, searchParams.from, searchParams.to);
   const db = await getDb();
   const a = [range?.[0] ?? null, range?.[1] ?? null];
+  const stCond = `(cardinality($3::text[])=0 or d.status = any($3::text[]))`;
+  const live = `d.status not in ('rejected','cancelled')`;
+  const a3 = [...a, pgArr(stList)];
   // รวม RI + EXP เป็นรายการเดียว (net = ก่อน VAT)
   const docs = `(select 'RI' k, g.id, g.ri_no no, g.ri_date dt, g.contact_id, g.status, g.subtotal net, g.vat, g.total from goods_receipts g
-                  where g.status not in ('rejected','cancelled') and ($1::date is null or g.ri_date>=$1::date) and ($2::date is null or g.ri_date<=$2::date)
+                  where ($1::date is null or g.ri_date>=$1::date) and ($2::date is null or g.ri_date<=$2::date)
                 union all
                  select 'EXP', e.id, e.exp_no, e.exp_date, e.contact_id, e.status, e.subtotal, e.vat, e.total from expenses e
-                  where e.status not in ('rejected','cancelled') and ($1::date is null or e.exp_date>=$1::date) and ($2::date is null or e.exp_date<=$2::date)) d`;
-  const where = kind ? `where d.k='${kind}'` : '';
-  const [tot] = await db.q<any>(`select count(*)::int n, coalesce(sum(net),0) net, coalesce(sum(vat),0) vat, coalesce(sum(total),0) total from ${docs} ${where}`, a);
+                  where ($1::date is null or e.exp_date>=$1::date) and ($2::date is null or e.exp_date<=$2::date)) d`;
+  const kindC = kind ? `d.k='${kind}'` : 'true';
+  const where = `where ${live} and ${stCond} and ${kindC}`;
+  const rowsWhere = `where ${withCancel ? 'true' : live} and ${stCond} and ${kindC}`;
+  const [tot] = await db.q<any>(`select count(*)::int n, coalesce(sum(net),0) net, coalesce(sum(vat),0) vat, coalesce(sum(total),0) total from ${docs} ${where}`, a3);
   let rows: any[] = [];
-  if (view === 'summary') rows = await db.q(`select d.*, c.business_name, c.contact_name from ${docs} join contacts c on c.id=d.contact_id ${where} order by d.dt desc, d.no desc`, a);
+  if (view === 'summary') rows = await db.q(`select d.*, c.business_name, c.contact_name from ${docs} join contacts c on c.id=d.contact_id ${rowsWhere} order by d.dt desc, d.no desc`, a3);
   if (view === 'vendor') rows = await db.q(`select coalesce(c.business_name,c.contact_name,'-') name, count(*)::int n, sum(d.net) net, sum(d.vat) vat, sum(d.total) total
-      from ${docs} join contacts c on c.id=d.contact_id ${where} group by 1 order by total desc`, a);
+      from ${docs} join contacts c on c.id=d.contact_id ${where} group by 1 order by total desc`, a3);
   if (view === 'account') rows = await db.q(`select x.code, coalesce(ac.name, case when x.code is null then 'สินค้าคงเหลือ (ใบรับสินค้า)' end) name, x.k, sum(x.net) net from (
-      select 'RI' k, null::text code, g.subtotal net from goods_receipts g where g.status not in ('rejected','cancelled') and ($1::date is null or g.ri_date>=$1::date) and ($2::date is null or g.ri_date<=$2::date)
+      select 'RI' k, null::text code, g.subtotal net, g.status from goods_receipts g where g.status not in ('rejected','cancelled') and ($1::date is null or g.ri_date>=$1::date) and ($2::date is null or g.ri_date<=$2::date)
       union all
-      select 'EXP', l.account_code, l.net from expense_lines l join expenses e on e.id=l.expense_id where e.status not in ('rejected','cancelled')
+      select 'EXP', l.account_code, l.net, e.status from expense_lines l join expenses e on e.id=l.expense_id where e.status not in ('rejected','cancelled')
         and ($1::date is null or e.exp_date>=$1::date) and ($2::date is null or e.exp_date<=$2::date)) x
-      left join accounts ac on ac.code=x.code ${kind ? `where x.k='${kind}'` : ''} group by x.code, ac.name, x.k order by x.k desc, x.code`, a);
-  const rc = kind === '' ? (await db.q<any>('select purchase_expense_reconcile($1::date,$2::date) r', a))[0].r : null;
-  const q = (o: Partial<Sp>) => { const u = new URLSearchParams(); Object.entries({ view, period, kind, from: searchParams.from, to: searchParams.to, ...o }).forEach(([k, v]) => v && u.set(k, String(v))); return `/reports/purchases?${u}`; };
+      left join accounts ac on ac.code=x.code where (cardinality($3::text[])=0 or x.status = any($3::text[])) ${kind ? `and x.k='${kind}'` : ''} group by x.code, ac.name, x.k order by x.k desc, x.code`, a3);
+  const lineMap = new Map<string, any[]>();
+  if (view === 'summary' && rows.length) {
+    const ids = `{${rows.map(r => r.id).join(',')}}`;
+    for (const l of await db.q<any>(`select l.expense_id id, l.description d, null::numeric qty, l.net, l.vat, coalesce(l.category, l.account_code) tag from expense_lines l where l.expense_id = any($1::uuid[])
+        union all select l.ri_id, p.name, l.qty, l.net, l.vat, 'สินค้า' from goods_receipt_lines l join products p on p.id=l.product_id where l.ri_id = any($1::uuid[])`, [ids]))
+      lineMap.set(l.id, [...(lineMap.get(l.id) ?? []), l]);
+  }
+  const rc = kind === '' && stSel.length === 0 ? (await db.q<any>('select purchase_expense_reconcile($1::date,$2::date) r', a))[0].r : null;
+  const q = (o: Partial<Sp>) => { const u = new URLSearchParams(); Object.entries({ view, period, kind, from: searchParams.from, to: searchParams.to, ...o }).forEach(([k, v]) => v && u.set(k, String(v))); stSel.forEach(v => u.append('st', v)); return `/reports/purchases?${u}`; };
   const href = (r: any) => r.k === 'RI' ? `/purchases/ri/${r.id}` : `/expenses/${r.id}`;
   return (
     <>
       <div className="top"><div><h1>รายงานซื้อและค่าใช้จ่าย</h1><p className="sub">มูลค่าก่อน VAT · ไม่รวมเอกสารที่ไม่อนุมัติ/ยกเลิก · ใบรับสินค้าเป็นสินค้าคงเหลือ ไม่ใช่ค่าใช้จ่ายจนกว่าจะขาย · ภาษีซื้อแยกต่างหาก</p></div></div>
       <div className="tabs">{VIEWS.map(([k, v]) => <Link key={k} href={q({ view: k })} className={view === k ? 'on' : ''}>{v}</Link>)}</div>
-      <form className="row-inline" method="get">
-        <input type="hidden" name="view" value={view} />
-        <label className="f">ช่วงเวลา<select name="period" defaultValue={period}>{PERIODS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <label className="f">ตั้งแต่<input type="date" name="from" defaultValue={searchParams.from ?? ''} /></label>
-        <label className="f">ถึง<input type="date" name="to" defaultValue={searchParams.to ?? ''} /></label>
-        <label className="f">ประเภท<select name="kind" defaultValue={kind}><option value="">ทั้งหมด</option>{KINDS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <button className="btn" type="submit">แสดงผล</button>
-      </form>
+      <ReportFilter period={period} from={searchParams.from} to={searchParams.to} groups={[{ label: 'เอกสารซื้อ/ค่าใช้จ่าย', options: ST_OPTS }]} selected={stSel} hidden={{ view }}
+        selects={[{ name: 'kind', label: 'ประเภท', value: kind, options: [['', 'ทั้งหมด'], ...KINDS] }]} />
       <div className="panel">
         <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {tot.n} เอกสาร</div>
         <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 8 }}>
@@ -77,9 +90,9 @@ export default async function PurchaseReport({ searchParams }: { searchParams: S
       </div>}
       <div className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 14 }}>
         {rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : view === 'summary' ? (
-          <table><thead><tr><th>เลขที่เอกสาร</th><th>วันที่</th><th>ผู้จำหน่าย</th><th>ประเภท</th><th className="num">มูลค่า</th><th className="num">ภาษีซื้อ</th><th className="num">ยอดรวมสุทธิ</th><th>สถานะ</th></tr></thead>
-            <tbody>{rows.map(r => <tr key={r.no}><td className="no"><Link href={href(r)}>{r.no}</Link></td><td>{dateTh(r.dt)}</td><td>{partyName(r)}</td>
-              <td>{r.k === 'RI' ? 'ซื้อสินค้า' : 'ค่าใช้จ่าย'}</td><td className="num">{money(r.net)}</td><td className="num">{money(r.vat)}</td><td className="num">{money(r.total)}</td><td><Pill s={ST[r.status] ?? r.status} /></td></tr>)}</tbody></table>
+          <DocRows partyLabel="ผู้จำหน่าย" kindLabel="ประเภท" vatLabel="ภาษีซื้อ" rows={rows.map(r => ({ key: r.id, href: href(r), no: r.no, date: dateTh(r.dt), party: partyName(r),
+            kind: r.k === 'RI' ? 'ซื้อสินค้า' : 'ค่าใช้จ่าย', net: Number(r.net), vat: Number(r.vat), total: Number(r.total), status: ST[r.status] ?? r.status, dim: ['rejected', 'cancelled'].includes(r.status),
+            lines: (lineMap.get(r.id) ?? []).map((l: any) => ({ d: l.d, tag: l.tag, q: l.qty != null ? Number(l.qty).toLocaleString('th-TH', { maximumFractionDigits: 4 }) : undefined, net: Number(l.net), vat: Number(l.vat) })) }))} />
         ) : view === 'vendor' ? (
           <table><thead><tr><th>ผู้จำหน่าย</th><th className="num">จำนวนเอกสาร</th><th className="num">มูลค่า</th><th className="num">ภาษีซื้อ</th><th className="num">ยอดรวมสุทธิ</th></tr></thead>
             <tbody>{rows.map(r => <tr key={r.name}><td>{r.name}</td><td className="num">{r.n}</td><td className="num">{money(r.net)}</td><td className="num">{money(r.vat)}</td><td className="num">{money(r.total)}</td></tr>)}</tbody></table>

@@ -3,7 +3,9 @@ import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { Pill } from '@/components/Pill';
 import { STATUS } from '@/lib/status';
-import { PERIODS, periodRange } from '@/lib/period';
+import { periodRange } from '@/lib/period';
+import { reportPeriod } from '@/lib/report-filter';
+import { ReportFilter } from '@/components/ReportFilter';
 import { parseStatuses } from '@/lib/status-filter';
 import { requirePage } from '@/lib/auth';
 
@@ -14,7 +16,7 @@ const STATUSES = ['billed', 'receipt_opened', 'collected', 'cancelled'];
 
 export default async function BillingReport({ searchParams }: { searchParams: Sp }) {
   await requirePage('reports.read');
-  const period = PERIODS.some(p => p[0] === searchParams.period) ? searchParams.period! : 'month';
+  const period = reportPeriod(searchParams.period);
   const st = parseStatuses(searchParams.st, STATUSES);
   const t = today();
   const range = periodRange(period, t, searchParams.from, searchParams.to);
@@ -29,14 +31,7 @@ export default async function BillingReport({ searchParams }: { searchParams: Sp
   return (
     <>
       <div className="top"><div><h1>รายงานใบวางบิล</h1><p className="sub">ยอดรวมไม่นับใบที่ยกเลิก · ใบวางบิลไม่ลงบัญชีรายได้</p></div></div>
-      <form className="row-inline" method="get">
-        <label className="f">ช่วงเวลา<select name="period" defaultValue={period}>{PERIODS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <label className="f">ตั้งแต่<input type="date" name="from" defaultValue={searchParams.from ?? ''} /></label>
-        <label className="f">ถึง<input type="date" name="to" defaultValue={searchParams.to ?? ''} /></label>
-        <fieldset className="f" style={{ border: 0, padding: 0 }}><legend>สถานะ (ไม่เลือก = ทั้งหมด)</legend>
-          {STATUSES.map(s => <label key={s} style={{ marginRight: 10 }}><input type="checkbox" name="st" value={s} defaultChecked={st.includes(s)} /> {STATUS[s]?.[0] ?? s}</label>)}</fieldset>
-        <button className="btn" type="submit">แสดงผล</button>
-      </form>
+      <ReportFilter period={period} from={searchParams.from} to={searchParams.to} groups={[{ label: 'เอกสารวางบิล', options: STATUSES.map(x => [x, STATUS[x]?.[0] ?? x] as [string, string]) }]} selected={st} />
       <div className="panel">
         <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {live.length} เอกสาร{rows.length !== live.length ? ` (ยกเลิก ${rows.length - live.length} ไม่นับยอด)` : ''}</div>
         <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 8 }}>
