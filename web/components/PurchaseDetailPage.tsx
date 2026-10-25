@@ -1,3 +1,4 @@
+import { ActsMenu } from '@/components/ActsMenu';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDb } from '@/lib/db';
@@ -47,7 +48,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
     <>
       <div className="top noprint">
         <div><h1>{v.no} <Pill s={pillKey} /></h1><p className="sub"><Link href={back}>← {backName}</Link></p></div>
-        <div className="acts">
+        <ActsMenu>
           <a className="btn ghost" href={`/purchases/${kind.toLowerCase()}/${id}/pdf`} target="_blank">ดาวน์โหลด PDF</a>
           {kind === 'PO' && W && st === 'pending' && <Link className="btn ghost" href={`/purchases/orders/${id}/edit`}>แก้ไข</Link>}
           {kind === 'PO' && W && <ActionButton label="สร้างซ้ำ" variant="ghost" action={A.duplicatePurchaseOrder.bind(null, id)} />}
@@ -60,7 +61,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
           {AP && (st === pendingKey || st === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={(A_.reject as any).bind(null, id)} />}
           {W && (kind === 'PO' ? ['approved', 'rejected'] : ['approved', 'paid', 'rejected']).includes(st) && <ActionButton label="รีเซ็ต" variant="ghost" action={(A_.reset as any).bind(null, id)} />}
           {W && st !== 'cancelled' && st !== 'converted' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={(A_.cancel as any).bind(null, id)} />}
-        </div>
+        </ActsMenu>
       </div>
       <div className="detail">
         <section className="panel">

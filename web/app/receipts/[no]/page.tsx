@@ -1,3 +1,4 @@
+import { ActsMenu } from '@/components/ActsMenu';
 import { can } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
 import Link from 'next/link';
@@ -35,9 +36,9 @@ export default async function ReceiptDetail({ params }: { params: { no: string }
     <>
       <div className="top noprint">
         <div><h1>{v.receipt.receipt_no} <Pill s={v.receipt.status} /></h1><p className="sub"><Link href="/receipts">← ใบเสร็จและการรับเงิน</Link></p></div>
-        <div className="acts"><PrintButton />
+        <ActsMenu><PrintButton />
           <a className="btn ghost" href={`/receipts/${no}/pdf`}>ดาวน์โหลด PDF</a>
-          <a className="btn ghost" href={`/receipts/${no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a></div>
+          <a className="btn ghost" href={`/receipts/${no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a></ActsMenu>
       </div>
       <div className="detail">
         <ReceiptSheet v={v} />

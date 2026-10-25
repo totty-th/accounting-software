@@ -87,7 +87,7 @@ export function QtTable({ rows, canWrite, canApprove, canOwn, exportHref }: { ro
       </div>
       <div className="panel" style={{ padding: 0, overflow: 'visible' }}>
         <div style={{ minHeight: 200 }}>
-          <table><thead><tr>
+          <table className="qtcards"><thead><tr>
             <th style={{ width: 30 }}><input type="checkbox" checked={all} onChange={() => setSel(all ? new Set() : new Set(rows.map(r => r.id)))} aria-label="เลือกทั้งหมด" /></th>
             <th>วันที่</th><th>เลขที่เอกสาร</th><th>ชื่อลูกค้า / โปรเจ็ค</th><th className="num">ยอดรวมสุทธิ</th><th>สถานะ</th><th /></tr></thead>
             <tbody>{rows.map(r => {
@@ -103,18 +103,18 @@ export function QtTable({ rows, canWrite, canApprove, canOwn, exportHref }: { ro
               ];
               return (
                 <tr key={r.id} style={{ opacity: dim ? .55 : 1 }}>
-                  <td><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} aria-label={`เลือก ${r.doc_no}`} /></td>
-                  <td>{dth(r.date)}</td>
-                  <td className="no"><span style={{ color: toneColor[tone], marginRight: 4 }}>●</span><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link>
+                  <td className="c-chk"><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} aria-label={`เลือก ${r.doc_no}`} /></td>
+                  <td className="c-date">{dth(r.date)}</td>
+                  <td className="no c-no"><span style={{ color: toneColor[tone], marginRight: 4 }}>●</span><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link>
                     {r.related.length > 0 && <Menu align="left" trigger={<span title="เอกสารที่เกี่ยวข้อง" style={{ marginLeft: 6 }}>📎</span>} onRun={() => {}}
                       items={r.related.map(d => ({ label: `${d.doc_no}${d.status === 'cancelled' ? ' (ยกเลิก)' : ''}`, href: `/sales/${d.doc_no}` }))} />}
                   </td>
-                  <td>{r.customer}{r.project ? <div className="sub">{r.project}</div> : null}</td>
-                  <td className="num">{fmt(r.total)}
+                  <td className="c-cust">{r.customer}{r.project ? <div className="sub">{r.project}</div> : null}</td>
+                  <td className="num c-total">{fmt(r.total)}
                     {r.billing && <div className="sub">{r.billing.deposit ? 'รับมัดจำแล้ว' : 'เรียกเก็บแล้ว'} {fmt(r.billing.billed)} <button aria-label="ประวัติการเรียกเก็บ" onClick={() => setInfo(r)}
                       style={{ background: 'none', border: 0, cursor: 'pointer', color: '#db2777' }}>ⓘ</button></div>}</td>
-                  <td><Menu trigger={<span className="pill" style={{ background: toneColor[tone], color: '#fff', padding: '3px 10px', borderRadius: 12 }}>{label} ▾</span>} items={its} onRun={run} /></td>
-                  <td><Menu align="right" trigger={<span style={{ padding: '0 8px', fontWeight: 700 }}>⋯</span>} items={more} onRun={run} /></td>
+                  <td className="c-st"><Menu trigger={<span className="pill" style={{ background: toneColor[tone], color: '#fff', padding: '3px 10px', borderRadius: 12 }}>{label} ▾</span>} items={its} onRun={run} /></td>
+                  <td className="c-more"><Menu align="right" trigger={<span style={{ padding: '0 8px', fontWeight: 700 }}>⋯</span>} items={more} onRun={run} /></td>
                 </tr>);
             })}</tbody></table>
         </div>

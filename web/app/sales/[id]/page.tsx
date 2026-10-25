@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db';
 import { loadView, DOC_TITLE } from '@/lib/doc-view';
 import { DOC_TYPE } from '@/lib/status';
 import { money, dateTh } from '@/lib/format';
+import { ActsMenu } from '@/components/ActsMenu';
 import { Pill } from '@/components/Pill';
 import { DocSheet } from '@/components/DocSheet';
 import { SalesActions } from '@/components/SalesActions';
@@ -55,13 +56,13 @@ export default async function SalesDetail({ params }: { params: { id: string } }
       <div className="top noprint">
         <div><h1>{v.doc.doc_no} <Pill s={v.doc.status} /></h1>
           <p className="sub"><Link href={`/sales?type=${v.doc.doc_type}`}>← {DOC_TYPE[v.doc.doc_type]}</Link></p></div>
-        <div className="acts">
+        <ActsMenu>
           <PrintButton />
           <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf`}>ดาวน์โหลด PDF</a>
           <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a>
           {dlvOk && <a className="btn ghost" href={`/sales/${v.doc.doc_no}/delivery`}>พิมพ์ใบส่งของ</a>}
           <SalesActions d={v.doc} role={user.role} detail />
-        </div>
+        </ActsMenu>
       </div>
       <div className="detail">
         <DocSheet v={v} />

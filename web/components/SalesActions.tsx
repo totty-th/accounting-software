@@ -1,3 +1,4 @@
+import { ActsMenu } from '@/components/ActsMenu';
 import { ActionButton } from '@/components/ActionButton';
 import * as A from '@/lib/actions';
 import { can, type Role } from '@/lib/permissions';
@@ -36,5 +37,5 @@ export function SalesActions({ d, role, detail = false }: { d: any; role: Role; 
   if (W && d.doc_type === 'CA' && s === 'collected') out.push(b('รีเซ็ต', A.resetCash.bind(null, d.id)));
   if (W && (d.doc_type === 'CN' || d.doc_type === 'DN') && s === 'cancelled') out.push(b('รีเซ็ต', A.restoreSalesDoc.bind(null, d.id), '', 'c'));
   if ((W || (can(role, 'quote.own') && d.doc_type === 'QT')) && s !== 'cancelled' && s !== 'converted' && s !== 'rejected') out.push(cancel);
-  return <div className="acts">{out}</div>;
+  return detail ? <>{out}</> : <ActsMenu>{out}</ActsMenu>;
 }
