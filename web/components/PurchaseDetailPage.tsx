@@ -11,6 +11,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { PurchaseDocTools } from '@/components/PurchaseDocTools';
 import { TaxInvoiceBox } from '@/components/TaxInvoiceBox';
 import { PayForm } from '@/components/PayForm';
+import { SplitRiForm } from '@/components/SplitRiForm';
 import * as A from '@/lib/actions';
 
 const BACK: Record<string, [string, string]> = { EXP: ['/expenses', 'ค่าใช้จ่าย'], RI: ['/purchases', 'ใบรับสินค้า'], PO: ['/purchases/orders', 'ใบสั่งซื้อ'] };
@@ -25,6 +26,8 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
   const db = await getDb();
   const tbl = kind === 'EXP' ? 'expenses' : kind === 'RI' ? 'goods_receipts' : 'purchase_orders';
   const h = (await db.q<any>(`select t.*, c.business_name, c.contact_name, c.tax_id from ${tbl} t join contacts c on c.id=t.contact_id where t.id=$1`, [id]))[0];
+  if (kind === 'PO') h.billed = (await db.q<any>('select po_billed($1) b', [id]))[0].b;
+  const todayIso = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   const st = h.status as string;
   const pillKey = kind === 'PO' && st === 'pending' ? 'pending_approval' : st;
   const taxInv = kind !== 'PO' ? (await db.q<any>(`select * from purchase_tax_invoices where doc_type=$1 and doc_id=$2`, [kind, id]))[0] : undefined;
@@ -54,14 +57,17 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
           {kind === 'PO' && W && <ActionButton label="สร้างซ้ำ" variant="ghost" action={A.duplicatePurchaseOrder.bind(null, id)} />}
           {AP && st === pendingKey && <ActionButton label="อนุมัติ" action={(A_.approve as any).bind(null, id)} />}
           {kind === 'PO' && W && (st === 'pending' || st === 'approved') && <ActionButton label="สร้างใบรับสินค้า" action={A.upgradePoToRi.bind(null, id)} />}
+          {kind === 'PO' && W && (st === 'pending' || st === 'approved' || st === 'partial') && (
+            <details><summary className="btn ghost">แบ่งจ่ายใบรับสินค้า</summary>
+              <SplitRiForm poId={id} total={Number(h.total)} billed={Number(h.billed)} today={todayIso} /></details>)}
           {kind === 'PO' && W && (st === 'pending' || st === 'approved') && <Link className="btn ghost" href={`/expenses/new?po=${id}`}>สร้างค่าใช้จ่าย</Link>}
           {kind !== 'PO' && W && payable.includes(st) && (
             <details><summary className="btn">จ่ายเงิน</summary>
               <PayForm net={net} banks={banks} cards={cards} petties={petties} allowShort={kind === 'RI'}
                 onPay={(kind === 'EXP' ? A.payExpense : A.payGoodsReceipt).bind(null, id) as any} /></details>)}
           {AP && (st === pendingKey || st === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={(A_.reject as any).bind(null, id)} />}
-          {W && (kind === 'PO' ? ['approved', 'rejected', 'converted'] : ['approved', 'paid', 'rejected']).includes(st) && <ActionButton label="รีเซ็ต" variant="ghost" action={(A_.reset as any).bind(null, id)} />}
-          {W && st !== 'cancelled' && st !== 'converted' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={(A_.cancel as any).bind(null, id)} />}
+          {W && (kind === 'PO' ? ['approved', 'rejected', 'converted', 'partial'] : ['approved', 'paid', 'rejected']).includes(st) && <ActionButton label="รีเซ็ต" variant="ghost" confirmText={kind === 'PO' && (st === 'partial' || st === 'converted') ? 'ยืนยันการรีเซ็ต: อาจทำให้เปิดบิลซ้ำหรือรับเข้าสต็อกซ้ำได้ หากมียอดแบ่งจ่ายเหลือต้องเริ่มแบ่งจ่ายใหม่' : undefined} action={(A_.reset as any).bind(null, id)} />}
+          {W && st !== 'cancelled' && st !== 'converted' && st !== 'partial' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={(A_.cancel as any).bind(null, id)} />}
         </ActsMenu>
       </div>
       <div className="detail">
