@@ -5,7 +5,7 @@ import { periodRange } from '@/lib/period';
 import { taxPeriodLabel, reportPeriod, pickStatuses, PURCHASE_BUCKETS } from '@/lib/report-filter';
 import { purchaseTaxRows, filingInfo, branchLabel } from '@/lib/tax-report';
 import { dateIso } from '@/lib/format';
-import { STATUS } from '@/lib/status';
+const PST: Record<string, string> = { paid: 'ชำระเงินแล้ว', approved: 'รอชำระเงิน', pending: 'รออนุมัติ', unpaid: 'รออนุมัติ', cancelled: 'ยกเลิก', rejected: 'ยกเลิก' };
 import { companyOf, faFormat, send, xDate } from '@/lib/fa-xlsx';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 
 // GET /reports/purchase-tax/export?mode=doc|inputtax|pp36 → Excel
 //  inputtax/pp30 = "รายงานภาษีซื้อ(ภ.พ.30)" · pp36 = "รายงานภาษีซื้อ(ภ.พ.36)" ตามไฟล์ FA (REA 25-10-2026)
-//  doc = ภาษีซื้อตามเอกสาร — ⚠ ยังไม่ได้เทียบกับไฟล์ FA จริง (ไฟล์ที่ดาวน์โหลดไว้เป็นรายงานเจ้าหนี้) ใช้คอลัมน์เดียวกับหน้าจอ
+//  doc = ภาษีซื้อตามเอกสาร (PurchaseTaxReport) — เทียบไฟล์ FA จริงแล้ว 25-10-2026: 12 คอลัมน์, สถานะ ชำระเงินแล้ว/รอชำระเงิน/ยกเลิก
 export async function GET(req: Request) {
   const au = await apiUser(['reports.read']); if (au instanceof Response) return au;
   const u = new URL(req.url), g = (k: string) => u.searchParams.get(k) ?? undefined;
@@ -31,8 +31,8 @@ export async function GET(req: Request) {
   if (mode === 'doc') {
     const { list } = pickStatuses(u.searchParams.getAll('st'), PURCHASE_BUCKETS);
     const rows = await purchaseTaxRows(db, range, list, list.includes('cancelled'));
-    ws.addRow(['ลำดับที่', 'วัน/เดือน/ปี', 'เลขที่เอกสาร', 'เลขที่อ้างอิง', 'ชื่อผู้จำหน่าย', 'ชื่อโปรเจ็ค', 'เลขผู้เสียภาษี', 'สำนักงานใหญ่/สาขา', 'มูลค่า', 'ภาษีมูลค่าเพิ่ม', 'สถานะ']).font = { bold: true };
-    for (const r of rows) { ws.addRow([++n, xDate(r.date), r.no, r.ref_no ?? '', r.name, '', r.tax_id ?? null, r.branch, r.sub, r.vat, STATUS[r.status]?.[0] ?? r.status]);
+    ws.addRow(['ลำดับที่', 'วัน/เดือน/ปี', 'เลขที่เอกสาร', 'เลขที่อ้างอิง', 'ชื่อผู้จำหน่าย', 'ชื่อโปรเจ็ค', 'เลขผู้เสียภาษี', 'สำนักงานใหญ่/สาขา', 'มูลค่า', 'ภาษีมูลค่าเพิ่ม', 'เอกสารอ้างอิงในระบบ', 'สถานะ']).font = { bold: true };
+    for (const r of rows) { ws.addRow([++n, xDate(r.date), r.no, r.ref_no ?? '', r.name, '', r.tax_id ?? null, r.branch, r.sub, r.vat, r.ref_no ?? '', PST[r.status] ?? r.status]);
       if (!['cancelled', 'rejected'].includes(r.status)) { ts += r.sub; tv += r.vat; } }
   } else {
     // ใบกำกับภาษีที่ได้รับ (EXP/RI) แยกแบบ ภ.พ.30 / ภ.พ.36 — ไม่รวมเอกสารไม่อนุมัติ/ยกเลิก
