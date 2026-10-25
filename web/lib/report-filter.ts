@@ -15,6 +15,11 @@ export const SALES_BUCKETS: Record<string, string[]> = { wait: ['awaiting_paymen
 export const PURCHASE_BUCKETS: Record<string, string[]> = { pend: ['pending', 'unpaid'], appr: ['approved'], paid: ['paid'], cancelled: ['rejected', 'cancelled'] };
 /** ช่วงเวลาที่แสดงบนหัวไฟล์ Excel แบบ FA: เดือนเต็ม → "ตุลาคม 2026" นอกนั้น "dd/mm/yyyy - dd/mm/yyyy" */
 const MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+/** งวดภาษีบนหัวไฟล์ภาษี: เดือนเต็ม → "เดือน ตุลาคม ปี 2026" นอกนั้น "dd/mm/yyyy - dd/mm/yyyy" */
+export function taxPeriodLabel(r: [string, string] | null): string {
+  const l = periodLabel(r), m = MONTHS.findIndex(x => l.startsWith(x + ' '));
+  return m >= 0 ? `เดือน ${MONTHS[m]} ปี ${l.slice(-4)}` : l;
+}
 export function periodLabel(r: [string, string] | null): string {
   if (!r) return 'ทั้งหมด';
   const [a, b] = r, last = new Date(Date.UTC(+a.slice(0, 4), +a.slice(5, 7), 0)).getUTCDate();
