@@ -222,3 +222,8 @@ tr.dl-sub td{background:rgba(127,127,127,.06);font-size:13px}
 .taxsum{display:flex;gap:28px;text-align:right}.taxsum b{font-size:22px;display:block}
 tr.ratesub td{padding-top:0;color:var(--muted);font-size:12px}
 @media print{.dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+.ghead{cursor:pointer;font-weight:600}.ghead:hover{background:var(--hover,#f3f6fa)}
+.grp .chev{display:inline-block;transition:transform .15s}.grp:not(.closed) .chev{transform:rotate(90deg)}
+.grp.closed .grow{display:none}.cnt{background:#e6ebf2;border-radius:10px;padding:0 7px;font-size:12px;font-weight:500}
+.grow .dot{margin-right:6px}
