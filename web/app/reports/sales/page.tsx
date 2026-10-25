@@ -9,9 +9,11 @@ import { ReportFilter } from '@/components/ReportFilter';
 import { DocRows } from '@/components/DocRows';
 import { requirePage } from '@/lib/auth';
 import { ReportTools } from '@/components/ReportTools';
+import { ProductGroups } from '@/components/ProductGroups';
+import { acctDocs } from '@/lib/fa-xlsx';
 
 export const dynamic = 'force-dynamic';
-type Sp = { view?: string; period?: string; from?: string; to?: string; type?: string; st?: string | string[] };
+type Sp = { view?: string; tab?: string; period?: string; from?: string; to?: string; type?: string; st?: string | string[] };
 const ST_BUCKETS = SALES_BUCKETS;
 const ST_OPTS: [string, string][] = [['wait', 'รอเก็บเงิน'], ['done', 'เก็บเงินแล้ว'], ['rcpt', 'เปิดใบเสร็จแล้ว'], ['split', 'แบ่งจ่าย'], ['ok', 'อนุมัติแล้ว/ใช้งาน (ใบลดหนี้/ใบเพิ่มหนี้)'], ['cancelled', 'ยกเลิก (แสดงแต่ไม่นับยอด)']];
 // รายงานสรุปยอดขาย: INV + ขายสด + ใบเพิ่มหนี้ เป็นบวก, ใบลดหนี้เป็นลบ · ไม่รวมใบเสนอราคา/ใบวางบิล/เอกสารที่ยกเลิก/ใบมัดจำ (มัดจำไม่ใช่รายได้)
@@ -55,8 +57,22 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
     rows = [...m.values()].sort((a, b) => b.total - a.total);
   }
   if (view === 'employee') rows = await db.q(`select * from sales_by_salesperson($1::date,$2::date,$3::text[])`, [range?.[0] ?? null, range?.[1] ?? null, pgArr(stList)]); // ไม่กรองตามประเภทเอกสาร (ให้ผลรวมตรงยอดบัญชีเสมอ)
-  if (view === 'product') rows = await db.q(`select description name, sum(qty)::numeric(18,4) qty, sum(net) sub
-    from sales_report_lines($2::date,$3::date,nullif($1,''),$4::text[]) group by 1 order by sub desc`, args);
+  // ยอดขายตามสินค้า (แบบ FA): แท็บเอกสารขาย = กลุ่มสินค้า กางดูเอกสารได้ · แท็บเอกสารบัญชี = ใบสำคัญที่ลงรายได้ตรง (JV) กลุ่มตามบัญชี
+  let acct: any[] = [], acctTotal = 0, salesTotal = 0;
+  const tab = searchParams.tab === 'acct' ? 'acct' : 'sales';
+  if (view === 'product') {
+    const lines = await db.q<any>(`select r.doc_no, r.doc_type, r.doc_date, r.description, r.qty, r.net, coalesce(c.business_name,c.contact_name,'-') party
+      from sales_report_lines($2::date,$3::date,nullif($1,''),$4::text[]) r join contacts c on c.id=r.contact_id order by r.doc_date desc, r.doc_no desc`, args);
+    const m = new Map<string, any>();
+    for (const l of lines) { const g = m.get(l.description) ?? { name: l.description, qty: 0, sub: 0, docs: [] }; g.qty += +l.qty; g.sub += +l.net; g.docs.push(l); m.set(l.description, g); }
+    rows = [...m.values()].sort((a, b) => b.sub - a.sub);
+    salesTotal = rows.reduce((t, g) => t + g.sub, 0);
+    if (type === '') {
+      const am = new Map<string, any>();
+      for (const v of await acctDocs(db, 'revenue', range)) { if (v.status === 'cancelled') continue; const k = `${v.code} / ${v.name}`; const g = am.get(k) ?? { name: k, sub: 0, docs: [] }; g.sub += +v.val; g.docs.push(v); am.set(k, g); }
+      acct = [...am.values()]; acctTotal = acct.reduce((t, g) => t + g.sub, 0);
+    }
+  }
   const rc = type === '' && stSel.length === 0 ? (await db.q<any>('select sales_revenue_reconcile($1::date,$2::date) r', [range?.[0] ?? null, range?.[1] ?? null]))[0].r : null;
   const q = (o: Partial<Sp>) => { const u = new URLSearchParams(); Object.entries({ view, period, type, from: searchParams.from, to: searchParams.to, ...o }).forEach(([k, v]) => v && u.set(k, String(v))); stSel.forEach(v => u.append('st', v)); return `/reports/sales?${u}`; };
   return (
@@ -67,7 +83,7 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
       <div className="panel">
         <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {tot.n} เอกสาร</div>
         <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 8 }}>
-          <div><div className="sub">มูลค่าก่อนภาษี</div><strong>{money(tot.sub)}</strong></div>
+          <div><div className="sub">มูลค่าก่อนภาษี</div><strong>{money(tot.sub)}</strong></div>{view === 'product' && <div title={`เอกสารขาย ${money(salesTotal)} · เอกสารบัญชี ${money(acctTotal)}`}><div className="sub">ยอดรวมก่อนภาษี (ขาย+บัญชี) ⓘ</div><strong>{money(salesTotal + acctTotal)}</strong><div className="sub">เอกสารขาย {money(salesTotal)} · เอกสารบัญชี {money(acctTotal)}</div></div>}
           <div><div className="sub">ภาษีมูลค่าเพิ่ม</div><strong>{money(tot.vat)}</strong></div>
           <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(tot.total)}</strong></div>
         </div>
@@ -84,9 +100,10 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
           <div className="sub" style={{ marginTop: 8 }}>รายการบัญชีรายได้ที่ลงตรง (ไม่ผ่านเอกสารขาย เช่น ใบสำคัญทั่วไป) รวม {money(rc.gl.manual)} · ไม่นับในยอดขายข้างบน</div>
           <ul className="rel">{rc.gl.manual_items.map((m: any) => <li key={m.voucher_no + m.code}>{m.voucher_no} {dateTh(m.date)} · {m.code} {m.name} · {money(m.amount)}</li>)}</ul></>}
       </div>}
-      <ReportTools exportBase="/reports/sales/export" modes={[['summary', 'Excel (สรุป)'], ['detail', 'Excel (แบบละเอียด)']]} title="รายงานขาย" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
+      <ReportTools exportBase="/reports/sales/export" modes={view === 'product' ? [['product', 'Excel (สรุป)'], ['productdetail', 'Excel (แบบละเอียด)']] : [['summary', 'Excel (สรุป)'], ['detail', 'Excel (แบบละเอียด)']]} title="รายงานขาย" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
       <div data-report className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 4 }}>
-        {rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : view === 'summary' ? (
+        {view === 'product' && <div className="tabs noprint" style={{ padding: '8px 12px 0' }}><Link href={q({ tab: 'sales' })} className={tab === 'sales' ? 'on' : ''}>เอกสารขาย ({rows.reduce((t, g) => t + g.docs.length, 0)})</Link>{type === '' && <Link href={q({ tab: 'acct' })} className={tab === 'acct' ? 'on' : ''}>เอกสารบัญชี ({acct.reduce((t, g) => t + g.docs.length, 0)})</Link>}</div>}
+        {view === 'product' && tab === 'acct' ? (acct.length === 0 ? <div className="empty">ไม่มีเอกสารบัญชีในช่วงที่เลือก</div> : <ProductGroups cols={['เลขที่เอกสาร', 'วันที่', 'คำอธิบาย', '', 'มูลค่า']} groups={acct.map(g => ({ name: g.name, qty: null, unit: null, sub: g.sub, docs: g.docs.map((v: any) => ({ no: v.no, href: '', a: dateTh(v.dt), b: v.memo ?? '', qty: null, unit: null, net: +v.val })) }))} total={acctTotal} />) : rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : view === 'summary' ? (
           <DocRows partyLabel="ลูกค้า" vatLabel="ภาษีมูลค่าเพิ่ม" rows={rows.map(r => ({ key: r.id, href: `/sales/${r.doc_no}`, no: r.doc_no, date: dateTh(r.doc_date), party: partyName(r),
             net: Number(r.sub), vat: Number(r.vat), total: Number(r.total), status: r.status, dim: r.status === 'cancelled',
             lines: (lineMap.get(r.id) ?? []).map((l: any) => ({ d: l.description, q: `${Number(l.qty).toLocaleString('th-TH', { maximumFractionDigits: 4 })} × ${money(l.unit_price)}`, net: Number(l.amount) })) }))} />
@@ -99,8 +116,8 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
           <table><thead><tr><th>พนักงานขาย</th><th className="num">จำนวนลูกค้า</th><th className="num">จำนวนเอกสาร</th><th className="num">มูลค่า</th><th className="num">ภาษีมูลค่าเพิ่ม</th><th className="num">ยอดรวมสุทธิ</th></tr></thead>
             <tbody>{rows.map(r => <tr key={r.salesperson}><td>{r.salesperson}</td><td className="num">{r.customer_count}</td><td className="num">{r.doc_count}</td><td className="num">{money(r.sub)}</td><td className="num">{money(r.vat)}</td><td className="num">{money(r.total)}</td></tr>)}</tbody></table>
         ) : (
-          <table><thead><tr><th>รายการ</th><th className="num">จำนวน</th><th className="num">มูลค่าก่อนภาษี</th></tr></thead>
-            <tbody>{rows.map(r => <tr key={r.name}><td>{r.name}</td><td className="num">{Number(r.qty).toLocaleString('th-TH', { maximumFractionDigits: 4 })}</td><td className="num">{money(r.sub)}</td></tr>)}</tbody></table>
+          <ProductGroups cols={['เลขที่เอกสาร', 'ชื่อลูกค้า/ชื่อโปรเจ็ค', 'จำนวน', 'ราคาต่อหน่วย', 'มูลค่าก่อนภาษี']} groups={rows.map(g => ({ name: g.name, qty: g.qty, unit: g.qty ? g.sub / g.qty : 0, sub: g.sub,
+            docs: g.docs.map((d: any) => ({ no: d.doc_no, href: `/sales/${d.doc_no}`, a: d.party, b: '', qty: +d.qty, unit: +d.qty ? +d.net / +d.qty : 0, net: +d.net })) }))} total={salesTotal} />
         )}
       </div>
     </>

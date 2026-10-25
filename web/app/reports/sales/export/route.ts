@@ -14,7 +14,8 @@ const TYPES = ['INV', 'CA', 'CN', 'DN'];
 export async function GET(req: Request) {
   const au = await apiUser(['reports.read']); if (au instanceof Response) return au;
   const u = new URL(req.url), g = (k: string) => u.searchParams.get(k) ?? undefined;
-  const detail = g('mode') === 'detail';
+  const mode = g('mode') ?? '';
+  const detail = mode === 'detail';
   const period = reportPeriod(g('period')), range = periodRange(period, today(), g('from'), g('to'));
   const type = TYPES.includes(g('type') ?? '') ? g('type')! : '';
   const { list } = pickStatuses(u.searchParams.getAll('st'), SALES_BUCKETS);
@@ -33,6 +34,24 @@ export async function GET(req: Request) {
     order by array_position(array['CA','INV','DN','CN'], d.doc_type), d.doc_date desc, d.doc_no desc`, [type, range?.[0] ?? null, range?.[1] ?? null, pgArr(list)]);
   const co = await companyOf(db), pl = periodLabel(range);
   const wb = new ExcelJS.Workbook();
+  if (mode === 'product' || mode === 'productdetail') {   // ยอดขายแยกตามสินค้า: สรุป = 1 แถว/สินค้า · ละเอียด = แตกเอกสารใต้สินค้า (ตามเมนู Excel ของต้นแบบ)
+    const ls = await db.q<any>(`select r.description, r.doc_no, r.doc_date, r.qty, r.net, coalesce(c.business_name,c.contact_name,'-') party
+      from sales_report_lines($2::date,$3::date,nullif($1,''),$4::text[]) r join contacts c on c.id=r.contact_id order by r.description, r.doc_date, r.doc_no`, [type, range?.[0] ?? null, range?.[1] ?? null, pgArr(list)]);
+    const full = mode === 'productdetail';
+    const pw = faSheet(wb, 'SalesByProduct', 'รายงานยอดขายแยกตามสินค้า', co, pl, 6, 0);
+    faHead(pw, full ? ['ลำดับที่', 'ชื่อสินค้า/เลขที่เอกสาร', 'วัน/เดือน/ปี', 'ชื่อลูกค้า', 'จำนวน', 'ราคาต่อหน่วย', 'มูลค่าก่อนภาษี'] : ['ลำดับที่', 'ชื่อสินค้า', 'จำนวน', 'ราคาต่อหน่วย', 'มูลค่าก่อนภาษี']);
+    const gs = new Map<string, any[]>(); for (const l of ls) gs.set(l.description, [...(gs.get(l.description) ?? []), l]);
+    let tt = 0, k = 0;
+    for (const [name, ds] of gs) {
+      const q = ds.reduce((x, l) => x + Number(l.qty), 0), v = ds.reduce((x, l) => x + Number(l.net), 0); tt += v; k++;
+      const unit = q ? Math.round(v / q * 100) / 100 : 0;
+      const r = full ? pw.addRow([k, name, null, null, q, unit, v]) : pw.addRow([k, name, q, unit, v]); r.font = { bold: true };
+      if (full) for (const l of ds) pw.addRow([null, l.doc_no, xDate(l.doc_date), l.party, Number(l.qty), Number(l.qty) ? Math.round(Number(l.net) / Number(l.qty) * 100) / 100 : 0, Number(l.net)]);
+    }
+    const tr = full ? pw.addRow([null, null, null, null, null, 'ยอดรวมก่อนภาษี', tt]) : pw.addRow([null, null, null, 'ยอดรวมก่อนภาษี', tt]); tr.font = { bold: true };
+    if (full) faFormat(pw, [9, 34, 13, 30, 12, 14, 16], [3], [5, 6, 7]); else faFormat(pw, [9, 40, 12, 14, 16], [], [3, 4, 5]);
+    return send(wb, full ? 'รายงานยอดขายแยกตามสินค้า_แบบละเอียด' : 'รายงานยอดขายแยกตามสินค้า');
+  }
   const head = detail
     ? ['ลำดับที่', 'วัน/เดือน/ปี', 'เลขที่เอกสาร', 'ชื่อลูกค้า', 'ชื่อโปรเจ็ค', 'เลขผู้เสียภาษี', 'สำนักงานใหญ่/สาขา', 'ขายแยกภาษี', 'ขายรวมภาษี', 'ส่วนลดก่อน VAT', 'ส่วนลดตามเอกสาร', 'มูลค่า', 'ภาษีมูลค่าเพิ่ม', 'ยอดรวมสุทธิ', 'เอกสารอ้างอิงในระบบ', 'เลขที่อ้างอิง', 'เอกสารอ้างอิงรับมัดจำ', 'สถานะ', 'พนักงานขาย', 'หมายเหตุ', 'โน้ต (สำหรับใช้ภายในบริษัท)']
     : ['ลำดับที่', 'เลขที่เอกสาร', 'วัน/เดือน/ปี', 'ชื่อลูกค้า', 'ชื่อโปรเจ็ค', 'เลขผู้เสียภาษี', 'สำนักงานใหญ่/สาขา', 'มูลค่า', 'ภาษีมูลค่าเพิ่ม', 'ยอดรวมสุทธิ', 'เอกสารอ้างอิงในระบบ', 'เลขที่อ้างอิง', 'เอกสารอ้างอิงรับมัดจำ', 'สถานะ', 'พนักงานขาย', 'หมายเหตุ', 'โน้ต (สำหรับใช้ภายในบริษัท)'];
