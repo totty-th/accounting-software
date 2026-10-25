@@ -15,11 +15,15 @@ const SQL: Record<RelKind, string> = {
   // ใบเสร็จ: เอกสารที่รับชำระ (INV/DN/CN)
   receipt: `select ri.receipt_id id, d.doc_no no, d.doc_type kind, '/sales/' || d.doc_no href from receipt_items ri join sales_docs d on d.id = ri.doc_id
     union all select ri.receipt_id, c.doc_no, c.doc_type, '/sales/' || c.doc_no from receipt_items ri join sales_docs c on c.ref_doc_id = ri.doc_id and c.doc_type in ('CN','DN') and c.status <> 'cancelled'`,
-  exp: `select w.expense_id id, w.cert_no no, 'WT' kind, '/wht' href from wht_certs w where w.expense_id is not null and w.status = 'active'
+  exp: `select e.id, po.po_no no, 'PO' kind, '/purchases/orders/' || po.id href from expenses e join purchase_orders po on po.id = e.po_id
+    union all select w.expense_id id, w.cert_no no, 'WT' kind, '/wht' href from wht_certs w where w.expense_id is not null and w.status = 'active'
     union all select x.doc_id, s.pay_no, 'PAY', '/payments' from payment_slip_items x join payment_slips s on s.id = x.slip_id where s.status = 'active' and x.doc_type = 'EXP'`,
-  ri: `select g.id, po.po_no, 'PO', '/purchases/orders/' || po.id from goods_receipts g join purchase_orders po on po.id = g.po_id
+  ri: `select g.id, po.po_no no, 'PO' kind, '/purchases/orders/' || po.id href from goods_receipts g join purchase_orders po on po.id = g.po_id
     union all select x.doc_id, s.pay_no, 'PAY', '/payments' from payment_slip_items x join payment_slips s on s.id = x.slip_id where s.status = 'active' and x.doc_type = 'RI'`,
-  po: `select po.id, g.ri_no, 'RI', '/purchases/ri/' || g.id from purchase_orders po join goods_receipts g on g.id = po.ri_id`,
+  // PO → RI/EXP ทุกใบที่สร้างจาก PO นี้ (รวมใบที่ยกเลิกแล้ว — FA ยังแสดงลิงก์) · รีเซ็ต PO แล้วสร้างใหม่ได้หลายใบ
+  po: `select g.po_id id, g.ri_no no, 'RI' kind, '/purchases/ri/' || g.id href from goods_receipts g where g.po_id is not null
+    union all select po.id, g.ri_no, 'RI', '/purchases/ri/' || g.id from purchase_orders po join goods_receipts g on g.id = po.ri_id
+    union all select e.po_id, e.exp_no, 'EXP', '/expenses/' || e.id from expenses e where e.po_id is not null`,
 };
 
 export async function related(db: Db, kind: RelKind, ids: string[]): Promise<Map<string, Rel[]>> {

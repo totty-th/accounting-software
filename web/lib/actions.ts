@@ -252,6 +252,12 @@ export async function saveExpenseFull(header: Record<string, unknown>, lines: an
     [...ALL, '/expenses', '/expenses/new'], 'expenses.write');
   return { ...r, id: out };
 }
+export async function saveExpenseFromPo(po: string, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
+  let out: string | undefined;
+  const r = await run(async () => { out = (await (await getDb()).q<any>('select save_expense_from_po($1::uuid,$2::jsonb,$3::jsonb) as id', [po, JSON.stringify(header), JSON.stringify(lines)]))[0].id; },
+    [...ALL, '/expenses', '/expenses/new', '/purchases/orders'], 'expenses.write');
+  return { ...r, id: out };
+}
 export const duplicatePurchaseOrder = async (id: string) => run(call('select duplicate_purchase_order($1,$2::date)', id, today()), PO, 'expenses.write');
 /** สร้างผู้จำหน่าย/สินค้าใหม่จากหน้าใบสั่งซื้อ (คืนข้อมูลให้เลือกต่อได้ทันที) */
 export async function quickCreateVendor(p: { name: string; tax_id: string; address: string }): Promise<Result & { vendor?: any }> {

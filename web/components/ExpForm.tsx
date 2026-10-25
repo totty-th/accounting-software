@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveExpenseFull, quickCreateVendor } from '@/lib/actions';
+import { saveExpenseFull, saveExpenseFromPo, quickCreateVendor } from '@/lib/actions';
 import type { Vendor } from '@/components/PoForm';
 
 interface Acc { id: string; label: string }
@@ -13,14 +13,15 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2,
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
 /** ค่าใช้จ่าย: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) */
-export function ExpForm({ vendors: v0, accounts, today, purchaser, canCreateVendor }: {
+export function ExpForm({ vendors: v0, accounts, today, purchaser, canCreateVendor, fromPo }: {
   vendors: Vendor[]; accounts: Acc[]; today: string; purchaser: string; canCreateVendor: boolean;
+  fromPo?: { id: string; no: string; header: Record<string, any>; lines: Line[] };
 }) {
   const router = useRouter();
   const [vendors, setVendors] = useState(v0);
   const [h, setH] = useState({ date: today, contact: '', credit_days: '0', due_date: today, purchaser, project: '', ref_no: '', description: '',
-    price_mode: 'exclusive', show_signature: true, note: '', internal_note: '' });
-  const [lines, setLines] = useState<Line[]>([blank(), blank(), blank()]);
+    price_mode: 'exclusive', show_signature: true, note: '', internal_note: '', ...Object.fromEntries(Object.entries(fromPo?.header ?? {}).filter(([, v]) => v !== undefined)) });
+  const [lines, setLines] = useState<Line[]>(fromPo?.lines.length ? fromPo.lines : [blank(), blank(), blank()]);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [nv, setNv] = useState<{ name: string; tax_id: string; address: string } | null>(null);
@@ -49,9 +50,10 @@ export function ExpForm({ vendors: v0, accounts, today, purchaser, canCreateVend
   const ok = h.contact && act.length > 0 && act.every(l => l.description.trim() && l.account && Number(l.qty) > 0 && l.unit_price !== '');
   const submit = () => start(async () => {
     setErr(null);
-    const r = await saveExpenseFull({ ...h, credit_days: Number(h.credit_days) || 0 },
-      act.map(l => ({ description: l.description, account: l.account, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
-        discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 })));
+    const body = act.map(l => ({ description: l.description, account: l.account, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
+      discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 }));
+    const head = { ...h, credit_days: Number(h.credit_days) || 0 };
+    const r = fromPo ? await saveExpenseFromPo(fromPo.id, head, body) : await saveExpenseFull(head, body);
     if (r.error) return setErr(r.error);
     router.push(r.id ? `/expenses/${r.id}` : '/expenses'); router.refresh();
   });

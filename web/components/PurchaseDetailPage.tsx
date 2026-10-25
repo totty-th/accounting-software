@@ -54,12 +54,13 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
           {kind === 'PO' && W && <ActionButton label="สร้างซ้ำ" variant="ghost" action={A.duplicatePurchaseOrder.bind(null, id)} />}
           {AP && st === pendingKey && <ActionButton label="อนุมัติ" action={(A_.approve as any).bind(null, id)} />}
           {kind === 'PO' && W && (st === 'pending' || st === 'approved') && <ActionButton label="สร้างใบรับสินค้า" action={A.upgradePoToRi.bind(null, id)} />}
+          {kind === 'PO' && W && (st === 'pending' || st === 'approved') && <Link className="btn ghost" href={`/expenses/new?po=${id}`}>สร้างค่าใช้จ่าย</Link>}
           {kind !== 'PO' && W && payable.includes(st) && (
             <details><summary className="btn">จ่ายเงิน</summary>
               <PayForm net={net} banks={banks} cards={cards} petties={petties} allowShort={kind === 'RI'}
                 onPay={(kind === 'EXP' ? A.payExpense : A.payGoodsReceipt).bind(null, id) as any} /></details>)}
           {AP && (st === pendingKey || st === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={(A_.reject as any).bind(null, id)} />}
-          {W && (kind === 'PO' ? ['approved', 'rejected'] : ['approved', 'paid', 'rejected']).includes(st) && <ActionButton label="รีเซ็ต" variant="ghost" action={(A_.reset as any).bind(null, id)} />}
+          {W && (kind === 'PO' ? ['approved', 'rejected', 'converted'] : ['approved', 'paid', 'rejected']).includes(st) && <ActionButton label="รีเซ็ต" variant="ghost" action={(A_.reset as any).bind(null, id)} />}
           {W && st !== 'cancelled' && st !== 'converted' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={(A_.cancel as any).bind(null, id)} />}
         </ActsMenu>
       </div>

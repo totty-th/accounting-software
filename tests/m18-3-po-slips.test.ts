@@ -63,7 +63,9 @@ describe('M18.3 ใบสั่งซื้อ (PO)', () => {
     expect(+(await one<any>('select stock_on_hand($1) v', [prod])).v).toBe(4);
     expect(await tb('21311')).toBe(-2568);
     expect(await err(call('select upgrade_po_to_ri($1)', [id]))).toContain('รออนุมัติหรืออนุมัติแล้ว');
-    expect(await err(call('select reset_purchase_order($1)', [id]))).toContain('ยังไม่ทดสอบ');
+    // M25.5: รีเซ็ต PO ที่ดำเนินการแล้วได้ (กลับรออนุมัติ ไม่แตะ RI) ตามที่ทดสอบบน FA
+    await call('select reset_purchase_order($1)', [id]); expect(await st('purchase_orders', id)).toBe('pending'); expect(await st('goods_receipts', r)).toBe('unpaid');
+    await call('select upgrade_po_to_ri($1)', [id]);
     expect(await err(call('select cancel_purchase_order($1)', [id]))).toContain('ยังไม่ดำเนินการ');
   });
 });
