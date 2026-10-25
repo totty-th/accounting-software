@@ -11,7 +11,7 @@ type Sp = { view?: string; period?: string; from?: string; to?: string; type?: s
 // รายงานสรุปยอดขาย: INV + ขายสด + ใบเพิ่มหนี้ เป็นบวก, ใบลดหนี้เป็นลบ · ไม่รวมใบเสนอราคา/ใบวางบิล/เอกสารที่ยกเลิก/ใบมัดจำ (มัดจำไม่ใช่รายได้)
 // ยอดต้องตรงบัญชีรายได้หมวด 41 — มีแผงกระทบยอดด้านล่าง (sales_revenue_reconcile)
 const TYPES = ['INV', 'CA', 'CN', 'DN'];
-const VIEWS: [string, string][] = [['summary', 'สรุปยอดขาย'], ['customer', 'ยอดขายตามลูกค้า'], ['product', 'ยอดขายตามสินค้า/รายการ']];
+const VIEWS: [string, string][] = [['summary', 'สรุปยอดขาย'], ['customer', 'ยอดขายตามลูกค้า'], ['employee', 'ยอดขายตามพนักงาน'], ['product', 'ยอดขายตามสินค้า/รายการ']];
 
 export default async function SalesReport({ searchParams }: { searchParams: Sp }) {
   await requirePage('reports.read');
@@ -34,6 +34,7 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
   if (view === 'customer') rows = await db.q(`select coalesce(c.business_name,c.contact_name,'-') name, count(*)::int n,
       sum(d.subtotal*(${sgn})) sub, sum(d.vat*(${sgn})) vat, sum(d.total*(${sgn})) total
     from sales_docs d join contacts c on c.id=d.contact_id where ${base} group by 1 order by total desc`, args);
+  if (view === 'employee') rows = await db.q(`select * from sales_by_salesperson($1::date,$2::date)`, [range?.[0] ?? null, range?.[1] ?? null]); // ไม่กรองตามประเภทเอกสาร (ให้ผลรวมตรงยอดบัญชีเสมอ)
   if (view === 'product') rows = await db.q(`select description name, sum(qty)::numeric(18,4) qty, sum(net) sub
     from sales_report_lines($2::date,$3::date,nullif($1,'')) group by 1 order by sub desc`, args);
   const rc = type === '' ? (await db.q<any>('select sales_revenue_reconcile($1::date,$2::date) r', [range?.[0] ?? null, range?.[1] ?? null]))[0].r : null;
@@ -78,6 +79,9 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
         ) : view === 'customer' ? (
           <table><thead><tr><th>ลูกค้า</th><th className="num">จำนวนเอกสาร</th><th className="num">มูลค่า</th><th className="num">ภาษีมูลค่าเพิ่ม</th><th className="num">ยอดรวมสุทธิ</th></tr></thead>
             <tbody>{rows.map(r => <tr key={r.name}><td>{r.name}</td><td className="num">{r.n}</td><td className="num">{money(r.sub)}</td><td className="num">{money(r.vat)}</td><td className="num">{money(r.total)}</td></tr>)}</tbody></table>
+        ) : view === 'employee' ? (
+          <table><thead><tr><th>พนักงานขาย</th><th className="num">จำนวนลูกค้า</th><th className="num">จำนวนเอกสาร</th><th className="num">มูลค่า</th><th className="num">ภาษีมูลค่าเพิ่ม</th><th className="num">ยอดรวมสุทธิ</th></tr></thead>
+            <tbody>{rows.map(r => <tr key={r.salesperson}><td>{r.salesperson}</td><td className="num">{r.customer_count}</td><td className="num">{r.doc_count}</td><td className="num">{money(r.sub)}</td><td className="num">{money(r.vat)}</td><td className="num">{money(r.total)}</td></tr>)}</tbody></table>
         ) : (
           <table><thead><tr><th>รายการ</th><th className="num">จำนวน</th><th className="num">มูลค่าก่อนภาษี</th></tr></thead>
             <tbody>{rows.map(r => <tr key={r.name}><td>{r.name}</td><td className="num">{Number(r.qty).toLocaleString('th-TH', { maximumFractionDigits: 4 })}</td><td className="num">{money(r.sub)}</td></tr>)}</tbody></table>
