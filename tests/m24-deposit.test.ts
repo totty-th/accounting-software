@@ -68,3 +68,43 @@ describe('M24 มัดจำจาก QT แบบ FA', () => {
     expect(await err(call('select create_deposit_invoice($1,$2::date,100)', [q, D]))).toContain('รออนุมัติหรืออนุมัติแล้ว');
   });
 });
+
+describe('M24.4 มัดจำ BL / CA และใบสุดท้าย', () => {
+  const dep = async (q: string, kind: string, net = 1000) =>
+    (await one<{ id: string }>('select create_deposit_doc($1,$2,$3::date,$4) as id', [q, kind, D, net])).id;
+  it('มัดจำ CA: ลง 11319/21921/27111 · เก็บเงินแล้ว QT ยังมัดจำแล้ว · ใบสุดท้าย CA หักมัดจำ', async () => {
+    const q = await doc('QT', D, svc(3200));
+    const c = await sd(await dep(q, 'CA'));
+    expect([c.doc_type, c.status, +c.total]).toEqual(['CA', 'pending_collect', 1070]);
+    expect(await entries(c.voucher_id)).toEqual([['11319', 1070, 0], ['21921', 0, 1000], ['27111', 0, 70]]);
+    await call('select collect_cash_sale($1,$2::date)', [c.id, D]);
+    expect((await sd(q)).status).toBe('deposit_paid');
+    const f = await sd((await one<{ id: string }>('select create_final_invoice($1,$2::date,$3) as id', [q, D, 'CA'])).id);
+    expect([f.doc_type, +f.deposit_net, +f.total]).toEqual(['CA', 1000, 2354]);
+    expect(await entries(f.voucher_id)).toEqual([['11319', 2354, 0], ['21921', 1000, 0], ['41210', 0, 3200], ['27111', 0, 154]]);
+  });
+  it('มัดจำ BL: ไม่ลงบัญชี · แปลงเป็น INV ลงบัญชี · ใบสุดท้ายหักจาก INV', async () => {
+    const q = await doc('QT', D, svc(3200));
+    const b = await sd(await dep(q, 'BL'));
+    expect([b.doc_type, b.status, b.voucher_id]).toEqual(['BL', 'billed', null]);
+    expect((await sd(q)).status).toBe('deposit_paid');
+    const inv = await sd((await one<{ id: string }>('select convert_deposit_bl($1,$2::date) as id', [b.id, D])).id);
+    expect([inv.doc_type, inv.is_deposit, +inv.total]).toEqual(['INV', true, 1070]);
+    expect(await entries(inv.voucher_id)).toEqual([['11311', 1070, 0], ['21921', 0, 1000], ['27111', 0, 70]]);
+    expect((await sd(b.id)).status).toBe('invoice_opened');
+    const f = await sd((await one<{ id: string }>('select create_final_invoice($1,$2::date) as id', [q, D])).id);
+    expect(+f.total).toBe(2354);
+    expect(await err(call('select cancel_sales_doc($1)', [b.id]))).toContain('เปิดเป็นใบแจ้งหนี้แล้ว');
+  });
+  it('ใบสุดท้ายเป็น BL หักมัดจำ ไม่ลงบัญชี · ยกเลิกมัดจำ CA → QT กลับอนุมัติ', async () => {
+    const q = await doc('QT', D, svc(3200));
+    const c = await dep(q, 'CA');
+    const f = await sd((await one<{ id: string }>('select create_final_invoice($1,$2::date,$3) as id', [q, D, 'BL'])).id);
+    expect([f.doc_type, +f.deposit_net, +f.total, f.voucher_id]).toEqual(['BL', 1000, 2354, null]);
+    expect(await err(call('select cancel_sales_doc($1)', [c]))).toContain('ฉบับสุดท้าย');
+    await call('select cancel_sales_doc($1)', [f.id]);
+    expect((await sd(q)).status).toBe('deposit_paid');
+    await call('select cancel_sales_doc($1)', [c]);
+    expect((await sd(q)).status).toBe('approved');
+  });
+});

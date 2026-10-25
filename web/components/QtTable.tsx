@@ -18,7 +18,7 @@ const toneColor: Record<string, string> = { green: '#1f9d55', orange: '#d97706',
 
 type Item = { label: string; run?: () => Promise<any>; href?: string; danger?: boolean; confirm?: boolean };
 
-function itemsFor(r: QtRow, W: boolean, AP: boolean, onDeposit: (r: QtRow) => void): Item[] {
+function itemsFor(r: QtRow, W: boolean, AP: boolean, onDeposit: (r: QtRow, k: 'INV' | 'CA' | 'BL') => void): Item[] {
   const s = r.status, out: Item[] = [];
   const bill = W && ['pending_approval', 'approved', 'partial'].includes(s);
   if (AP && s === 'pending_approval') out.push({ label: 'อนุมัติ', run: () => A.approveQuote(r.id) });
@@ -27,8 +27,13 @@ function itemsFor(r: QtRow, W: boolean, AP: boolean, onDeposit: (r: QtRow) => vo
   if (bill) out.push({ label: s === 'partial' ? 'ออกใบแจ้งหนี้ที่เหลือ' : 'สร้างใบแจ้งหนี้', run: () => A.quoteToInvoice(r.id) });
   if (bill) out.push({ label: 'สร้างขายสด', run: () => A.billQuotation(r.id, 'CA') });
   if (bill) out.push({ label: s === 'partial' ? 'แบ่งจ่ายเพิ่ม' : 'แบ่งจ่าย', href: `/sales/${r.doc_no}/split` });
-  if (W && ['pending_approval', 'approved'].includes(s)) out.push({ label: 'มัดจำใบแจ้งหนี้', run: async () => { onDeposit(r); return {}; } });
-  if (W && s === 'deposit_paid') out.push({ label: 'เปิดเป็นใบแจ้งหนี้ (หักมัดจำ)', run: () => A.createFinalInvoice(r.id) });
+  if (W && ['pending_approval', 'approved'].includes(s)) for (const [k, l] of [['INV', 'มัดจำใบแจ้งหนี้'], ['BL', 'มัดจำใบวางบิล'], ['CA', 'มัดจำใบกำกับภาษี/ใบเสร็จ (เงินสด)']] as const)
+    out.push({ label: l, run: async () => { onDeposit(r, k); return {}; } });
+  if (W && s === 'deposit_paid') {
+    out.push({ label: 'เปิดเป็นใบแจ้งหนี้ (หักมัดจำ)', run: () => A.createFinalInvoice(r.id, 'INV') });
+    out.push({ label: 'เปิดเป็นใบวางบิล (หักมัดจำ)', run: () => A.createFinalInvoice(r.id, 'BL') });
+    out.push({ label: 'เปิดเป็นใบกำกับภาษี/ใบเสร็จ (เงินสด) (หักมัดจำ)', run: () => A.createFinalInvoice(r.id, 'CA') });
+  }
   if (AP && ['pending_approval', 'approved'].includes(s)) out.push({ label: 'ไม่อนุมัติ', run: () => A.rejectQuote(r.id), danger: true, confirm: true });
   if (AP && ['rejected', 'approved', 'partial', 'converted'].includes(s)) out.push({ label: 'รีเซ็ต', run: () => A.resetQuote(r.id) });
   return out;
@@ -64,10 +69,11 @@ export function QtTable({ rows, canWrite, canApprove, canOwn, exportHref }: { ro
   const [msg, setMsg] = useState<string | null>(null);
   const [info, setInfo] = useState<QtRow | null>(null);
   const [dep, setDep] = useState<QtRow | null>(null);
+  const [depKind, setDepKind] = useState<'INV' | 'CA' | 'BL'>('INV');
   const [depNet, setDepNet] = useState('');
   const [pending, start] = useTransition();
   const run = (i: Item) => start(async () => {
-    const r = await i.run!(); if (r?.error) { setMsg(r.error); setTimeout(() => setMsg(null), 7000); } else { if (i.label !== 'มัดจำใบแจ้งหนี้') setDep(null); router.refresh(); }
+    const r = await i.run!(); if (r?.error) { setMsg(r.error); setTimeout(() => setMsg(null), 7000); } else { if (!i.label.startsWith('มัดจำใบ')) setDep(null); router.refresh(); }
   });
   const toggle = (id: string) => setSel(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const all = rows.length > 0 && rows.every(r => sel.has(r.id));
@@ -93,7 +99,7 @@ export function QtTable({ rows, canWrite, canApprove, canOwn, exportHref }: { ro
             <tbody>{rows.map(r => {
               const [label, tone] = STATUS[r.status] ?? [r.status, 'grey'];
               const dim = r.status === 'rejected' || r.status === 'cancelled';
-              const its = itemsFor(r, canWrite, canApprove, x => { setDep(x); setDepNet(''); });
+              const its = itemsFor(r, canWrite, canApprove, (x, k) => { setDep(x); setDepKind(k); setDepNet(''); });
               const more: Item[] = [
                 ...((W) && r.status === 'pending_approval' ? [{ label: 'แก้ไข', href: `/sales/${r.doc_no}/edit` }] : []),
                 { label: 'พิมพ์', href: `/sales/${r.doc_no}/pdf` }, { label: 'แชร์', href: `/sales/${r.doc_no}` },
@@ -127,12 +133,12 @@ export function QtTable({ rows, canWrite, canApprove, canOwn, exportHref }: { ro
         return (
           <div onClick={() => setDep(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>
             <div className="panel" onClick={e => e.stopPropagation()} style={{ maxWidth: 420, width: '94%' }}>
-              <h3>มัดจำใบแจ้งหนี้ — {dep.doc_no}</h3>
+              <h3>{({ INV: 'มัดจำใบแจ้งหนี้', BL: 'มัดจำใบวางบิล', CA: 'มัดจำใบกำกับภาษี/ใบเสร็จ (เงินสด)' })[depKind]} — {dep.doc_no}</h3>
               <p className="sub">มูลค่าใบเสนอราคา {fmt(dep.total)} (ก่อน VAT {fmt(dep.subtotal)})</p>
               <label className="f">ยอดมัดจำ (ก่อน VAT)<input type="number" min="0" step="0.01" autoFocus value={depNet} onChange={e => setDepNet(e.target.value)} /></label>
               <p>VAT {dep.rate}% <b>{fmt(vat)}</b> · รวม <b>{fmt(tot)}</b> · ยอดคงเหลือ <b>{fmt(Math.max(dep.total - tot, 0))}</b></p>
               <p style={{ textAlign: 'right' }}><button className="btn sm ghost" onClick={() => setDep(null)}>ยกเลิก</button>{' '}
-                <button className="btn sm" disabled={bad || pending} onClick={() => run({ label: 'มัดจำ', run: () => A.createDeposit(dep.id, net) })}>บันทึกเอกสาร</button></p>
+                <button className="btn sm" disabled={bad || pending} onClick={() => run({ label: 'มัดจำ', run: () => A.createDeposit(dep.id, net, depKind) })}>บันทึกเอกสาร</button></p>
               {depNet !== '' && bad && <p className="sub" style={{ color: '#dc2626' }}>ยอดมัดจำต้องมากกว่า 0 และไม่เกินมูลค่าใบเสนอราคา</p>}
             </div>
           </div>);

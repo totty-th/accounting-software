@@ -4,7 +4,7 @@ export const STATUS: Record<string, [string, Tone]> = {
   pending_approval: ['รออนุมัติ', 'orange'], approved: ['อนุมัติแล้ว', 'green'], converted: ['ดำเนินการแล้ว', 'teal'],
   deposit_paid: ['มัดจำแล้ว', 'purple'], partial: ['แบ่งจ่าย', 'purple'], awaiting_payment: ['รอเก็บเงิน', 'orange'], receipt_opened: ['เปิดใบเสร็จแล้ว', 'blue'],
   split_paid: ['แบ่งจ่าย', 'purple'], pending_collect: ['รอเก็บเงิน', 'orange'], collected: ['เก็บเงินแล้ว', 'green'],
-  active: ['ใช้งาน', 'green'], billed: ['วางบิลแล้ว', 'blue'], cancelled: ['ยกเลิก', 'grey'],
+  active: ['ใช้งาน', 'green'], billed: ['วางบิลแล้ว', 'blue'], invoice_opened: ['เปิดบิลแล้ว', 'blue'], cancelled: ['ยกเลิก', 'grey'],
   pending: ['รอดำเนินการ', 'orange'], paid: ['ชำระแล้ว', 'green'], unpaid: ['รออนุมัติ', 'orange'], rejected: ['ไม่อนุมัติ', 'red'],
   received: ['รับสินค้าแล้ว', 'green'], filed: ['ยื่นแล้ว', 'blue'], deleted: ['ลบแล้ว', 'grey'],
 };
