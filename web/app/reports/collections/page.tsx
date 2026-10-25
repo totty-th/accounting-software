@@ -8,6 +8,7 @@ import { reportPeriod } from '@/lib/report-filter';
 import { ReportFilter } from '@/components/ReportFilter';
 import { parseStatuses } from '@/lib/status-filter';
 import { requirePage } from '@/lib/auth';
+import { ReportTools } from '@/components/ReportTools';
 
 export const dynamic = 'force-dynamic';
 type Sp = { period?: string; from?: string; to?: string; st?: string | string[] };
@@ -39,7 +40,8 @@ export default async function CollectionReport({ searchParams }: { searchParams:
         <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {live.length} เอกสาร{rows.length !== live.length ? ` (ยกเลิก ${rows.length - live.length} ไม่นับยอด)` : ''}</div>
         <div style={{ marginTop: 8 }}><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(total)}</strong></div>
       </div>
-      <div className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 14 }}>
+      <ReportTools title="รายงานการเก็บเงิน" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
+      <div data-report className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 4 }}>
         {rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> :
           <table><thead><tr><th>เลขที่เอกสาร</th><th>ประเภท</th><th>วันที่</th><th>ลูกค้า</th><th>ช่องทางรับชำระ</th><th className="num">ยอดรวมสุทธิ</th><th>สถานะ</th></tr></thead>
             <tbody>{rows.map(r => <tr key={r.id} style={r.status === 'cancelled' ? { opacity: .55 } : undefined}><td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link></td><td>{DOC_TYPE[r.doc_type]}</td><td>{dateTh(r.doc_date)}</td><td>{partyName(r)}</td>

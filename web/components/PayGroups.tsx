@@ -14,7 +14,7 @@ export function PayGroups({ groups }: { groups: PayGroup[] }) {
     <table><thead><tr><th>เลขที่เอกสาร</th><th>วันที่</th><th>ชื่อผู้จำหน่าย</th><th>วันที่ชำระ</th><th>รายละเอียดการชำระ</th><th className="num">ยอดรวมสุทธิ</th><th className="num">ยอดชำระ</th></tr></thead>
       <tbody>{groups.map(g => (
         <Fragment key={g.key}>
-          <tr style={{ background: 'rgba(127,127,127,.1)', fontWeight: 600 }}>
+          <tr data-group style={{ background: 'rgba(127,127,127,.1)', fontWeight: 600 }}>
             <td colSpan={5}><button className="xp" onClick={() => tog(g.key)} aria-expanded={open.has(g.key)}>{open.has(g.key) ? '▾' : '▸'}</button>{g.label} <span className="sub">({g.rows.length} รายการ)</span></td>
             <td className="num">{m(g.net)}</td><td className="num">{m(g.paid)}</td></tr>
           {open.has(g.key) && g.rows.map(r => <tr key={r.key}>

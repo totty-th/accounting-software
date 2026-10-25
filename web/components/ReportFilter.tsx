@@ -11,7 +11,7 @@ export function ReportFilter({ period, from, to, groups, selected, name = 'st', 
   const toggle = (v: string) => setSel(s => s.includes(v) ? s.filter(x => x !== v) : [...s, v]);
   const label = sel.length === 0 ? allLabel : `เลือก ${sel.length} สถานะ`;
   return (
-    <form className="row-inline rf" method="get">
+    <form className="row-inline rf noprint" method="get">
       {Object.entries(hidden).map(([k, v]) => v ? <input key={k} type="hidden" name={k} value={v} /> : null)}
       <label className="f">ช่วงเวลา<select name="period" value={p} onChange={e => setP(e.target.value)}>{REPORT_PERIODS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
       {p === 'custom' && <>

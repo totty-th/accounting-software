@@ -108,3 +108,16 @@ describe('M24.4 มัดจำ BL / CA และใบสุดท้าย', (
     expect((await sd(q)).status).toBe('approved');
   });
 });
+
+describe('M25.1 ตัวกรองสถานะรายงานตามพนักงาน/สินค้า', () => {
+  it('กรองสถานะได้ทั้งสองฟังก์ชัน · ไม่ส่ง = ทั้งหมด', async () => {
+    await doc('INV', D, svc(1000)); const i2 = await doc('INV', D, svc(500));
+    await call(`update sales_docs set status='collected' where id=$1`, [i2]);
+    const all = await db.query<any>(`select * from sales_by_salesperson(null,null)`);
+    expect(+all.rows[0].doc_count).toBe(2);
+    const w = await db.query<any>(`select * from sales_by_salesperson(null,null,'{awaiting_payment}')`);
+    expect([+w.rows[0].doc_count, +w.rows[0].sub]).toEqual([1, 1000]);
+    const p = await db.query<any>(`select sum(net) s from sales_report_lines(null,null,null,'{collected}')`);
+    expect(+p.rows[0].s).toBe(500);
+  });
+});

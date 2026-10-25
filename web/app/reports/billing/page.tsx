@@ -8,6 +8,7 @@ import { reportPeriod } from '@/lib/report-filter';
 import { ReportFilter } from '@/components/ReportFilter';
 import { parseStatuses } from '@/lib/status-filter';
 import { requirePage } from '@/lib/auth';
+import { ReportTools } from '@/components/ReportTools';
 
 export const dynamic = 'force-dynamic';
 type Sp = { period?: string; from?: string; to?: string; st?: string | string[] };
@@ -40,7 +41,8 @@ export default async function BillingReport({ searchParams }: { searchParams: Sp
           <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(sum('total'))}</strong></div>
         </div>
       </div>
-      <div className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 14 }}>
+      <ReportTools title="รายงานใบวางบิล" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
+      <div data-report className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 4 }}>
         {rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> :
           <table><thead><tr><th>เลขที่เอกสาร</th><th>วันที่</th><th>ลูกค้า</th><th className="num">มูลค่า</th><th className="num">ภาษีมูลค่าเพิ่ม</th><th className="num">ยอดรวมสุทธิ</th><th>สถานะ</th></tr></thead>
             <tbody>{rows.map(r => <tr key={r.id} style={r.status === 'cancelled' ? { opacity: .55 } : undefined}><td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link></td><td>{dateTh(r.doc_date)}</td><td>{partyName(r)}</td>

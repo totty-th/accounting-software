@@ -8,6 +8,7 @@ import { reportPeriod, pickStatuses, pgArr } from '@/lib/report-filter';
 import { ReportFilter } from '@/components/ReportFilter';
 import { DocRows } from '@/components/DocRows';
 import { requirePage } from '@/lib/auth';
+import { ReportTools } from '@/components/ReportTools';
 
 export const dynamic = 'force-dynamic';
 type Sp = { view?: string; period?: string; from?: string; to?: string; type?: string; st?: string | string[] };
@@ -54,15 +55,15 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
     for (const d of docs) { const g = m.get(d.name) ?? { name: d.name, n: 0, sub: 0, vat: 0, total: 0, docs: [] }; g.n++; g.sub += +d.sub; g.vat += +d.vat; g.total += +d.total; g.docs.push(d); m.set(d.name, g); }
     rows = [...m.values()].sort((a, b) => b.total - a.total);
   }
-  if (view === 'employee') rows = await db.q(`select * from sales_by_salesperson($1::date,$2::date)`, [range?.[0] ?? null, range?.[1] ?? null]); // ไม่กรองตามประเภทเอกสาร (ให้ผลรวมตรงยอดบัญชีเสมอ)
+  if (view === 'employee') rows = await db.q(`select * from sales_by_salesperson($1::date,$2::date,$3::text[])`, [range?.[0] ?? null, range?.[1] ?? null, pgArr(stList)]); // ไม่กรองตามประเภทเอกสาร (ให้ผลรวมตรงยอดบัญชีเสมอ)
   if (view === 'product') rows = await db.q(`select description name, sum(qty)::numeric(18,4) qty, sum(net) sub
-    from sales_report_lines($2::date,$3::date,nullif($1,'')) group by 1 order by sub desc`, args);
+    from sales_report_lines($2::date,$3::date,nullif($1,''),$4::text[]) group by 1 order by sub desc`, args);
   const rc = type === '' && stSel.length === 0 ? (await db.q<any>('select sales_revenue_reconcile($1::date,$2::date) r', [range?.[0] ?? null, range?.[1] ?? null]))[0].r : null;
   const q = (o: Partial<Sp>) => { const u = new URLSearchParams(); Object.entries({ view, period, type, from: searchParams.from, to: searchParams.to, ...o }).forEach(([k, v]) => v && u.set(k, String(v))); stSel.forEach(v => u.append('st', v)); return `/reports/sales?${u}`; };
   return (
     <>
       <div className="top"><div><h1>รายงานขาย</h1><p className="sub">ใบลดหนี้นับเป็นลบ · ไม่รวมเอกสารที่ยกเลิก ใบเสนอราคา ใบวางบิล และใบมัดจำ</p></div></div>
-      <div className="tabs">{VIEWS.map(([k, v]) => <Link key={k} href={q({ view: k })} className={view === k ? 'on' : ''}>{v}</Link>)}</div>
+      <div className="tabs noprint">{VIEWS.map(([k, v]) => <Link key={k} href={q({ view: k })} className={view === k ? 'on' : ''}>{v}</Link>)}</div>
       <ReportFilter period={period} from={searchParams.from} to={searchParams.to} groups={[{ label: 'เอกสารขาย', options: ST_OPTS }]} selected={stSel} hidden={{ view }} selects={[{ name: 'type', label: 'ประเภทเอกสาร', value: type, options: [['', 'ทั้งหมด'], ...TYPES.map(k => [k, DOC_TYPE[k]] as [string, string])] }]} />
       <div className="panel">
         <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {tot.n} เอกสาร</div>
@@ -84,7 +85,8 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
           <div className="sub" style={{ marginTop: 8 }}>รายการบัญชีรายได้ที่ลงตรง (ไม่ผ่านเอกสารขาย เช่น ใบสำคัญทั่วไป) รวม {money(rc.gl.manual)} · ไม่นับในยอดขายข้างบน</div>
           <ul className="rel">{rc.gl.manual_items.map((m: any) => <li key={m.voucher_no + m.code}>{m.voucher_no} {dateTh(m.date)} · {m.code} {m.name} · {money(m.amount)}</li>)}</ul></>}
       </div>}
-      <div className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 14 }}>
+      <ReportTools title="รายงานขาย" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
+      <div data-report className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 4 }}>
         {rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : view === 'summary' ? (
           <DocRows partyLabel="ลูกค้า" vatLabel="ภาษีมูลค่าเพิ่ม" rows={rows.map(r => ({ key: r.id, href: `/sales/${r.doc_no}`, no: r.doc_no, date: dateTh(r.doc_date), party: partyName(r),
             net: Number(r.sub), vat: Number(r.vat), total: Number(r.total), status: r.status, dim: r.status === 'cancelled',
