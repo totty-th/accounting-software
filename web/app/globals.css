@@ -244,3 +244,7 @@ tr.ratesub td{padding-top:0;color:var(--muted);font-size:12px}
 .xl-menu{position:relative}.xl-menu summary{list-style:none;cursor:pointer}.xl-menu summary::-webkit-details-marker{display:none}
 .xl-body{position:absolute;right:0;top:100%;margin-top:4px;background:var(--panel,#fff);border:1px solid #d5d9e0;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);z-index:20;min-width:260px;display:flex;flex-direction:column}
 .xl-body a{padding:10px 14px;color:inherit;text-decoration:none}.xl-body a:hover{background:#f3f6fa}
+
+/* แถวที่มีลิงก์เอกสาร คลิกตรงไหนก็เปิด (RowClick) */
+main tbody tr:has(a[href^="/"]){cursor:pointer}
+main tbody tr:has(a[href^="/"]) td{user-select:text}
