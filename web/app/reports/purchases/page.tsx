@@ -81,16 +81,16 @@ export default async function PurchaseReport({ searchParams }: { searchParams: S
       {!isAcct && <div className="tabs noprint">{VIEWS.map(([k, v]) => <Link key={k} href={q({ view: k })} className={view === k ? 'on' : ''}>{v}</Link>)}</div>}
       <ReportFilter period={period} from={searchParams.from} to={searchParams.to} groups={[{ label: 'เอกสารซื้อ/ค่าใช้จ่าย', options: ST_OPTS }]} selected={stSel} hidden={{ view, doc: isAcct ? 'acct' : '' }}
         selects={[{ name: 'kind', label: 'ประเภท', value: kind, options: [['', 'ทั้งหมด'], ...KINDS] }]} />
-      {isAcct ? <div className="panel"><div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {acct.length} เอกสาร · ใบสำคัญค่าใช้จ่ายที่ลงบัญชีโดยตรง (ใบกลับรายการแสดงติดลบ ไม่นับยอด)</div>
-        <div style={{ marginTop: 8 }}><div className="sub">ยอดรวมก่อนภาษี</div><strong>{money(acctTot)}</strong></div></div> : null}
-      {!isAcct && <div className="panel">
-        <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {tot.n} เอกสาร</div>
+      <div className="panel">
+        <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {tot.n + acct.length} เอกสาร (เอกสารซื้อ {tot.n} · เอกสารบัญชี {acct.length})</div>
         <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 8 }}>
-          <div><div className="sub">มูลค่าก่อนภาษี</div><strong>{money(tot.net)}</strong></div>
+          <div title={`เอกสารซื้อ ${money(tot.net)} · เอกสารบัญชี ${money(acctTot)}`}><div className="sub">ยอดรวมก่อนภาษี (ซื้อ+บัญชี) ⓘ</div><strong>{money(Number(tot.net) + acctTot)}</strong>
+            <div className="sub">เอกสารซื้อ {money(tot.net)} · เอกสารบัญชี {money(acctTot)}</div></div>
           <div><div className="sub">ภาษีซื้อ</div><strong>{money(tot.vat)}</strong></div>
-          <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(tot.total)}</strong></div>
+          <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(Number(tot.total) + acctTot)}</strong></div>
         </div>
-      </div>}
+        {isAcct && <div className="sub" style={{ marginTop: 6 }}>แท็บนี้ = ใบสำคัญค่าใช้จ่ายที่ลงบัญชีโดยตรง (ใบกลับรายการแสดงติดลบ ไม่นับยอด) · รวม {money(acctTot)}</div>}
+      </div>
       {rc && !isAcct && <div className="panel" style={{ marginTop: 14 }}>
         <h3>กระทบยอดกับบัญชี</h3>
         <ul className="rel">
