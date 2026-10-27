@@ -337,3 +337,52 @@ export const cancelWhtCert = async (id: string) => run(call('select cancel_wht_c
 
 export const sharePurchaseDoc = async (kind: string, id: string) => run(call('select ensure_purchase_share_token($1,$2)', kind, id), PURCHASE_PATHS, 'expenses.write');
 export const unsharePurchaseDoc = async (kind: string, id: string) => run(call('select revoke_purchase_share_token($1,$2)', kind, id), PURCHASE_PATHS, 'expenses.write');
+
+// ---- โมดูลสินค้า/สต็อก (M26) ----
+const STK = ['/products', '/stock', '/stock/transfers', '/stock/warehouses', '/stock/low'];
+export type ProductInput = { kind: string; name: string; code: string; category: string; unit: string; barcode: string; sale: number; buy: number;
+  block: boolean; units: { unit: string; factor: number; sale: number; buy: number; barcode: string }[]; open?: { date: string; qty: number; cost: number } | null };
+export async function createProductFull(p: ProductInput) {
+  return run(async () => {
+    if (!p.name?.trim() || !p.code?.trim()) throw new Error('ต้องระบุชื่อและรหัสสินค้า');
+    if (!p.unit?.trim()) throw new Error('ต้องระบุหน่วยสินค้าหลัก');
+    const db = await getDb();
+    const [r] = await db.q<any>(`insert into products(code,name,kind,base_unit,sale_price,purchase_price,category,barcode,block_negative)
+      values ($1,$2,$3,$4,$5,$6,nullif($7,''),nullif($8,''),$9) returning id`,
+      [p.code.trim(), p.name.trim(), p.kind, p.unit.trim(), p.sale || 0, p.buy || 0, p.category?.trim() ?? '', p.barcode?.trim() ?? '', p.kind === 'goods_stock' && !!p.block]);
+    for (const u of p.units ?? []) {
+      if (!u.unit?.trim() || !(u.factor > 0)) throw new Error('หน่วยอื่นต้องมีชื่อและอัตราแปลงมากกว่า 0');
+      await db.q('insert into product_units(product_id,unit,factor,sale_price,purchase_price,barcode) values ($1,$2,$3,$4,$5,nullif($6,\'\'))', [r.id, u.unit.trim(), u.factor, u.sale || 0, u.buy || 0, u.barcode ?? '']);
+    }
+    if (p.open && p.kind === 'goods_stock' && p.open.qty > 0) await db.q('select set_opening_stock($1,$2::date,$3,$4)', [r.id, p.open.date, p.open.qty, p.open.cost]);
+  }, STK.concat('/sales'), 'master.write');
+}
+export async function adjustStock(p: { product: string; date: string; wh: string; dir: 'in' | 'out'; reason: string; qty: number; cost?: number | null; note?: string }) {
+  return run(call('select adjust_stock($1::date,$2,$3,$4,$5,$6,$7,$8)', p.date, p.product, p.wh, p.dir, p.reason, p.qty, p.cost ?? null, p.note ?? ''), STK, 'master.write');
+}
+export async function deleteAdjustment(id: string) { return run(call('select delete_stock_adjustment($1)', id), STK, 'master.write'); }
+export async function createTransfer(p: { date: string; from: string; to: string; lines: { product_id: string; qty: number }[] }) {
+  return run(async () => {
+    if (p.from === p.to) throw new Error('คลังต้นทางและปลายทางต้องไม่ใช่คลังเดียวกัน');
+    if (!p.lines.length) throw new Error('ต้องมีรายการสินค้าอย่างน้อย 1 รายการ');
+    await (await getDb()).q('select create_transfer($1::date,$2,$3,$4::jsonb)', [p.date, p.from, p.to, JSON.stringify(p.lines)]);
+  }, STK, 'master.write');
+}
+export async function receiveTransfer(id: string) { return run(call('select receive_transfer($1)', id), STK, 'master.write'); }
+export async function resetTransfer(id: string) { return run(call('select reset_transfer($1)', id), STK, 'master.write'); }
+export async function cancelTransfer(id: string) { return run(call('select cancel_transfer($1)', id), STK, 'master.write'); }
+export async function saveWarehouse(p: { id?: string; name: string; code: string; purpose: string; address: string; postal: string; contact: string; email: string; phone: string; low?: number | null }) {
+  return run(async () => {
+    if (!p.name?.trim()) throw new Error('ต้องระบุชื่อคลังสินค้า');
+    if (!p.purpose) throw new Error('ต้องเลือกจุดประสงค์การใช้งาน');
+    const db = await getDb();
+    const code = p.code.trim() || `W${Date.now().toString().slice(-6)}`;
+    const id = p.id ?? (await db.q<any>('select create_warehouse($1,$2,$3) id', [code, p.name.trim(), p.purpose]))[0].id;
+    await db.q('select update_warehouse($1,$2,$3,$4,$5,$6,$7,$8,$9)', [id, p.name.trim(), code, p.purpose, p.address, p.postal, p.contact, p.email, p.phone]);
+    if (p.low !== undefined) await db.q('update warehouses set low_stock_min = $2 where id = $1', [id, p.low]);
+  }, STK, 'master.write');
+}
+export async function setMainWarehouse(id: string) { return run(call('select set_main_warehouse($1)', id), STK, 'master.write'); }
+export async function setLowStockMin(id: string, min: number | null) {
+  return run(call('update warehouses set low_stock_min = $2 where id = $1', id, min), STK, 'master.write');
+}

@@ -13,6 +13,9 @@ const ITEMS: [string, string, string, string, Perm[]][] = [
   ['/payments', 'ใบเตรียมจ่าย', 'var(--purple)', '', ['expenses.read']],
   ['/wht', 'หัก ณ ที่จ่าย (50 ทวิ)', 'var(--purple)', '', ['wht.read']],
   ['/stock', 'สต็อก', 'var(--blue)', '', ['stock.read']],
+  ['/stock/transfers', 'โอนสินค้า', 'var(--blue)', '', ['stock.read']],
+  ['/stock/warehouses', 'คลังสินค้า', 'var(--blue)', '', ['stock.read']],
+  ['/stock/low', 'สินค้าใกล้หมด', 'var(--blue)', '', ['stock.read']],
   ['/bank', 'ธนาคาร/กระทบยอด', 'var(--teal)', '', ['bank.read']],
   ['/reports/sales', 'รายงานขาย', 'var(--red)', 'รายงาน', ['reports.read']],
   ['/reports/billing', 'รายงานใบวางบิล', 'var(--red)', '', ['reports.read']],
@@ -69,7 +72,7 @@ function Item({ href, label, c, head, perms }: { href: string; label: string; c:
   return (
     <span style={{ display: 'contents' }}>
       {head && <h6>{head}</h6>}
-      <Link href={href} className={(href === '/' ? path === '/' : path.startsWith(href)) ? 'on' : ''} style={{ ['--c' as any]: c }}>
+      <Link href={href} className={(href === '/' || href === '/stock' ? path === href : path.startsWith(href)) ? 'on' : ''} style={{ ['--c' as any]: c }}>
         <i className="dot" style={{ ['--c' as any]: c }} />{label}
       </Link>
     </span>
