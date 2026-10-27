@@ -16,6 +16,7 @@ const ITEMS: [string, string, string, string, Perm[]][] = [
   ['/stock/transfers', 'โอนสินค้า', 'var(--blue)', '', ['stock.read']],
   ['/stock/warehouses', 'คลังสินค้า', 'var(--blue)', '', ['stock.read']],
   ['/stock/low', 'สินค้าใกล้หมด', 'var(--blue)', '', ['stock.read']],
+  ['/stock/settings', 'ตั้งค่าสต็อก', 'var(--blue)', '', ['stock.read']],
   ['/bank', 'ธนาคาร/กระทบยอด', 'var(--teal)', '', ['bank.read']],
   ['/reports/sales', 'รายงานขาย', 'var(--red)', 'รายงาน', ['reports.read']],
   ['/reports/billing', 'รายงานใบวางบิล', 'var(--red)', '', ['reports.read']],

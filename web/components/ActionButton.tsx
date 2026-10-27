@@ -1,9 +1,11 @@
 'use client';
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 
 type Result = { error?: string; ok?: true };
-export function ActionButton({ action, label, variant = '', confirmText }:
-  { action: () => Promise<Result>; label: string; variant?: '' | 'ghost' | 'danger'; confirmText?: string }) {
+export function ActionButton({ action, label, variant = '', confirmText, after }:
+  { action: () => Promise<Result>; label: string; variant?: '' | 'ghost' | 'danger'; confirmText?: string; after?: string }) {
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [armed, setArmed] = useState(false);
@@ -12,6 +14,7 @@ export function ActionButton({ action, label, variant = '', confirmText }:
     setArmed(false);
     setMsg(r.error ?? null);
     if (r.error) setTimeout(() => setMsg(null), 7000);
+    else if (after) router.push(after);
   });
   return (
     <>

@@ -4,7 +4,7 @@ import { getDb } from '@/lib/db';
 import { PURPOSE } from '@/lib/stock-labels';
 import { WarehouseForm, EMPTY_WH } from '@/components/WarehouseForm';
 import { ActionButton } from '@/components/ActionButton';
-import { setMainWarehouse } from '@/lib/actions';
+import { setMainWarehouse, deleteWarehouse } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 export default async function Warehouses() {
@@ -20,7 +20,8 @@ export default async function Warehouses() {
           <tbody>{rows.map(r => <tr key={r.id}><td>{r.name}{r.is_main && <span className="pill" style={{ background: 'var(--blue)', color: '#fff', marginLeft: 8 }}>คลังหลัก</span>}</td>
             <td>{r.code}</td><td>{pl[r.purpose] ?? r.purpose}</td><td>{r.address ?? ''}</td><td className="num">{r.low_stock_min ?? '-'}</td>
             <td style={{ whiteSpace: 'nowrap' }}>{w && <><WarehouseForm label="แก้ไข" init={{ ...EMPTY_WH, id: r.id, name: r.name, code: r.code, purpose: r.purpose, address: r.address ?? '', postal: r.postal_code ?? '', contact: r.contact_name ?? '', email: r.contact_email ?? '', phone: r.contact_phone ?? '', low: r.low_stock_min == null ? '' : String(Number(r.low_stock_min)) }} />{' '}
-              {!r.is_main && <ActionButton variant="ghost" label="ตั้งเป็นคลังหลัก" confirmText="ตั้งคลังนี้เป็นคลังหลัก" action={setMainWarehouse.bind(null, r.id)} />}</>}</td></tr>)}</tbody></table>
+              {!r.is_main && <ActionButton variant="ghost" label="ตั้งเป็นคลังหลัก" confirmText="ตั้งคลังนี้เป็นคลังหลัก" action={setMainWarehouse.bind(null, r.id)} />}{' '}
+              {!r.is_main && <ActionButton variant="danger" label="ลบ" confirmText="ลบคลังนี้ (ลบได้เมื่อไม่มีคงเหลือและไม่เคยมีประวัติ)" action={deleteWarehouse.bind(null, r.id)} />}</>}</td></tr>)}</tbody></table>
       </div>
     </>
   );

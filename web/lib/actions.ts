@@ -386,3 +386,21 @@ export async function setMainWarehouse(id: string) { return run(call('select set
 export async function setLowStockMin(id: string, min: number | null) {
   return run(call('update warehouses set low_stock_min = $2 where id = $1', id, min), STK, 'master.write');
 }
+
+// ---- M26.2: แก้/ลบ/ปิดใช้งานสินค้า · ลบคลัง · ตั้งค่าสต็อก ----
+export async function updateProductFull(id: string, p: ProductInput) {
+  return run(async () => {
+    if (!p.name?.trim()) throw new Error('ต้องระบุชื่อสินค้า');
+    if (!p.unit?.trim()) throw new Error('ต้องระบุหน่วยสินค้าหลัก');
+    for (const u of p.units ?? []) if (!u.unit?.trim() || !(u.factor > 0)) throw new Error('หน่วยอื่นต้องมีชื่อและอัตราแปลงมากกว่า 0');
+    await (await getDb()).q('select update_product($1, $2::jsonb)', [id, JSON.stringify({ kind: p.kind, name: p.name.trim(), code: p.code, category: p.category, base_unit: p.unit.trim(), barcode: p.barcode,
+      sale_price: p.sale || 0, purchase_price: p.buy || 0, block_negative: p.kind === 'goods_stock' && !!p.block,
+      units: (p.units ?? []).map(u => ({ unit: u.unit.trim(), factor: u.factor, sale_price: u.sale || 0, purchase_price: u.buy || 0, barcode: u.barcode })) })]);
+  }, STK.concat('/sales'), 'master.write');
+}
+export async function deleteProduct(id: string) { return run(call('select delete_product($1)', id), STK, 'master.write'); }
+export async function setProductActive(id: string, active: boolean) { return run(call('select set_product_active($1,$2)', id, active), STK, 'master.write'); }
+export async function deleteWarehouse(id: string) { return run(call('select delete_warehouse($1)', id), STK, 'master.write'); }
+export async function saveStockSettings(f: FormData): Promise<void> {
+  await run(call('select set_stock_settings($1,$2)', String(f.get('negative_sales') ?? 'warn'), f.get('low_stock_enabled') === '1'), STK.concat('/sales/new'), 'master.write');
+}

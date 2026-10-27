@@ -7,7 +7,7 @@ import { money, qty, dateTh } from '@/lib/format';
 import { KIND_LABEL } from '@/lib/stock-labels';
 import { StockAdjustDialog } from '@/components/StockAdjustDialog';
 import { ActionButton } from '@/components/ActionButton';
-import { deleteAdjustment } from '@/lib/actions';
+import { deleteAdjustment, deleteProduct, setProductActive } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 const DOC_HREF = (t: string, no: string, id: string): string | null =>
@@ -44,7 +44,12 @@ export default async function ProductPage({ params, searchParams }: { params: { 
   const tabHref = (t: string) => `/products/${p.id}${t ? `?tab=${t}` : ''}`;
   return (
     <>
-      <div className="top"><div><p className="sub"><Link href="/products">← ย้อนกลับ: รายการสินค้าทั้งหมด</Link></p><h1>{p.code} {p.name}</h1></div>
+      <div className="top"><div><p className="sub"><Link href="/products">← ย้อนกลับ: รายการสินค้าทั้งหมด</Link></p><h1>{p.code} {p.name}{!p.is_active && <span className="pill grey" style={{ marginLeft: 8, display: 'inline-block' }}>ปิดใช้งาน</span>}</h1></div>
+        {!stockTab && writable && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link className="btn sm" href={`/products/${p.id}/edit`}>แก้ไขสินค้า</Link>
+          <Link className="btn sm ghost" href={`/products/new?from=${p.id}`}>สร้างซ้ำ</Link>
+          <ActionButton variant="ghost" label={p.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'} action={setProductActive.bind(null, p.id, !p.is_active)} />
+          <ActionButton variant="danger" label="ลบสินค้า" confirmText="ลบสินค้านี้ถาวร (ลบไม่ได้ถ้าเคยถูกใช้งานแล้ว)" action={deleteProduct.bind(null, p.id)} after="/products" /></div>}
         {stockTab && writable && <StockAdjustDialog product={p.id} unit={p.base_unit} today={today()} whs={whs.map((w: any) => ({ id: w.id, name: w.name, qty: w.qty }))} onhand={Number(st?.q ?? 0)} />}</div>
       <div className="tabs noprint"><Link href={tabHref('')} className={!stockTab ? 'on' : ''}>รายละเอียดขาย-ซื้อ</Link>
         {p.kind === 'goods_stock' && <Link href={tabHref('stock')} className={stockTab ? 'on' : ''}>ข้อมูลสต็อกสินค้า</Link>}</div>

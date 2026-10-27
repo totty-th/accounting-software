@@ -248,3 +248,5 @@ tr.ratesub td{padding-top:0;color:var(--muted);font-size:12px}
 /* แถวที่มีลิงก์เอกสาร คลิกตรงไหนก็เปิด (RowClick) */
 main tbody tr:has(a[href^="/"]){cursor:pointer}
 main tbody tr:has(a[href^="/"]) td{user-select:text}
+.print-only{display:none}
+@media print{.print-only{display:flex !important}}

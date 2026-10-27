@@ -5,6 +5,7 @@ import { can } from '@/lib/permissions';
 import { getDb } from '@/lib/db';
 import { dateTh, money, qty } from '@/lib/format';
 import { Pill } from '@/components/Pill';
+import { PrintButton } from '@/components/ShareTools';
 import { ActionButton } from '@/components/ActionButton';
 import { receiveTransfer, resetTransfer, cancelTransfer } from '@/lib/actions';
 
@@ -19,9 +20,10 @@ export default async function TransferPage({ params }: { params: { id: string } 
   const total = ls.reduce((s: number, l: any) => s + Number(l.qty) * Number(l.unit_cost), 0);
   return (
     <>
-      <div className="top"><div><p className="sub"><Link href="/stock/transfers">← โอนสินค้า</Link></p><h1>{t.tf_no} <Pill s={t.status} /></h1>
+      <div className="top"><div><p className="sub noprint"><Link href="/stock/transfers">← โอนสินค้า</Link></p><h1>ใบโอนสินค้า {t.tf_no} <Pill s={t.status} /></h1>
         <p className="sub">วันที่ {dateTh(t.tf_date)} · {t.from_name} → {t.to_name}</p></div>
-        {w && <div style={{ display: 'flex', gap: 8 }}>
+        <div className="noprint" style={{ display: 'flex', gap: 8 }}><PrintButton /></div>
+        {w && <div className="noprint" style={{ display: 'flex', gap: 8 }}>
           {t.status === 'pending' && <><ActionButton label="รับสินค้าแล้ว" action={receiveTransfer.bind(null, t.id)} /><ActionButton variant="ghost" label="ยกเลิก" confirmText="ยกเลิกใบโอนนี้" action={cancelTransfer.bind(null, t.id)} /></>}
           {t.status === 'received' && <ActionButton variant="ghost" label="รีเซ็ต" confirmText="ย้อนสต็อกที่โอนกลับ และกลับเป็นรอดำเนินการ" action={resetTransfer.bind(null, t.id)} />}</div>}</div>
       <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
@@ -30,6 +32,7 @@ export default async function TransferPage({ params }: { params: { id: string } 
             <td className="num">{money(l.unit_cost)}</td><td className="num">{money(Number(l.qty) * Number(l.unit_cost))}</td></tr>)}</tbody>
           <tfoot><tr><td colSpan={5} className="num"><b>รวม</b></td><td className="num"><b>{money(total)}</b></td></tr></tfoot></table>
       </div>
+      <div className="print-only" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 48 }}><span>ผู้ส่งสินค้า ______________________</span><span>ผู้รับสินค้า ______________________</span></div>
     </>
   );
 }

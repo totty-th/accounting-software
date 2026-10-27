@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { saveQuotation, saveInvoice, updateSalesDoc, quickCreateCustomer, quickCreateSaleProduct } from '@/lib/actions';
 
 export interface Cust { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
-export interface QProd { id: string; code: string; name: string; unit: string; price: number; kind: 'service' | 'goods_nostock' | 'goods_stock'; onhand: number; description: string }
+export interface QProd { id: string; code: string; name: string; unit: string; price: number; kind: 'service' | 'goods_nostock' | 'goods_stock'; onhand: number; description: string; units?: { unit: string; factor: number; price: number }[] }
 interface Wh { id: string; label: string }
 interface Line { product_id: string; name: string; detail: string; unit: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
 const blank = (): Line => ({ product_id: '', name: '', detail: '', unit: '', qty: '1', unit_price: '', dtype: 'percent', dval: '', vat: '7', wht: '0' });
@@ -18,7 +18,8 @@ const KIND_ICON: Record<string, string> = { service: '🛎', goods_nostock: '�
 const KIND_LABEL: Record<string, string> = { service: 'บริการ', goods_nostock: 'สินค้าไม่นับสต็อก', goods_stock: 'สินค้านับสต็อก' };
 
 /** ใบเสนอราคา/ใบแจ้งหนี้: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — QT สร้างและแก้ไข (เฉพาะรออนุมัติ) · INV สร้างอย่างเดียว */
-export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses, people, today, salesperson, canPickSalesperson, init, canCreateCustomer, canCreateProduct }: {
+export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses, people, today, salesperson, canPickSalesperson, init, canCreateCustomer, canCreateProduct, negMode = 'warn' }: {
+  negMode?: 'allow' | 'warn' | 'block';
   docType?: 'QT' | 'INV'; id: string | null; customers: Cust[]; products: QProd[]; warehouses: Wh[]; people: string[]; today: string; salesperson: string; canPickSalesperson?: boolean;
   init?: { header: Record<string, any>; lines: Line[] }; canCreateCustomer: boolean; canCreateProduct: boolean;
 }) {
@@ -43,6 +44,10 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
   // เลือกสินค้า: ใส่ชื่อ หน่วย ราคาขาย และรายละเอียดจากรายการสินค้าให้อัตโนมัติ (ตาม FA)
   const pickProduct = (i: number, pid: string) => { const p = prods.find(x => x.id === pid); if (!p) return;
     setL(i, { product_id: p.id, name: p.name, unit: p.unit, unit_price: String(p.price), detail: p.description || lines[i].detail }); };
+  // เปลี่ยนเป็นหน่วยย่อย/หน่วยเพิ่ม: ใช้ราคาขายของหน่วยนั้น (ถ้าไม่ตั้งไว้ = ราคาหลัก × อัตราแปลง)
+  const pickUnit = (i: number, unit: string) => { const p = prods.find(x => x.id === lines[i].product_id); const u = p?.units?.find(x => x.unit === unit);
+    setL(i, { unit, ...(p ? { unit_price: String(unit === p.unit ? p.price : u && u.price > 0 ? u.price : Math.round(p.price * (u?.factor ?? 1) * 100) / 100) } : {}) }); };
+  const [warned, setWarned] = useState(false);
   const makeProduct = () => start(async () => {
     if (!np?.name.trim()) return setErr('ต้องระบุชื่อสินค้า');
     const r = await quickCreateSaleProduct({ kind: np.kind, name: np.name, code: np.code, unit: np.unit, price: Number(np.price) || 0, description: np.description });
@@ -70,8 +75,20 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
   const ok = h.contact && lines.some(hasContent) && lines.filter(hasContent).every(l => Number(l.qty) > 0 && l.unit_price !== '');
   const submit = () => start(async () => {
     setErr(null);
-    const payload = lines.filter(hasContent).map(l => ({ product_id: l.product_id || undefined, description: l.name, detail: l.detail, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
-        discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 }));
+    // ขายเป็นหน่วยเพิ่ม → แปลงเป็นหน่วยหลักก่อนบันทึก (ตัดสต็อกถูกหน่วย) และจดหน่วยที่ขายไว้ในรายละเอียด
+    const conv = (l: Line) => { const p = prods.find(x => x.id === l.product_id); const u = p?.units?.find(x => x.unit === l.unit);
+      if (!p || !u || l.unit === p.unit) return { qty: Number(l.qty), price: Number(l.unit_price), unit: l.unit, detail: l.detail };
+      return { qty: Number(l.qty) * u.factor, price: Number(l.unit_price) / u.factor, unit: p.unit, detail: [l.detail, `ขาย ${l.qty} ${l.unit} (1 ${l.unit} = ${u.factor} ${p.unit})`].filter(Boolean).join(' · ') }; };
+    if (isInv && negMode !== 'allow') {
+      const short = lines.filter(hasContent).map(l => ({ l, p: prods.find(x => x.id === l.product_id), c: conv(l) })).filter(x => x.p?.kind === 'goods_stock' && x.c.qty > (x.p?.onhand ?? 0));
+      if (short.length) {
+        const msg = short.map(x => `${x.p!.name} คงเหลือ ${x.p!.onhand} ขาย ${x.c.qty} ${x.p!.unit}`).join(' · ');
+        if (negMode === 'block') return setErr('ไม่อนุญาตให้ขายติดลบ: ' + msg);
+        if (!warned) { setWarned(true); return setErr('สต็อกไม่พอ (ขายติดลบ): ' + msg + ' — กดบันทึกอีกครั้งเพื่อยืนยัน'); }
+      }
+    }
+    const payload = lines.filter(hasContent).map(l => { const c = conv(l); return ({ product_id: l.product_id || undefined, description: l.name, detail: c.detail, unit: c.unit, qty: c.qty, unit_price: c.price,
+        discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 }); });
     const head = { ...h, credit_days: Number(h.credit_days) || 0 };
     const r = isInv && id ? await updateSalesDoc(id, { ...head, due_date: h.term_mode === 'credit' ? h.due_date : undefined }, payload).then(x => ({ ...x, id })) : isInv ? await saveInvoice({ ...head, due_date: h.term_mode === 'credit' ? h.due_date : undefined }, payload) : await saveQuotation(id, head, payload);
     if (r.error) return setErr(r.error);
@@ -140,7 +157,8 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
                 <textarea aria-label={`รายละเอียด ${i + 1}`} rows={Math.max(1, l.detail.split('\n').length)} placeholder="รายละเอียด (กด Shift+Enter เพื่อขึ้นบรรทัดใหม่)" value={l.detail} onChange={e => setL(i, { detail: e.target.value })} style={{ width: '100%' }} />
               </td>
               <td><input aria-label={`จำนวน ${i + 1}`} inputMode="decimal" value={l.qty} onChange={e => setL(i, { qty: e.target.value })} /></td>
-              <td>{l.product_id && l.unit ? <select aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })}><option value={l.unit}>{l.unit}{prods.find(x => x.id === l.product_id)?.kind === 'goods_stock' ? ` (คงเหลือ ${prods.find(x => x.id === l.product_id)?.onhand})` : ''}</option></select> : <input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} />}</td>
+              <td>{l.product_id && l.unit ? <select aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => pickUnit(i, e.target.value)}>{(() => { const pr = prods.find(x => x.id === l.product_id); const gs = pr?.kind === 'goods_stock';
+                  return <>{[pr?.unit ?? l.unit, ...(pr?.units ?? []).map(u => u.unit)].filter((u, k, a) => u && a.indexOf(u) === k).map(u => <option key={u} value={u}>{u}{u === pr?.unit && gs ? ` (คงเหลือ ${pr?.onhand})` : ''}</option>)}</>; })()}</select> : <input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} />}</td>
               <td><input aria-label={`ราคา ${i + 1}`} inputMode="decimal" value={l.unit_price} onChange={e => setL(i, { unit_price: e.target.value })} /></td>
               <td><input aria-label={`ส่วนลด ${i + 1}`} inputMode="decimal" value={l.dval} onChange={e => setL(i, { dval: e.target.value })} /></td>
               <td><select aria-label={`ภาษี ${i + 1}`} value={l.vat} onChange={e => setL(i, { vat: e.target.value })}><option value="0">0%</option><option value="7">7%</option><option value="exempt">ยกเว้น</option></select></td>
