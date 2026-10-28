@@ -18,6 +18,7 @@ export const PERMS = [
   'reports.read',
   'master.read', 'master.write',                     // ลูกค้า/ผู้ขาย/สินค้า
   'journal.write',                                   // บันทึก/กลับรายการสมุดรายวันทั่วไป (M27.1)
+  'accounts.write',                                  // ผังบัญชี · ยอดเริ่มต้น · ล็อกงวด · ปิดบัญชี (M27.3-4)
   'contact.create',
   'cost.view',                                       // เห็นราคาซื้อ/ต้นทุน
   'settings.company', 'users.manage',
@@ -26,7 +27,7 @@ export type Perm = (typeof PERMS)[number];
 
 const READ_ALL: Perm[] = ['dash.view', 'sales.read', 'receipts.read', 'expenses.read', 'wht.read', 'stock.read', 'bank.read',
   'reports.read', 'master.read', 'cost.view'];
-const ACCOUNTING_WRITE: Perm[] = ['sales.write', 'receipts.write', 'expenses.write', 'wht.write', 'bank.write', 'master.write', 'contact.create', 'journal.write'];
+const ACCOUNTING_WRITE: Perm[] = ['sales.write', 'receipts.write', 'expenses.write', 'wht.write', 'bank.write', 'master.write', 'contact.create', 'journal.write', 'accounts.write'];
 
 const MATRIX: Record<Role, readonly Perm[]> = {
   // เจ้าของ: เห็นและอนุมัติบัญชีทั้งหมด (ตามที่เจ้าของระบบระบุ) · จัดการผู้ใช้/ตั้งค่าระบบไม่ได้
