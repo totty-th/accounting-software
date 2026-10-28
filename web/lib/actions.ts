@@ -434,3 +434,27 @@ export async function suggestProducts(q: string, wh = ''): Promise<{ id: string;
   const { productQuery } = await import('./product-list');
   return (await productQuery(await getDb(), { q: q.trim(), wh, limit: 8 })).map(r => ({ id: r.id, code: r.code, name: r.name, onhand: r.onhand == null ? null : Number(r.onhand), unit: r.base_unit }));
 }
+
+// ---- M27.1: สมุดรายวัน / JV ----
+export type JvInput = { date: string; contact_id?: string; ref_no?: string; memo?: string; note?: string; lines: { account: string; debit?: number; credit?: number; desc?: string }[] };
+export async function createJv(p: JvInput, draftId?: string | null): Promise<Result & { id?: string }> {
+  let id: string | undefined;
+  const r = await run(async () => { id = (await (await getDb()).q<any>('select create_jv($1::jsonb, $2) id', [JSON.stringify(p), draftId ?? null]))[0].id; }, ['/journals', '/ledger/transactions', '/reports/trial-balance', '/reports/pnl'], 'journal.write');
+  return { ...r, id };
+}
+export async function saveJvDraft(p: JvInput, draftId?: string | null): Promise<Result & { id?: string }> {
+  let id: string | undefined;
+  const r = await run(async () => { id = (await (await getDb()).q<any>('select save_jv_draft($1, $2::jsonb) id', [draftId ?? null, JSON.stringify(p)]))[0].id; }, ['/journals'], 'journal.write');
+  return { ...r, id };
+}
+export async function deleteJvDraft(id: string) { return run(call('select delete_jv_draft($1)', id), ['/journals'], 'journal.write'); }
+// กลับรายการได้เฉพาะ JV ที่บันทึกมือ — ใบสำคัญที่ระบบสร้างจากเอกสารต้องยกเลิกที่เอกสารต้นทาง (กันบัญชีไม่ตรงกับเอกสาร)
+export async function reverseJv(id: string) {
+  return run(async () => {
+    const db = await getDb();
+    const [v] = await db.q<any>('select source_type from journal_vouchers where id = $1', [id]);
+    if (!v) throw new Error('ไม่พบใบสำคัญ');
+    if (v.source_type !== 'MANUAL') throw new Error('ใบสำคัญนี้ระบบสร้างจากเอกสาร — ยกเลิกที่เอกสารต้นทาง ไม่ใช่ที่สมุดรายวัน');
+    await db.q('select reverse_voucher($1)', [id]);
+  }, ['/journals', '/ledger/transactions', '/reports/trial-balance', '/reports/pnl'], 'journal.write');
+}
