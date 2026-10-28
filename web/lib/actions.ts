@@ -341,20 +341,23 @@ export const unsharePurchaseDoc = async (kind: string, id: string) => run(call('
 // ---- โมดูลสินค้า/สต็อก (M26) ----
 const STK = ['/products', '/stock', '/stock/transfers', '/stock/warehouses', '/stock/low'];
 export type ProductInput = { kind: string; name: string; code: string; category: string; unit: string; barcode: string; sale: number; buy: number;
-  block: boolean; units: { unit: string; factor: number; sale: number; buy: number; barcode: string }[]; open?: { date: string; qty: number; cost: number } | null };
+  block: boolean; units: { unit: string; factor: number; sale: number; buy: number; barcode: string }[]; open?: { date: string; qty: number; cost: number } | null;
+  description?: string; saleVat?: string; buyVat?: string; goodsType?: string; lowMode?: 'default' | 'custom'; lowItems?: { warehouse_id: string; min_qty: number }[] };
 export async function createProductFull(p: ProductInput) {
   return run(async () => {
     if (!p.name?.trim() || !p.code?.trim()) throw new Error('ต้องระบุชื่อและรหัสสินค้า');
     if (!p.unit?.trim()) throw new Error('ต้องระบุหน่วยสินค้าหลัก');
     const db = await getDb();
-    const [r] = await db.q<any>(`insert into products(code,name,kind,base_unit,sale_price,purchase_price,category,barcode,block_negative)
-      values ($1,$2,$3,$4,$5,$6,nullif($7,''),nullif($8,''),$9) returning id`,
-      [p.code.trim(), p.name.trim(), p.kind, p.unit.trim(), p.sale || 0, p.buy || 0, p.category?.trim() ?? '', p.barcode?.trim() ?? '', p.kind === 'goods_stock' && !!p.block]);
+    const [r] = await db.q<any>(`insert into products(code,name,kind,base_unit,sale_price,purchase_price,category,barcode,block_negative,description,sale_vat_mode,purchase_vat_mode,goods_type)
+      values ($1,$2,$3,$4,$5,$6,nullif($7,''),nullif($8,''),$9,nullif($10,''),$11,$12,$13) returning id`,
+      [p.code.trim(), p.name.trim(), p.kind, p.unit.trim(), p.sale || 0, p.buy || 0, p.category?.trim() ?? '', p.barcode?.trim() ?? '', p.kind === 'goods_stock' && !!p.block,
+        p.description ?? '', p.saleVat || 'exclusive', p.kind === 'service' ? 'exclusive' : p.buyVat || 'exclusive', p.kind === 'goods_nostock' ? p.goodsType || 'for_sale' : 'for_sale']);
     for (const u of p.units ?? []) {
       if (!u.unit?.trim() || !(u.factor > 0)) throw new Error('หน่วยอื่นต้องมีชื่อและอัตราแปลงมากกว่า 0');
       await db.q('insert into product_units(product_id,unit,factor,sale_price,purchase_price,barcode) values ($1,$2,$3,$4,$5,nullif($6,\'\'))', [r.id, u.unit.trim(), u.factor, u.sale || 0, u.buy || 0, u.barcode ?? '']);
     }
     if (p.open && p.kind === 'goods_stock' && p.open.qty > 0) await db.q('select set_opening_stock($1,$2::date,$3,$4)', [r.id, p.open.date, p.open.qty, p.open.cost]);
+    if (p.kind === 'goods_stock' && p.lowMode === 'custom') await db.q('select set_product_low_stock($1,$2,$3::jsonb)', [r.id, 'custom', JSON.stringify(p.lowItems ?? [])]);
   }, STK.concat('/sales'), 'master.write');
 }
 export async function adjustStock(p: { product: string; date: string; wh: string; dir: 'in' | 'out'; reason: string; qty: number; cost?: number | null; note?: string }) {
@@ -395,7 +398,9 @@ export async function updateProductFull(id: string, p: ProductInput) {
     for (const u of p.units ?? []) if (!u.unit?.trim() || !(u.factor > 0)) throw new Error('หน่วยอื่นต้องมีชื่อและอัตราแปลงมากกว่า 0');
     await (await getDb()).q('select update_product($1, $2::jsonb)', [id, JSON.stringify({ kind: p.kind, name: p.name.trim(), code: p.code, category: p.category, base_unit: p.unit.trim(), barcode: p.barcode,
       sale_price: p.sale || 0, purchase_price: p.buy || 0, block_negative: p.kind === 'goods_stock' && !!p.block,
+      description: p.description ?? '', sale_vat_mode: p.saleVat || 'exclusive', purchase_vat_mode: p.kind === 'service' ? 'exclusive' : p.buyVat || 'exclusive', goods_type: p.kind === 'goods_nostock' ? p.goodsType || 'for_sale' : 'for_sale',
       units: (p.units ?? []).map(u => ({ unit: u.unit.trim(), factor: u.factor, sale_price: u.sale || 0, purchase_price: u.buy || 0, barcode: u.barcode })) })]);
+    await (await getDb()).q('select set_product_low_stock($1,$2,$3::jsonb)', [id, p.kind === 'goods_stock' ? p.lowMode ?? 'default' : 'default', JSON.stringify(p.lowItems ?? [])]);
   }, STK.concat('/sales'), 'master.write');
 }
 export async function deleteProduct(id: string) { return run(call('select delete_product($1)', id), STK, 'master.write'); }
@@ -403,4 +408,24 @@ export async function setProductActive(id: string, active: boolean) { return run
 export async function deleteWarehouse(id: string) { return run(call('select delete_warehouse($1)', id), STK, 'master.write'); }
 export async function saveStockSettings(f: FormData): Promise<void> {
   await run(call('select set_stock_settings($1,$2)', String(f.get('negative_sales') ?? 'warn'), f.get('low_stock_enabled') === '1'), STK.concat('/sales/new'), 'master.write');
+}
+
+// ---- M26.3: นำเข้าสินค้าจากไฟล์ / ค้นหาแนะนำ ----
+export async function importProducts(p: { file: string; wh: string | null; rows: unknown[][]; map: Record<string, number> }) {
+  return run(async () => {
+    const { validateImport, fillCodes } = await import('./product-import');
+    const db = await getDb();
+    const existing = new Set((await db.q<any>('select code from products')).map(r => r.code as string));
+    const v = validateImport(p.rows, p.map as any, existing);
+    if (v.issues.length) throw new Error(`ไฟล์ยังมีข้อผิดพลาด ${v.issues.length} จุด — แก้ไขไฟล์แล้วนำเข้าใหม่`);
+    const items = fillCodes(v.items, existing);
+    await db.q('select import_products($1,$2,$3::jsonb)', [p.file, p.wh || null, JSON.stringify(items)]);
+  }, STK.concat('/products/import'), 'master.write');
+}
+export async function deleteImportBatch(id: string) { return run(call('select delete_import_batch($1)', id), STK.concat('/products/import'), 'master.write'); }
+/** ค้นหาแนะนำ (ชื่อ/รหัส/บาร์โค้ด) สำหรับช่องค้นหาหน้ารายการสินค้า */
+export async function suggestProducts(q: string, wh = ''): Promise<{ id: string; code: string; name: string; onhand: number | null; unit: string }[]> {
+  const u = await currentUser(); if (!u || !can(u.role, 'master.read') || !q.trim()) return [];
+  const { productQuery } = await import('./product-list');
+  return (await productQuery(await getDb(), { q: q.trim(), wh, limit: 8 })).map(r => ({ id: r.id, code: r.code, name: r.name, onhand: r.onhand == null ? null : Number(r.onhand), unit: r.base_unit }));
 }

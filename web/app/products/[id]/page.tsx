@@ -10,6 +10,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { deleteAdjustment, deleteProduct, setProductActive } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
+const VAT_LABEL: Record<string, string> = { exclusive: 'ราคายังไม่รวม VAT', inclusive: 'ราคารวม VAT แล้ว', zero: 'VAT 0%', exempt: 'สินค้าได้รับยกเว้นภาษี (N/A)' };
 const DOC_HREF = (t: string, no: string, id: string): string | null =>
   t === 'TF' ? `/stock/transfers/${id}` : t === 'RI' ? `/purchases/ri/${id}` : ['INV', 'CA', 'CN', 'DN'].includes(t) ? `/sales/${no}` : null;
 
@@ -55,11 +56,11 @@ export default async function ProductPage({ params, searchParams }: { params: { 
         {p.kind === 'goods_stock' && <Link href={tabHref('stock')} className={stockTab ? 'on' : ''}>ข้อมูลสต็อกสินค้า</Link>}</div>
       {!stockTab ? <>
         <div className="panel"><h3>ข้อมูลสินค้า</h3>
-          <ul className="rel"><li>ประเภทสินค้า: {KIND_LABEL[p.kind]}</li><li>ชื่อสินค้า: {p.name}</li><li>รหัสสินค้า: {p.code}</li><li>หน่วยสินค้าหลัก: {p.base_unit}</li>
+          <ul className="rel"><li>ประเภทสินค้า: {KIND_LABEL[p.kind]}{p.kind === 'goods_nostock' && p.goods_type === 'other' ? ' (อื่น ๆ)' : ''}</li><li>ชื่อสินค้า: {p.name}</li><li>รหัสสินค้า: {p.code}</li><li>หน่วยสินค้าหลัก: {p.base_unit}</li>
             <li>หมวดสินค้า: {p.category ?? '-'}</li><li>เลขบาร์โค้ด: {p.barcode ?? '-'}</li>{p.kind === 'goods_stock' && <li>ห้ามติดลบ: {p.block_negative ? 'ใช่ (กันขาย/โอน/ปรับลดเกินคงเหลือ)' : 'ไม่'}</li>}</ul></div>
         <div className="panel" style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
-          <div><h3>ข้อมูลการขาย</h3><p>ราคาขาย: <b>{money(p.sale_price)}</b> บาท</p></div>
-          {can(user.role, 'cost.view') && <div><h3>ข้อมูลการซื้อ</h3><p>ราคาซื้อ: <b>{money(p.purchase_price)}</b> บาท</p></div>}</div>
+          <div><h3>ข้อมูลการขาย</h3><p>ราคาขาย: <b>{money(p.sale_price)}</b> บาท</p><p>ภาษีมูลค่าเพิ่ม: {VAT_LABEL[p.sale_vat_mode]}</p>{p.description && <p style={{ whiteSpace: 'pre-line' }}>รายละเอียดสินค้า: {p.description}</p>}</div>
+          {can(user.role, 'cost.view') && p.kind !== 'service' && <div><h3>ข้อมูลการซื้อ</h3><p>ราคาซื้อ: <b>{money(p.purchase_price)}</b> บาท</p><p>ภาษีมูลค่าเพิ่ม: {VAT_LABEL[p.purchase_vat_mode]}</p></div>}</div>
         {units.length > 0 && <div className="panel" style={{ padding: 0, overflowX: 'auto' }}><h3 style={{ padding: '12px 14px 0' }}>หน่วยสินค้า (หน่วยหลัก: {p.base_unit})</h3>
           <table><thead><tr><th>หน่วยสินค้าอื่น</th><th className="num">= {p.base_unit}</th><th className="num">ราคาขาย</th><th className="num">ราคาซื้อ</th></tr></thead>
             <tbody>{units.map((u: any) => <tr key={u.unit}><td>{u.unit}</td><td className="num">{qty(u.factor)}</td><td className="num">{money(u.sale_price)}</td><td className="num">{money(u.purchase_price)}</td></tr>)}</tbody></table></div>}

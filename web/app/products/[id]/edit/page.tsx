@@ -10,6 +10,7 @@ export default async function EditProduct({ params }: { params: { id: string } }
   const init = await productInit(params.id, false); if (!init) notFound();
   const [p] = await db.q<any>('select id from products where id::text=$1', [params.id]);
   const cats = (await db.q<any>(`select distinct category c from products where category is not null order by 1`)).map(r => r.c);
+  const whs = (await db.q<any>('select id, name, is_main, low_stock_min from warehouses order by is_main desc, code')).map(w => ({ ...w, low_stock_min: w.low_stock_min == null ? null : Number(w.low_stock_min) }));
   const units = (await db.q<any>(`select distinct u from (select base_unit u from products union select unit from product_units) x order by 1`)).map(r => r.u);
-  return <><div className="top"><div><h1>แก้ไขสินค้า</h1></div></div><ProductForm today={today()} categories={cats} units={units} init={init} editId={p.id} /></>;
+  return <><div className="top"><div><h1>แก้ไขสินค้า</h1></div></div><ProductForm today={today()} categories={cats} units={units} init={init} whs={whs} editId={p.id} /></>;
 }

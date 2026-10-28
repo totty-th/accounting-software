@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { saveQuotation, saveInvoice, updateSalesDoc, quickCreateCustomer, quickCreateSaleProduct } from '@/lib/actions';
 
 export interface Cust { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
-export interface QProd { id: string; code: string; name: string; unit: string; price: number; kind: 'service' | 'goods_nostock' | 'goods_stock'; onhand: number; description: string; units?: { unit: string; factor: number; price: number }[] }
+export interface QProd { id: string; code: string; name: string; unit: string; price: number; kind: 'service' | 'goods_nostock' | 'goods_stock'; onhand: number; description: string; vat?: string; units?: { unit: string; factor: number; price: number }[] }
 interface Wh { id: string; label: string }
 interface Line { product_id: string; name: string; detail: string; unit: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
 const blank = (): Line => ({ product_id: '', name: '', detail: '', unit: '', qty: '1', unit_price: '', dtype: 'percent', dval: '', vat: '7', wht: '0' });
@@ -43,7 +43,7 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
     const cd = v ? v.credit_days : 0; set({ contact: cid, credit_days: String(cd), due_date: addDays(h.date, cd) }); };
   // เลือกสินค้า: ใส่ชื่อ หน่วย ราคาขาย และรายละเอียดจากรายการสินค้าให้อัตโนมัติ (ตาม FA)
   const pickProduct = (i: number, pid: string) => { const p = prods.find(x => x.id === pid); if (!p) return;
-    setL(i, { product_id: p.id, name: p.name, unit: p.unit, unit_price: String(p.price), detail: p.description || lines[i].detail }); };
+    setL(i, { product_id: p.id, name: p.name, unit: p.unit, unit_price: String(p.price), detail: p.description || lines[i].detail, ...(p.vat ? { vat: p.vat } : {}) }); };
   // เปลี่ยนเป็นหน่วยย่อย/หน่วยเพิ่ม: ใช้ราคาขายของหน่วยนั้น (ถ้าไม่ตั้งไว้ = ราคาหลัก × อัตราแปลง)
   const pickUnit = (i: number, unit: string) => { const p = prods.find(x => x.id === lines[i].product_id); const u = p?.units?.find(x => x.unit === unit);
     setL(i, { unit, ...(p ? { unit_price: String(unit === p.unit ? p.price : u && u.price > 0 ? u.price : Math.round(p.price * (u?.factor ?? 1) * 100) / 100) } : {}) }); };
