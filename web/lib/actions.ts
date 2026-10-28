@@ -482,3 +482,11 @@ export async function closeYear(year: number) {
 export async function resetYearClose(year: number) {
   return run(call('select reset_year_close($1::int)', year), [...ACC_PATHS, '/settings/close-year', '/journals', '/ledger/transactions'], 'accounts.write');
 }
+
+// ===== M27.5 เตรียมแบบภาษีรายเดือน (ภ.พ.30) =====
+const TAX_PATHS = ['/tax/filings', '/reports/purchase-tax', '/reports/sales-tax', '/journals', '/ledger/transactions', '/reports/trial-balance', '/reports/balance-sheet'];
+export async function filePp30(month: string) { return run(call('select file_pp30($1::date)', `${month}-01`), TAX_PATHS, 'accounts.write'); }
+export async function payPp30(id: string, date: string, account: string) { return run(call('select pay_pp30($1,$2::date,$3)', id, date, account), TAX_PATHS, 'accounts.write'); }
+export async function resetPp30Payment(id: string) { return run(call('select reset_pp30_payment($1)', id), TAX_PATHS, 'accounts.write'); }
+export async function setPp30Refund(id: string, recorded: boolean) { return run(call('select set_pp30_refund($1,$2)', id, recorded), TAX_PATHS, 'accounts.write'); }
+export async function deletePp30(id: string) { return run(call('select delete_pp30($1)', id), TAX_PATHS, 'accounts.write'); }
