@@ -2,6 +2,7 @@ import { requirePage } from '@/lib/auth';
 import { getDb, today, monthStart } from '@/lib/db';
 import { money } from '@/lib/format';
 import { Group } from '@/components/Board';
+import { ReportTools } from '@/components/ReportTools';
 
 export default async function TB({ searchParams }: { searchParams: { from?: string; to?: string; zero?: string } }) {
   await requirePage('reports.read');
@@ -20,14 +21,15 @@ export default async function TB({ searchParams }: { searchParams: { from?: stri
           <input type="checkbox" name="zero" value="1" defaultChecked={zero} style={{ width: 'auto' }} /> แสดงยอดศูนย์</label>
         <button className="btn">ดูรายงาน</button>
       </form>
-      <Group title={`งบทดลอง ${from} ถึง ${to}`} color="var(--red)" count={rows.length}>
+      <ReportTools title="งบทดลอง" meta={[['ตั้งแต่', from], ['ถึง', to]]} />
+      <div data-report><Group title={`งบทดลอง ${from} ถึง ${to}`} color="var(--red)" count={rows.length}>
         <table><thead><tr><th>รหัส</th><th>ชื่อบัญชี</th><th className="num">ยอดยกมา</th><th className="num">เดบิต</th><th className="num">เครดิต</th><th className="num">คงเหลือ (Dr+/Cr−)</th></tr></thead>
           <tbody>{rows.map(r => (
             <tr key={r.code}><td className="no">{r.code}</td><td>{r.name}</td><td className="num">{money(r.opening)}</td>
               <td className="num">{money(r.period_dr)}</td><td className="num">{money(r.period_cr)}</td><td className="num">{money(r.closing)}</td></tr>))}
             <tr style={{ fontWeight: 700 }}><td /><td>รวม</td><td className="num">{money(sum('opening'))}</td><td className="num">{money(sum('period_dr'))}</td><td className="num">{money(sum('period_cr'))}</td>
               <td className="num" title="เดบิตคงเหลือรวม = เครดิตคงเหลือรวม">{Math.abs(dr - cr) < 0.005 ? '✓ สมดุล' : 'ไม่สมดุล'}</td></tr></tbody></table>
-      </Group>
+      </Group></div>
     </>
   );
 }
