@@ -11,5 +11,6 @@ export async function productInit(id: string, dup: boolean): Promise<ProductInit
     sale: String(Number(p.sale_price)), buy: String(Number(p.purchase_price)), block: p.block_negative,
     description: p.description ?? '', saleVat: p.sale_vat_mode, buyVat: p.purchase_vat_mode, goodsType: p.goods_type, lowMode: p.low_stock_mode,
     low: Object.fromEntries((await db.q<any>('select warehouse_id, min_qty from product_low_stock where product_id=$1', [p.id])).map(l => [l.warehouse_id, String(Number(l.min_qty))])),
+    images: dup ? [] : (await db.q<any>('select id, name from product_images where product_id=$1 order by pos', [p.id])).map(i => ({ id: i.id as string, name: i.name as string })),
     units: us.map(u => ({ unit: u.unit, factor: String(Number(u.factor)), sale: String(Number(u.sale_price ?? 0)), buy: String(Number(u.purchase_price ?? 0)), barcode: u.barcode ?? '' })) };
 }

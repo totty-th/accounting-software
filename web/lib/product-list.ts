@@ -4,6 +4,7 @@ export async function productQuery(db: { q: <T = any>(sql: string, a?: unknown[]
   const sortCol = f.sort === 'price' ? 'p.sale_price' : 'lower(p.name)';
   const dir = f.dir === 'desc' ? 'desc' : 'asc';
   return db.q<any>(`select p.*, case when p.kind='goods_stock' then coalesce((select sum(qty_in-qty_out) from stock_movements m where m.product_id=p.id and m.voided_at is null and ($3='' or m.warehouse_id=$3::uuid)),0) end onhand,
+      (select i.id from product_images i where i.product_id=p.id order by i.pos limit 1) img,
       (select string_agg(u.unit || '|' || u.factor, ';') from product_units u where u.product_id=p.id) units
     from products p
     where ($1='' or p.kind=$1) and ($2='' or p.name ilike '%'||$2||'%' or p.code ilike '%'||$2||'%' or p.barcode ilike '%'||$2||'%')

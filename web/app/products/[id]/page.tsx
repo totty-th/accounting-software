@@ -22,6 +22,7 @@ export default async function ProductPage({ params, searchParams }: { params: { 
   const stockTab = searchParams.tab === 'stock' && p.kind === 'goods_stock';
   const writable = can(user.role, 'master.write');
   const units = await db.q<any>('select * from product_units where product_id=$1 order by factor', [p.id]);
+  const imgs = await db.q<any>('select id, name from product_images where product_id=$1 order by pos', [p.id]);
   const out: any = { p, units };
   if (stockTab) {
     const whs = await db.q<any>(`select w.id, w.name, w.is_main, coalesce(sum(m.qty_in-m.qty_out),0)::float8 qty from warehouses w
@@ -55,6 +56,9 @@ export default async function ProductPage({ params, searchParams }: { params: { 
       <div className="tabs noprint"><Link href={tabHref('')} className={!stockTab ? 'on' : ''}>รายละเอียดขาย-ซื้อ</Link>
         {p.kind === 'goods_stock' && <Link href={tabHref('stock')} className={stockTab ? 'on' : ''}>ข้อมูลสต็อกสินค้า</Link>}</div>
       {!stockTab ? <>
+        {imgs.length > 0 && <div className="panel"><h3>รูปสินค้า</h3><div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{imgs.map((i: any) =>
+          // eslint-disable-next-line @next/next/no-img-element
+          <a key={i.id} href={`/products/images/${i.id}`} target="_blank" rel="noreferrer"><img src={`/products/images/${i.id}`} alt={i.name} width={120} height={120} style={{ objectFit: 'cover', borderRadius: 6 }} /></a>)}</div></div>}
         <div className="panel"><h3>ข้อมูลสินค้า</h3>
           <ul className="rel"><li>ประเภทสินค้า: {KIND_LABEL[p.kind]}{p.kind === 'goods_nostock' && p.goods_type === 'other' ? ' (อื่น ๆ)' : ''}</li><li>ชื่อสินค้า: {p.name}</li><li>รหัสสินค้า: {p.code}</li><li>หน่วยสินค้าหลัก: {p.base_unit}</li>
             <li>หมวดสินค้า: {p.category ?? '-'}</li><li>เลขบาร์โค้ด: {p.barcode ?? '-'}</li>{p.kind === 'goods_stock' && <li>ห้ามติดลบ: {p.block_negative ? 'ใช่ (กันขาย/โอน/ปรับลดเกินคงเหลือ)' : 'ไม่'}</li>}</ul></div>

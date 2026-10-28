@@ -6,7 +6,7 @@ import { deleteProduct } from '@/lib/actions';
 import { money, qty } from '@/lib/format';
 
 export type PRow = { id: string; code: string; name: string; kind: string; base_unit: string; sale_price: number; purchase_price: number; category: string | null; barcode: string | null;
-  description: string | null; is_active: boolean; onhand: number | null; units: string };
+  description: string | null; is_active: boolean; img?: string | null; onhand: number | null; units: string };
 const ICON: Record<string, { t: string; l: string }> = { service: { t: '🛎', l: 'บริการ' }, goods_nostock: { t: '📦', l: 'สินค้าไม่นับสต็อก' }, goods_stock: { t: '🏷', l: 'สินค้านับสต็อก' } };
 
 /** ตารางรายการสินค้า (แบบ FA): ติ๊กเลือกหลายรายการ → ชิป "เลือก N รายการ ✕" + ดาวน์โหลด Excel เฉพาะที่เลือก · เมนู … = แก้ไข/สร้างซ้ำ/ลบ · ติดลบแสดงสีแดงในวงเล็บ */
@@ -49,7 +49,7 @@ export function ProductTable({ rows, canWrite, showCost, sortHref, sort, dir, ex
                 <tr key={x.id} style={x.is_active ? undefined : { opacity: 0.55 }}>
                   <td><input type="checkbox" aria-label={`เลือก ${x.name}`} checked={sel.has(x.id)} onChange={() => toggle(x.id)} /></td>
                   <td className="no"><span title={ICON[x.kind].l} aria-label={ICON[x.kind].l} style={{ marginRight: 6 }}>{ICON[x.kind].t}</span>{x.code}</td>
-                  <td><Link href={`/products/${x.id}`}>{x.name}</Link>{!x.is_active && <span className="sub"> (ปิดใช้งาน)</span>}
+                  <td>{x.img ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={`/products/images/${x.img}`} alt="" width={36} height={36} loading="lazy" style={{ objectFit: 'cover', borderRadius: 4, marginRight: 8, verticalAlign: 'middle' }} /> : <span aria-hidden style={{ display: 'inline-block', width: 36, height: 36, lineHeight: '36px', textAlign: 'center', borderRadius: 4, background: 'var(--bg2, #eee)', marginRight: 8, verticalAlign: 'middle', opacity: 0.6 }}>🖼</span>}<Link href={`/products/${x.id}`}>{x.name}</Link>{!x.is_active && <span className="sub"> (ปิดใช้งาน)</span>}
                     {(x.description || x.barcode) && <div className="sub" style={{ whiteSpace: 'pre-line' }}>{x.description || x.barcode}</div>}</td>
                   <td className="num">{money(x.sale_price)}</td>{showCost && <td className="num">{money(x.purchase_price)}</td>}
                   <td className="num">{x.onhand == null ? '-' : <span style={{ color: neg ? 'var(--red)' : undefined }} title={tip}>{neg ? `(${qty(Math.abs(Number(x.onhand)))})` : qty(x.onhand)}<div className="sub" style={{ color: neg ? 'var(--red)' : undefined }}>{x.base_unit}{tip && <span aria-hidden> ⓘ</span>}</div></span>}</td>

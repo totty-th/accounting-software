@@ -343,8 +343,9 @@ const STK = ['/products', '/stock', '/stock/transfers', '/stock/warehouses', '/s
 export type ProductInput = { kind: string; name: string; code: string; category: string; unit: string; barcode: string; sale: number; buy: number;
   block: boolean; units: { unit: string; factor: number; sale: number; buy: number; barcode: string }[]; open?: { date: string; qty: number; cost: number } | null;
   description?: string; saleVat?: string; buyVat?: string; goodsType?: string; lowMode?: 'default' | 'custom'; lowItems?: { warehouse_id: string; min_qty: number }[] };
-export async function createProductFull(p: ProductInput) {
-  return run(async () => {
+export async function createProductFull(p: ProductInput): Promise<Result & { id?: string }> {
+  let newId: string | undefined;
+  const res = await run(async () => {
     if (!p.name?.trim() || !p.code?.trim()) throw new Error('ต้องระบุชื่อและรหัสสินค้า');
     if (!p.unit?.trim()) throw new Error('ต้องระบุหน่วยสินค้าหลัก');
     const db = await getDb();
@@ -352,6 +353,7 @@ export async function createProductFull(p: ProductInput) {
       values ($1,$2,$3,$4,$5,$6,nullif($7,''),nullif($8,''),$9,nullif($10,''),$11,$12,$13) returning id`,
       [p.code.trim(), p.name.trim(), p.kind, p.unit.trim(), p.sale || 0, p.buy || 0, p.category?.trim() ?? '', p.barcode?.trim() ?? '', p.kind === 'goods_stock' && !!p.block,
         p.description ?? '', p.saleVat || 'exclusive', p.kind === 'service' ? 'exclusive' : p.buyVat || 'exclusive', p.kind === 'goods_nostock' ? p.goodsType || 'for_sale' : 'for_sale']);
+    newId = r.id;
     for (const u of p.units ?? []) {
       if (!u.unit?.trim() || !(u.factor > 0)) throw new Error('หน่วยอื่นต้องมีชื่อและอัตราแปลงมากกว่า 0');
       await db.q('insert into product_units(product_id,unit,factor,sale_price,purchase_price,barcode) values ($1,$2,$3,$4,$5,nullif($6,\'\'))', [r.id, u.unit.trim(), u.factor, u.sale || 0, u.buy || 0, u.barcode ?? '']);
@@ -359,6 +361,7 @@ export async function createProductFull(p: ProductInput) {
     if (p.open && p.kind === 'goods_stock' && p.open.qty > 0) await db.q('select set_opening_stock($1,$2::date,$3,$4)', [r.id, p.open.date, p.open.qty, p.open.cost]);
     if (p.kind === 'goods_stock' && p.lowMode === 'custom') await db.q('select set_product_low_stock($1,$2,$3::jsonb)', [r.id, 'custom', JSON.stringify(p.lowItems ?? [])]);
   }, STK.concat('/sales'), 'master.write');
+  return { ...res, id: newId };
 }
 export async function adjustStock(p: { product: string; date: string; wh: string; dir: 'in' | 'out'; reason: string; qty: number; cost?: number | null; note?: string }) {
   return run(call('select adjust_stock($1::date,$2,$3,$4,$5,$6,$7,$8)', p.date, p.product, p.wh, p.dir, p.reason, p.qty, p.cost ?? null, p.note ?? ''), STK, 'master.write');
@@ -403,6 +406,8 @@ export async function updateProductFull(id: string, p: ProductInput) {
     await (await getDb()).q('select set_product_low_stock($1,$2,$3::jsonb)', [id, p.kind === 'goods_stock' ? p.lowMode ?? 'default' : 'default', JSON.stringify(p.lowItems ?? [])]);
   }, STK.concat('/sales'), 'master.write');
 }
+export async function deleteProductImage(id: string) { return run(call('select delete_product_image($1)', id), STK, 'master.write'); }
+export async function setProductImageOrder(product: string, ids: string[]) { return run(call('select set_product_image_order($1, $2::uuid[])', product, ids), STK.concat(`/products/${product}`), 'master.write'); }
 export async function deleteProduct(id: string) { return run(call('select delete_product($1)', id), STK, 'master.write'); }
 export async function setProductActive(id: string, active: boolean) { return run(call('select set_product_active($1,$2)', id, active), STK, 'master.write'); }
 export async function deleteWarehouse(id: string) { return run(call('select delete_warehouse($1)', id), STK, 'master.write'); }

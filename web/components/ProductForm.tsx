@@ -1,13 +1,14 @@
 'use client';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { createProductFull, updateProductFull } from '@/lib/actions';
+import { createProductFull, updateProductFull, deleteProductImage, setProductImageOrder } from '@/lib/actions';
+import { ProductImages, type ImgItem } from './ProductImages';
 import { KIND_LABEL } from '@/lib/stock-labels';
 
 type U = { unit: string; factor: string; sale: string; buy: string; barcode: string };
 // ฟอร์มสร้างสินค้า (ตาม FA): ประเภท · ข้อมูลสินค้า · ขาย/ซื้อ · หลายหน่วย · ยอดตั้งต้น
 export type ProductInit = { kind: string; name: string; code: string; category: string; unit: string; barcode: string; sale: string; buy: string; block: boolean; units: U[];
-  description: string; saleVat: string; buyVat: string; goodsType: string; lowMode: 'default' | 'custom'; low: Record<string, string> };
+  description: string; saleVat: string; buyVat: string; goodsType: string; lowMode: 'default' | 'custom'; low: Record<string, string>; images?: { id: string; name: string }[] };
 const VATS: [string, string][] = [['exclusive', 'ราคายังไม่รวม VAT'], ['inclusive', 'ราคารวม VAT แล้ว'], ['zero', 'VAT 0%'], ['exempt', 'สินค้าได้รับยกเว้นภาษี (N/A)']];
 type Wh = { id: string; name: string; is_main: boolean; low_stock_min: number | null };
 export function ProductForm({ today, categories, units, init, editId, whs = [] }: { today: string; categories: string[]; units: string[]; init?: ProductInit; editId?: string; whs?: Wh[] }) {
@@ -20,6 +21,7 @@ export function ProductForm({ today, categories, units, init, editId, whs = [] }
   const [lowOn, setLowOn] = useState(true);
   const [lowMode, setLowMode] = useState<'default' | 'custom'>(init?.lowMode ?? 'default');
   const [low, setLow] = useState<Record<string, string>>(init?.low ?? {});
+  const [imgs, setImgs] = useState<ImgItem[]>((init?.images ?? []).map(i => ({ id: i.id, name: i.name, url: `/products/images/${i.id}` })));
   const [block, setBlock] = useState(init?.block ?? false);
   const [multi, setMulti] = useState(!!init?.units.length);
   const [us, setUs] = useState<U[]>(init?.units.length ? init.units : [{ unit: '', factor: '', sale: '', buy: '', barcode: '' }]);
@@ -35,7 +37,22 @@ export function ProductForm({ today, categories, units, init, editId, whs = [] }
       units: multi ? us.filter(u => u.unit.trim()).map(u => ({ unit: u.unit, factor: Number(u.factor), sale: Number(u.sale) || 0, buy: Number(u.buy) || 0, barcode: u.barcode })) : [],
       open: stock && open && !editId ? { date: o.date, qty: Number(o.qty), cost: Number(o.cost) } : null };
     const res = editId ? await updateProductFull(editId, body) : await createProductFull(body);
-    if (res.error) setErr(res.error); else r.push(editId ? `/products/${editId}` : '/products');
+    if (res.error) return setErr(res.error);
+    const pid = editId ?? (res as { id?: string }).id;
+    if (pid) {
+      try {
+        if (editId) { const keep = new Set(imgs.map(i => i.id)); for (const o of init?.images ?? []) if (!keep.has(o.id)) { const d = await deleteProductImage(o.id); if (d.error) throw new Error(d.error); } }
+        const ids: string[] = [];
+        for (const it of imgs) {
+          if (it.id) { ids.push(it.id); continue; }
+          const fd = new FormData(); fd.append('product', pid); fd.append('file', it.blob!, it.name);
+          const up = await fetch('/products/images/upload', { method: 'POST', body: fd }); const j = await up.json();
+          if (!up.ok) throw new Error(`${it.name}: ${j.error ?? 'อัปโหลดรูปไม่สำเร็จ'}`); ids.push(j.id);
+        }
+        if (ids.length) { const o = await setProductImageOrder(pid, ids); if (o.error) throw new Error(o.error); }
+      } catch (e: any) { setErr(`บันทึกสินค้าแล้ว แต่รูปบางรูปไม่สำเร็จ: ${e.message} — แก้ไขสินค้าเพื่อลองอีกครั้ง`); if (!editId) r.replace(`/products/${pid}/edit`); return; }
+    }
+    r.push(editId ? `/products/${editId}` : '/products');
   });
   return (
     <>
@@ -51,6 +68,7 @@ export function ProductForm({ today, categories, units, init, editId, whs = [] }
           <label className="f">เลขบาร์โค้ด<input value={f.barcode} onChange={e => set('barcode', e.target.value)} /></label>
           {kind === 'goods_nostock' && <label className="f">ประเภท<select value={gtype} onChange={e => setGtype(e.target.value)}><option value="for_sale">สินค้าเพื่อขาย</option><option value="other">อื่น ๆ</option></select></label>}
         </div></div>
+      <ProductImages items={imgs} onChange={setImgs} />
       <div className="panel"><h3>ข้อมูลการขาย / การซื้อ</h3>
         <div className="grid">
           <label className="f">ราคาขาย<input type="number" min="0" step="0.01" value={f.sale} onChange={e => set('sale', e.target.value)} /></label>
