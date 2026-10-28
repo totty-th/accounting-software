@@ -474,3 +474,11 @@ export async function lockPeriod(from: string, to: string, reason: string) {
   return run(call('select lock_period($1::date,$2::date,$3)', from, to, reason), ACC_PATHS, 'accounts.write');
 }
 export async function releasePeriodLock(id: string) { return run(call('select release_period_lock($1)', id), ACC_PATHS, 'accounts.write'); }
+
+// ===== M27.4 ปิดบัญชีรายได้/ค่าใช้จ่ายสิ้นปี =====
+export async function closeYear(year: number) {
+  return run(call('select close_year($1::int)', year), [...ACC_PATHS, '/settings/close-year', '/journals', '/ledger/transactions'], 'accounts.write');
+}
+export async function resetYearClose(year: number) {
+  return run(call('select reset_year_close($1::int)', year), [...ACC_PATHS, '/settings/close-year', '/journals', '/ledger/transactions'], 'accounts.write');
+}

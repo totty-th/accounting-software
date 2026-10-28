@@ -23,6 +23,7 @@ const ITEMS: [string, string, string, string, Perm[]][] = [
   ['/accounts', 'ผังบัญชี/บัญชีแยกประเภท', 'var(--teal)', '', ['reports.read']],
   ['/settings/opening-balance', 'ยอดเริ่มต้น', 'var(--teal)', '', ['reports.read']],
   ['/settings/lock', 'ล็อกงวดบัญชี', 'var(--teal)', '', ['reports.read']],
+  ['/settings/close-year', 'ปิดบัญชีสิ้นปี', 'var(--teal)', '', ['reports.read']],
   ['/reports/sales', 'รายงานขาย', 'var(--red)', 'รายงาน', ['reports.read']],
   ['/reports/billing', 'รายงานใบวางบิล', 'var(--red)', '', ['reports.read']],
   ['/reports/collections', 'รายงานการเก็บเงิน', 'var(--red)', '', ['reports.read']],
