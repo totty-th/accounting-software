@@ -222,6 +222,11 @@ tr.dl-sub td{background:rgba(127,127,127,.06);font-size:13px}
 .kebab summary{list-style:none;cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:0 8px;line-height:22px;font-size:11px}
 .kebab summary::-webkit-details-marker{display:none}
 .kebab-pop{position:absolute;right:0;top:100%;z-index:30;min-width:150px;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:6px;display:grid;gap:2px}
+.kebab-pop .mi{display:block;width:100%;text-align:left;background:none;border:0;font:inherit;cursor:pointer;padding:6px 8px;border-radius:6px;text-decoration:none;color:inherit}.kebab-pop .mi:hover{background:rgba(127,127,127,.15)}
+.fincards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:12px 0}
+.fincard{background:var(--surface);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow);border-top:5px solid var(--c,var(--brand))}
+.fincard.off{opacity:.55}
+.fincard .row{display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:6px;margin-top:6px}
 .kebab-pop a{padding:6px 8px;border-radius:6px;text-decoration:none;color:inherit}.kebab-pop a:hover{background:rgba(127,127,127,.15)}
 .taxhead{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .taxsum{display:flex;gap:28px;text-align:right}.taxsum b{font-size:22px;display:block}

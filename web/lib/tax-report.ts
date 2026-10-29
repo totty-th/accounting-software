@@ -71,3 +71,57 @@ export async function whtRows(db: Db, range: [string, string] | null, statuses: 
     order by w.cert_no`, [range?.[0] ?? null, range?.[1] ?? null, pgArr(statuses)]);
   return rows.map(r => ({ ...r, branch: branchLabel(r), form: WHT_FORM[r.form_code] ?? r.form_code, base: Number(r.base), wht: Number(r.wht) }));
 }
+
+// ---------- รายงานภาษีซื้อ ภ.พ.30 / ภ.พ.36 แบบ FA (REA 29-10-2026) ----------
+export type InputTaxRow = { kind: 'inv' | 'rd'; date: string; no: string; doc_no: string | null; rd_date: string | null; rd_no: string | null; name: string; tax_id: string | null; branch: string;
+  project: string | null; base: number; vat: number; status: string; filed: boolean; round: string; doc_href: string | null };
+const monthKey = (d: any) => String(d instanceof Date ? d.toISOString() : d).slice(0, 7);
+const roundName = (n: number) => (n === 0 ? 'ยื่นปกติ' : `ยื่นเพิ่มเติม-${n}`);
+const brOf = (b: string | null) => branchLabel({ branch_code: b && /^[0-9]{5}$/.test(b) ? b : null });
+const docHref = (t: string, id: string) => (t === 'EXP' ? `/expenses/${id}` : `/purchases/ri/${id}`);
+
+/** ภ.พ.30 ฝั่งซื้อ: ใบกำกับ ภ.พ.30 ที่รับแล้ว (+ แถวใบเสร็จสรรพากรของ ภ.พ.36 เมื่อ withRd) · รอบ/สถานะรายเอกสารจากแบบที่ติ๊กเลือก (pp30_filing_docs) ไม่อยู่ในแบบ = รอยื่นรอบถัดไป */
+export async function inputTaxPp30Rows(db: Db, range: [string, string] | null, fs: string, withRd: boolean): Promise<InputTaxRow[]> {
+  const f = await db.q<any>(`select id, period_month, seq, status from pp30_filings where status = 'filed'`);
+  const nextSeq = (k: string) => f.filter(x => monthKey(x.period_month) === k).length;
+  const rnd = (k: string, seq: number) => `${k.slice(5, 7)}-${k.slice(0, 4)} (${roundName(seq)})`;
+  const fil = new Map<string, any>(f.map(x => [x.id, x]));
+  const inv = await db.q<any>(`select t.doc_type, t.doc_id, t.invoice_date, t.invoice_no, t.vendor_name, t.vendor_tax_id, t.branch, t.base_amount, t.vat_amount,
+      coalesce(e.exp_no, g.ri_no) doc_no, coalesce(e.project, g.project) project, d.filing_id
+    from purchase_tax_invoices t left join expenses e on t.doc_type = 'EXP' and e.id = t.doc_id left join goods_receipts g on t.doc_type = 'RI' and g.id = t.doc_id
+      left join pp30_filing_docs d on d.doc_type = t.doc_type and d.doc_id = t.doc_id
+    where t.vat_form = 'PP30' and ($1::date is null or t.invoice_date >= $1::date) and ($2::date is null or t.invoice_date <= $2::date)
+      and coalesce(e.status, g.status) not in ('rejected','cancelled') order by t.invoice_date, t.invoice_no`, [range?.[0] ?? null, range?.[1] ?? null]);
+  const out: InputTaxRow[] = inv.map(r => {
+    const k = monthKey(r.invoice_date), fl = r.filing_id ? fil.get(r.filing_id) : null;
+    return { kind: 'inv' as const, date: r.invoice_date, no: r.invoice_no, doc_no: r.doc_no, rd_date: null, rd_no: null, name: r.vendor_name, tax_id: r.vendor_tax_id, branch: brOf(r.branch), project: r.project ?? null,
+      base: Number(r.base_amount), vat: Number(r.vat_amount), filed: !!fl, status: fl ? 'ยื่นแบบภาษีแล้ว' : 'รอยื่นแบบภาษี', round: fl ? rnd(monthKey(fl.period_month), fl.seq) : rnd(k, nextSeq(k)), doc_href: docHref(r.doc_type, r.doc_id) };
+  });
+  if (withRd) {
+    const rd = await db.q<any>(`select d.doc_type, d.doc_id, d.rd_receipt_no, d.rd_receipt_date, d.base_amount, d.vat_amount, coalesce(e.exp_no, g.ri_no) doc_no, coalesce(e.project, g.project) project, p.filing_id
+      from pp36_filing_docs d join pp36_filings pf on pf.id = d.filing_id and pf.status = 'filed'
+        left join expenses e on d.doc_type = 'EXP' and e.id = d.doc_id left join goods_receipts g on d.doc_type = 'RI' and g.id = d.doc_id
+        left join pp30_filing_docs p on p.doc_type = d.doc_type and p.doc_id = d.doc_id
+      where d.rd_receipt_no is not null and ($1::date is null or d.rd_receipt_date >= $1::date) and ($2::date is null or d.rd_receipt_date <= $2::date) order by d.rd_receipt_date, d.rd_receipt_no`, [range?.[0] ?? null, range?.[1] ?? null]);
+    for (const r of rd) {
+      const k = monthKey(r.rd_receipt_date), fl = r.filing_id ? fil.get(r.filing_id) : null;
+      out.push({ kind: 'rd', date: r.rd_receipt_date, no: r.rd_receipt_no, doc_no: r.doc_no, rd_date: null, rd_no: null, name: 'กรมสรรพากร', tax_id: null, branch: '', project: r.project ?? null,
+        base: Number(r.base_amount), vat: Number(r.vat_amount), filed: !!fl, status: fl ? 'ยื่นแบบภาษีแล้ว' : 'รอยื่นแบบภาษี', round: fl ? rnd(monthKey(fl.period_month), fl.seq) : rnd(k, nextSeq(k)), doc_href: docHref(r.doc_type, r.doc_id) });
+    }
+    out.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }
+  return out.filter(r => !fs || (fs === 'filed') === r.filed);
+}
+
+/** ภ.พ.36: ใบกำกับของผู้ขายต่างประเทศ (vat_form = PP36) + เลขที่/วันที่ใบเสร็จสรรพากร · สถานะ ชำระภาษีแล้ว = แบบ ภ.พ.36 ที่ยื่นมีการชำระแล้ว */
+export async function inputTaxPp36Rows(db: Db, range: [string, string] | null, fs: string): Promise<InputTaxRow[]> {
+  const rows = await db.q<any>(`select t.doc_type, t.doc_id, t.invoice_date, t.invoice_no, t.vendor_name, t.vendor_tax_id, t.branch, t.base_amount, t.vat_amount,
+      coalesce(e.exp_no, g.ri_no) doc_no, coalesce(e.project, g.project) project, d.rd_receipt_no, d.rd_receipt_date, pf.paid_date
+    from purchase_tax_invoices t left join expenses e on t.doc_type = 'EXP' and e.id = t.doc_id left join goods_receipts g on t.doc_type = 'RI' and g.id = t.doc_id
+      left join pp36_filing_docs d on d.doc_type = t.doc_type and d.doc_id = t.doc_id left join pp36_filings pf on pf.id = d.filing_id and pf.status = 'filed'
+    where t.vat_form = 'PP36' and ($1::date is null or t.invoice_date >= $1::date) and ($2::date is null or t.invoice_date <= $2::date)
+      and coalesce(e.status, g.status) not in ('rejected','cancelled') order by t.invoice_date, t.invoice_no`, [range?.[0] ?? null, range?.[1] ?? null]);
+  return rows.map(r => ({ kind: 'inv' as const, date: r.invoice_date, no: r.invoice_no, doc_no: r.doc_no, rd_date: r.rd_receipt_date ?? null, rd_no: r.rd_receipt_no ?? null, name: r.vendor_name, tax_id: r.vendor_tax_id, branch: brOf(r.branch),
+    project: r.project ?? null, base: Number(r.base_amount), vat: Number(r.vat_amount), filed: !!r.paid_date, status: r.paid_date ? 'ชำระภาษีแล้ว' : 'รอชำระภาษี', round: '', doc_href: docHref(r.doc_type, r.doc_id) }))
+    .filter(r => !fs || (fs === 'paid') === r.filed);
+}

@@ -13,7 +13,11 @@ type Group = { key: string; label: string; c: string; href?: string; perms?: Per
 const R: Perm[] = ['reports.read'];
 const GROUPS: Group[] = [
   { key: 'home', label: 'ภาพรวม', c: 'var(--brand)', href: '/', perms: ['dash.view'] },
-  { key: 'fin', label: 'การเงิน', c: 'var(--teal)', href: '/bank', perms: ['bank.read'] },
+  { key: 'fin', label: 'การเงิน', c: 'var(--teal)', items: [
+    { href: '/bank', label: 'บัญชีธนาคาร/กระทบยอด', perms: ['bank.read'] },
+    { href: '/finance/petty-cash', label: 'เงินสดย่อย', perms: ['bank.read'] },
+    { href: '/finance/cheque', label: 'เช็คจ่าย', perms: ['bank.read'] },
+    { href: '/finance/credit-card', label: 'บัตรเครดิตจ่าย', perms: ['bank.read'] }] },
   { key: 'sales', label: 'เอกสารขาย', c: 'var(--green)', items: [
     { href: '/sales?type=QT', label: 'ใบเสนอราคา', perms: ['sales.read', 'quote.own'] },
     { href: '/sales?type=BL', label: 'ใบวางบิล', perms: ['sales.read'] },
@@ -63,6 +67,8 @@ const GROUPS: Group[] = [
     { head: 'บริหารภาษีมูลค่าเพิ่ม', href: '/tax/purchase-vat', label: 'จัดการเอกสารภาษีซื้อ', perms: R },
     { href: '/tax/filings', label: 'เตรียมแบบภาษีรายเดือน (ภ.พ.30)', perms: R },
     { href: '/reports/output-tax', label: 'รายงานภาษีขาย ภ.พ.30', perms: R },
+    { href: '/reports/input-tax', label: 'รายงานภาษีซื้อ ภ.พ.30', perms: R },
+    { href: '/reports/foreign-input-tax', label: 'รายงานภาษีซื้อ ภ.พ.36', perms: R },
     { head: 'หัก ณ ที่จ่าย', href: '/tax/wht-submission', label: 'ยื่นหัก ณ ที่จ่ายออนไลน์', perms: R }] },
   { key: 'set', label: 'ตั้งค่า', c: 'var(--grey)', items: [
     { href: '/settings/company', label: 'ข้อมูลบริษัท', perms: ['settings.company'] },

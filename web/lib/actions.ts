@@ -150,11 +150,26 @@ export const resetGoodsReceipt = async (id: string) => run(call('select reset_go
 export const cancelGoodsReceipt = async (id: string) => run(call('select cancel_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.write');
 export const payGoodsReceipt = async (id: string, payments?: PurchasePay[], shortReason?: string) =>
   run(call('select pay_goods_receipt($1,$2::date,$3::jsonb,$4)', id, today(), payJson(payments), shortReason ?? null), [...ALL, '/purchases'], 'expenses.write');
+const FIN = ['/finance/petty-cash', '/finance/credit-card', '/finance/cheque', '/bank'];
 export const createPettyFund = async (p: { name: string; limit: number; responsible: string }) =>
-  run(call('select create_petty_fund($1,$2,$3)', p.name, p.limit, p.responsible || null), ['/expenses', '/purchases'], 'master.write');
+  run(call('select create_petty_fund($1,$2,$3)', p.name, p.limit, p.responsible || null), ['/expenses', '/purchases', ...FIN], 'master.write');
 export const createCreditCard = async (p: { bank: string; last4: string; holder: string; name: string; limit: number; statementDay: number; dueDay: number }) =>
   run(call('select create_credit_card($1,$2,$3,$4,$5,$6,$7)', p.bank, p.last4, p.holder, p.name, p.limit, p.statementDay, p.dueDay),
-    ['/expenses', '/purchases'], 'master.write');
+    ['/expenses', '/purchases', ...FIN], 'master.write');
+// เมนูการเงิน (M27.9): เติมเงินสดย่อย · แก้ไข/ไม่ใช้งาน/ลบ ของเงินสดย่อย บัตรเครดิต และบัญชีเช็คจ่าย
+export const topupPetty = async (p: { id: string; date: string; amount: number; from: string }) =>
+  run(call('select topup_petty_fund($1,$2::date,$3,$4)', p.id, p.date || today(), p.amount, p.from), [...FIN, ...ALL], 'bank.write');
+export const updatePetty = async (p: { id: string; name: string; limit: number; responsible: string }) =>
+  run(call('select update_petty_fund($1,$2,$3,$4)', p.id, p.name, p.limit, p.responsible || null), FIN, 'master.write');
+export const setPettyActive = async (id: string, active: boolean) => run(call('select set_petty_fund_active($1,$2)', id, active), FIN, 'master.write');
+export const deletePetty = async (id: string) => run(call('select delete_petty_fund($1)', id), FIN, 'master.write');
+export const updateCard = async (p: { id: string; bank: string; last4: string; holder: string; name: string; limit: number; statementDay: number; dueDay: number }) =>
+  run(call('select update_credit_card($1,$2,$3,$4,$5,$6,$7,$8)', p.id, p.bank, p.last4, p.holder, p.name, p.limit, p.statementDay, p.dueDay), FIN, 'master.write');
+export const setCardActive = async (id: string, active: boolean) => run(call('select set_credit_card_active($1,$2)', id, active), FIN, 'master.write');
+export const deleteCard = async (id: string) => run(call('select delete_credit_card($1)', id), FIN, 'master.write');
+export const addChequeAccount = async (bank: string) => run(call('select add_cheque_account($1)', bank), FIN, 'master.write');
+export const setChequeActive = async (bank: string, active: boolean) => run(call('select set_cheque_account_active($1,$2)', bank, active), FIN, 'master.write');
+export const deleteChequeAccount = async (bank: string) => run(call('select delete_cheque_account($1)', bank), FIN, 'master.write');
 export const resetExpense = async (id: string) => run(call('select reset_expense($1)', id), ALL, 'expenses.write');
 export const cancelExpense = async (id: string) => run(call('select cancel_expense($1)', id), ALL, 'expenses.write');
 

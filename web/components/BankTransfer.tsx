@@ -4,17 +4,18 @@ import { useRouter } from 'next/navigation';
 import { bankTransfer } from '@/lib/actions';
 
 // โอนเงินระหว่างบัญชี (เงินสด ↔ ธนาคาร ↔ ธนาคาร) ค่าธรรมเนียมจ่ายจากบัญชีต้นทาง
-export function BankTransfer({ accounts }: { accounts: { code: string; label: string }[] }) {
+export function BankTransfer({ accounts, from, to, startOpen = false, onClose, label = 'โอนเงินระหว่างบัญชี' }:
+  { accounts: { code: string; label: string }[]; from?: string; to?: string; startOpen?: boolean; onClose?: () => void; label?: string }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [pending, start] = useTransition();
-  const [v, setV] = useState({ from: accounts[0]?.code ?? '', to: accounts[1]?.code ?? '', date: '', amount: '', fee: '' });
+  const [v, setV] = useState({ from: from ?? accounts[0]?.code ?? '', to: to ?? accounts[1]?.code ?? '', date: '', amount: '', fee: '' });
   const [err, setErr] = useState<string | null>(null);
-  if (!open) return <button className="btn ghost" onClick={() => setOpen(true)}>โอนเงินระหว่างบัญชี</button>;
+  if (!open) return <button className="btn ghost" onClick={() => setOpen(true)}>{label}</button>;
   const go = () => start(async () => {
     const r = await bankTransfer({ from: v.from, to: v.to, date: v.date, amount: Number(v.amount), fee: Number(v.fee || 0) });
     if (r.error) return setErr(r.error);
-    setOpen(false); setErr(null); setV({ ...v, amount: '', fee: '' }); router.refresh();
+    setOpen(false); onClose?.(); setErr(null); setV({ ...v, amount: '', fee: '' }); router.refresh();
   });
   const sel = (k: 'from' | 'to') => (
     <select value={v[k]} onChange={e => setV({ ...v, [k]: e.target.value })}>
@@ -30,7 +31,7 @@ export function BankTransfer({ accounts }: { accounts: { code: string; label: st
       </div>
       {err && <div className="notice" role="alert" style={{ borderLeftColor: 'var(--red)' }}>{err}</div>}
       <button className="btn" disabled={pending || !v.amount} onClick={go}>{pending ? 'กำลังบันทึก...' : 'โอนเงิน'}</button>{' '}
-      <button className="btn ghost" onClick={() => setOpen(false)}>ปิด</button>
+      <button className="btn ghost" onClick={() => { setOpen(false); onClose?.(); }}>ปิด</button>
     </div>
   );
 }
