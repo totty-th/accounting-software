@@ -43,7 +43,7 @@ export async function GET(req: Request) {
   for (const r of rows) {
     const cancelled = r.status === 'cancelled', f = filing(dateIso(r.date), r.created_at);
     const st = mode === 'output' ? f.status : STATUS[r.status]?.[0] ?? r.status;
-    const base = [++n, xDate(r.date), r.no, r.ref_no ?? '', r.name, '', r.tax_id ?? null, r.branch];
+    const base = [++n, xDate(r.date), r.no, r.ref_no ?? '', r.name, r.project ?? '', r.tax_id ?? null, r.branch];
     if (mode === 'rate') ws.addRow([...base, r.sub, 0, 0, r.sub, r.vat, r.sub + r.vat, r.ref_no ?? '', st]);
     else ws.addRow([...base, r.sub, r.vat, r.ref_no ?? '', st, ...(mode === 'output' ? [f.round] : [])]);
     if (!cancelled) { ts += r.sub; tv += r.vat; }

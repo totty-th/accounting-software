@@ -48,7 +48,7 @@ export default async function SalesTax({ searchParams }: { searchParams: Sp & { 
                 <tr style={r.status === 'cancelled' ? { opacity: .55 } : undefined}>
                   <td>{dateTh(r.date)}</td>
                   <td className="no"><Dot s={r.status} /><Link href={`/sales/${r.no}`}>{r.no}</Link>{r.deposit && <span className="sub"> (มัดจำ)</span>}<RelPop rel={r.rel} extra={r.status === 'cancelled' ? undefined : `ภ.พ.30 ${f.round} · ${f.status}`} /></td>
-                  <td>{r.name}</td><td>{r.tax_id ?? ''}</td><td>{r.branch}</td>
+                  <td>{r.name}{r.project && <span className="sub"> · {r.project}</span>}</td><td>{r.tax_id ?? ''}</td><td>{r.branch}</td>
                   <td className="num">{money(r.sub)}</td><td className="num">{money(r.vat)}</td>
                   <td><Kebab print={`/sales/${r.no}/pdf`} download={`/sales/${r.no}/pdf?download=1`} /></td></tr>
                 <tr className="ratesub"><td colSpan={4} /><td className="num">7%</td><td className="num">{money(r.sub)}</td><td colSpan={2} /></tr>

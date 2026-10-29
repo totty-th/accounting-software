@@ -24,16 +24,16 @@ export async function filingInfo(db: Db) {
 }
 
 export type SalesTaxRow = { id: string; no: string; type: string; date: string; status: string; name: string; tax_id: string | null; branch: string;
-  ref_no: string | null; sub: number; vat: number; created_at: any; deposit: boolean; rel: { no: string; kind: string; href: string }[] };
+  ref_no: string | null; project: string | null; sub: number; vat: number; created_at: any; deposit: boolean; rel: { no: string; kind: string; href: string }[] };
 
 export async function salesTaxRows(db: Db, range: [string, string] | null, statuses: string[], withCancel: boolean): Promise<SalesTaxRow[]> {
   const rows = await db.q<any>(`select d.id, d.doc_no no, d.doc_type type, d.doc_date date, d.status, d.created_at, d.is_deposit deposit,
-      coalesce(c.business_name, c.contact_name, '-') name, c.tax_id, c.branch_code, c.is_cash_default, ref.doc_no ref_no,
+      coalesce(c.business_name, c.contact_name, '-') name, c.tax_id, c.branch_code, c.is_cash_default, ref.doc_no ref_no, d.project,
       d.subtotal * (case when d.doc_type = 'CN' then -1 else 1 end) sub, d.vat * (case when d.doc_type = 'CN' then -1 else 1 end) vat
     from sales_docs d join contacts c on c.id = d.contact_id left join sales_docs ref on ref.id = d.ref_doc_id
     where d.doc_type = any($4::text[]) and ($1::date is null or d.doc_date >= $1::date) and ($2::date is null or d.doc_date <= $2::date)
       and ${withCancel ? 'true' : `d.status <> 'cancelled'`} and (cardinality($3::text[]) = 0 or d.status = any($3::text[]))
-    order by ${TYPE_ORDER}, d.doc_no`, [range?.[0] ?? null, range?.[1] ?? null, pgArr(statuses), pgArr(SALES_TAX_TYPES)]);
+    order by ${TYPE_ORDER}, d.doc_no desc`, [range?.[0] ?? null, range?.[1] ?? null, pgArr(statuses), pgArr(SALES_TAX_TYPES)]);
   const m = await related(db, 'sales', rows.map(r => r.id));
   return rows.map(r => ({ ...r, branch: branchLabel(r), sub: Number(r.sub), vat: Number(r.vat), rel: m.get(r.id) ?? [] }));
 }
