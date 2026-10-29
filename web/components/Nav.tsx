@@ -40,6 +40,8 @@ const ITEMS: [string, string, string, string, Perm[]][] = [
   ['/reports/sales-tax', 'ภาษีขายตามเอกสาร', 'var(--red)', '', ['reports.read']],
   ['/reports/purchase-tax', 'ภาษีซื้อ', 'var(--red)', '', ['reports.read']],
   ['/reports/wht', 'ภาษีหัก ณ ที่จ่าย', 'var(--red)', '', ['reports.read']],
+  ['/reports/projects', 'โปรเจ็ค', 'var(--red)', '', ['reports.read']],
+  ['/reports/inventory', 'สรุปสินค้าคงเหลือ', 'var(--red)', '', ['reports.read']],
   ['/contacts', 'สมุดรายชื่อ', 'var(--grey)', 'ข้อมูลหลัก', ['master.read']],
   ['/products', 'สินค้า', 'var(--grey)', '', ['master.read']],
   ['/admin/users', 'ผู้ใช้และสิทธิ์', 'var(--grey)', 'ผู้ดูแลระบบ', ['users.manage']],

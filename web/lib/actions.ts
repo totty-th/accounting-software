@@ -505,3 +505,8 @@ export async function resetPp36Payment(id: string) { return run(call('select res
 export async function deletePp36(id: string) { return run(call('select delete_pp36($1)', id), PP36_PATHS, 'accounts.write'); }
 
 export async function setPp36Receipt(type: string, id: string, no: string, date: string) { return run(call('select set_pp36_receipt($1,$2,$3,$4::date)', type, id, no, date || null), [...PP36_PATHS, '/tax/purchase-vat'], 'accounts.write'); }
+
+// ===== M27.6 โปรเจ็ค =====
+export async function createProject(name: string, contact: string) { return run(call('select create_project($1,$2::uuid)', name, contact || null), ['/reports/projects'], 'accounts.write'); }
+export async function updateProject(id: string, name: string, contact: string) { return run(call('select update_project($1,$2,$3::uuid)', id, name, contact || null), ['/reports/projects'], 'accounts.write'); }
+export async function deleteProject(id: string) { return run(call('select delete_project($1)', id), ['/reports/projects'], 'accounts.write'); }
