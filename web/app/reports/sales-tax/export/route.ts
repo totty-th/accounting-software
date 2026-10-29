@@ -21,8 +21,10 @@ export async function GET(req: Request) {
   const period = reportPeriod(g('period')), range = periodRange(period, today(), g('from'), g('to'));
   const { sel, list } = pickStatuses(u.searchParams.getAll('st'), SALES_BUCKETS);
   const db = await getDb();
-  const rows = await salesTaxRows(db, range, list, mode !== 'output' && (sel.length === 0 || list.includes('cancelled')));
+  const all = await salesTaxRows(db, range, list, mode !== 'output' && (sel.length === 0 || list.includes('cancelled')));
   const filing = await filingInfo(db);
+  const fs = g('fs');
+  const rows = !fs || mode !== 'output' ? all : all.filter(r => (fs === 'filed') === (filing(dateIso(r.date), r.created_at).status === 'ยื่นแบบภาษีแล้ว'));
   const co = await companyOf(db);
   const month = taxPeriodLabel(range);
   const wb = new ExcelJS.Workbook();

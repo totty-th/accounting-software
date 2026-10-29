@@ -38,6 +38,7 @@ const ITEMS: [string, string, string, string, Perm[]][] = [
   ['/reports/purchases', 'รายงานซื้อ/ค่าใช้จ่าย', 'var(--red)', '', ['reports.read']],
   ['/reports/payments', 'รายงานการชำระเงิน', 'var(--red)', '', ['reports.read']],
   ['/reports/sales-tax', 'ภาษีขายตามเอกสาร', 'var(--red)', '', ['reports.read']],
+  ['/reports/output-tax', 'ภาษีขาย ภ.พ.30', 'var(--red)', '', ['reports.read']],
   ['/reports/purchase-tax', 'ภาษีซื้อ', 'var(--red)', '', ['reports.read']],
   ['/reports/wht', 'ภาษีหัก ณ ที่จ่าย', 'var(--red)', '', ['reports.read']],
   ['/reports/projects', 'โปรเจ็ค', 'var(--red)', '', ['reports.read']],
