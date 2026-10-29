@@ -490,3 +490,9 @@ export async function payPp30(id: string, date: string, account: string) { retur
 export async function resetPp30Payment(id: string) { return run(call('select reset_pp30_payment($1)', id), TAX_PATHS, 'accounts.write'); }
 export async function setPp30Refund(id: string, recorded: boolean) { return run(call('select set_pp30_refund($1,$2)', id, recorded), TAX_PATHS, 'accounts.write'); }
 export async function deletePp30(id: string) { return run(call('select delete_pp30($1)', id), TAX_PATHS, 'accounts.write'); }
+
+// ===== M27.5 จัดการเอกสารภาษีซื้อ (สถานะใบกำกับภาษีต่อเอกสาร) =====
+export async function setPurchaseVatStatus(type: string, id: string, status: string, inv?: { invoice_no?: string; invoice_date?: string }) {
+  return run(call('select set_purchase_vat_status($1,$2,$3,$4::jsonb)', type, id, status, JSON.stringify(inv ?? {})),
+    ['/tax/purchase-vat', '/reports/purchase-tax', '/expenses', '/purchases'], 'accounts.write');
+}
