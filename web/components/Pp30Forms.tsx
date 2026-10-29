@@ -3,15 +3,27 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { filePp30, payPp30, filePp36, payPp36 } from '@/lib/actions';
 
-/** สร้างแบบ ภ.พ.30 ของเดือนที่เลือก (ย้ายภาษีซื้อ + หักกลบภาษีขาย ลงวันสิ้นเดือน) */
-export function Pp30Create({ defaultMonth }: { defaultMonth: string }) {
-  const r = useRouter(); const [m, setM] = useState(defaultMonth); const [err, setErr] = useState<string | null>(null); const [p, start] = useTransition();
+export type Pp30Doc = { type: string; id: string; date: string; inv: string; vendor: string; vat: number; form: 'PP30' | 'PP36'; rd?: string };
+
+/** เตรียมแบบ ภ.พ.30 (แบบ FA): ภาษีขายของเดือนอัตโนมัติ · ติ๊กเลือกใบกำกับภาษีซื้อที่จะใช้สิทธิ์ · ยื่นซ้ำเดือนเดิมได้ (ยื่นเพิ่มเติม) */
+export function Pp30Create({ month, docs, outputVat }: { month: string; docs: Pp30Doc[]; outputVat: number }) {
+  const r = useRouter(); const [sel, setSel] = useState<string[]>([]); const [err, setErr] = useState<string | null>(null); const [p, start] = useTransition();
+  const key = (d: Pp30Doc) => `${d.type}:${d.id}`;
+  const chosen = docs.filter(d => sel.includes(key(d)));
+  const inp = Math.round(chosen.reduce((s, d) => s + d.vat, 0) * 100) / 100, net = Math.round((outputVat - inp) * 100) / 100;
+  const f = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2 });
   return (
-    <div className="panel"><b>เตรียมแบบ ภ.พ.30</b>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap' }}>
-        <label className="f">เดือนภาษี<input type="month" value={m} onChange={e => setM(e.target.value)} /></label>
-        <button className="btn" disabled={p || !m} onClick={() => start(async () => { const x = await filePp30(m); if (x.error) setErr(x.error); else { setErr(null); r.refresh(); } })}>สร้างแบบ</button></div>
-      {err && <div className="err" role="alert">{err}</div>}</div>
+    <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
+      <table><thead><tr><th style={{ width: 30 }}><input type="checkbox" aria-label="เลือกทั้งหมด" checked={docs.length > 0 && sel.length === docs.length} onChange={e => setSel(e.target.checked ? docs.map(key) : [])} /></th>
+        <th>วันที่ใบกำกับ</th><th>เลขที่ใบกำกับ</th><th>ผู้จำหน่าย</th><th>แบบ</th><th className="num">ภาษีมูลค่าเพิ่ม</th></tr></thead>
+        <tbody>{docs.map(d => <tr key={key(d)}><td><input type="checkbox" aria-label={`เลือก ${d.inv}`} checked={sel.includes(key(d))} onChange={e => setSel(e.target.checked ? [...sel, key(d)] : sel.filter(x => x !== key(d)))} /></td>
+          <td>{d.date}</td><td className="no">{d.inv}{d.rd && <small> · ใบเสร็จ {d.rd}</small>}</td><td>{d.vendor}</td><td>{d.form === 'PP36' ? 'ภ.พ.36' : 'ภ.พ.30'}</td><td className="num">{f(d.vat)}</td></tr>)}
+          {docs.length === 0 && <tr><td colSpan={6} className="empty">ไม่มีใบกำกับภาษีซื้อที่รอใช้สิทธิ์ในเดือนนี้ (รับใบกำกับที่หน้า จัดการเอกสารภาษีซื้อ · ภ.พ.36 ต้องชำระและบันทึกใบเสร็จสรรพากรก่อน)</td></tr>}</tbody></table>
+      <div style={{ padding: 10, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span>ภาษีขายที่ยังไม่ยื่น {f(outputVat)}</span><span>ภาษีซื้อที่เลือก {f(inp)}</span><b>{net >= 0 ? `ภาษีที่ต้องชำระ ${f(net)}` : `ภาษีที่ขอคืน ${f(-net)}`}</b>
+        <button className="btn" disabled={p || (chosen.length === 0 && outputVat === 0)} onClick={() => start(async () => { const x = await filePp30(month, chosen.map(d => ({ type: d.type, id: d.id }))); if (x.error) setErr(x.error); else { setErr(null); setSel([]); r.refresh(); } })}>บันทึกแบบยื่นภาษี</button>
+        {err && <span className="err" role="alert">{err}</span>}</div>
+    </div>
   );
 }
 export function Pp30Pay({ id, accounts, defaultDate, kind = '30' }: { kind?: '30' | '36'; id: string; accounts: { code: string; name: string }[]; defaultDate: string }) {

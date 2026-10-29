@@ -485,7 +485,7 @@ export async function resetYearClose(year: number) {
 
 // ===== M27.5 เตรียมแบบภาษีรายเดือน (ภ.พ.30) =====
 const TAX_PATHS = ['/tax/filings', '/reports/purchase-tax', '/reports/sales-tax', '/journals', '/ledger/transactions', '/reports/trial-balance', '/reports/balance-sheet'];
-export async function filePp30(month: string) { return run(call('select file_pp30($1::date)', `${month}-01`), TAX_PATHS, 'accounts.write'); }
+export async function filePp30(month: string, docs?: { type: string; id: string }[]) { return run(docs ? call('select file_pp30($1::date,$2::jsonb)', `${month}-01`, JSON.stringify(docs)) : call('select file_pp30($1::date)', `${month}-01`), TAX_PATHS, 'accounts.write'); }
 export async function payPp30(id: string, date: string, account: string) { return run(call('select pay_pp30($1,$2::date,$3)', id, date, account), TAX_PATHS, 'accounts.write'); }
 export async function resetPp30Payment(id: string) { return run(call('select reset_pp30_payment($1)', id), TAX_PATHS, 'accounts.write'); }
 export async function setPp30Refund(id: string, recorded: boolean) { return run(call('select set_pp30_refund($1,$2)', id, recorded), TAX_PATHS, 'accounts.write'); }
@@ -503,3 +503,5 @@ export async function filePp36(month: string, docs: { type: string; id: string }
 export async function payPp36(id: string, date: string, account: string) { return run(call('select pay_pp36($1,$2::date,$3)', id, date, account), PP36_PATHS, 'accounts.write'); }
 export async function resetPp36Payment(id: string) { return run(call('select reset_pp36_payment($1)', id), PP36_PATHS, 'accounts.write'); }
 export async function deletePp36(id: string) { return run(call('select delete_pp36($1)', id), PP36_PATHS, 'accounts.write'); }
+
+export async function setPp36Receipt(type: string, id: string, no: string, date: string) { return run(call('select set_pp36_receipt($1,$2,$3,$4::date)', type, id, no, date || null), [...PP36_PATHS, '/tax/purchase-vat'], 'accounts.write'); }
