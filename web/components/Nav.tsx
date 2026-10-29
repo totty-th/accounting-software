@@ -25,6 +25,7 @@ const ITEMS: [string, string, string, string, Perm[]][] = [
   ['/settings/lock', 'ล็อกงวดบัญชี', 'var(--teal)', '', ['reports.read']],
   ['/settings/close-year', 'ปิดบัญชีสิ้นปี', 'var(--teal)', '', ['reports.read']],
   ['/tax/purchase-vat', 'จัดการเอกสารภาษีซื้อ', 'var(--teal)', '', ['reports.read']],
+  ['/tax/wht-submission', 'ยื่นหัก ณ ที่จ่ายออนไลน์', 'var(--teal)', '', ['reports.read']],
   ['/tax/filings', 'เตรียมแบบภาษีรายเดือน (ภ.พ.30)', 'var(--teal)', '', ['reports.read']],
   ['/reports/sales', 'รายงานขาย', 'var(--red)', 'รายงาน', ['reports.read']],
   ['/reports/billing', 'รายงานใบวางบิล', 'var(--red)', '', ['reports.read']],
