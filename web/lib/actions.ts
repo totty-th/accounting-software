@@ -492,7 +492,14 @@ export async function setPp30Refund(id: string, recorded: boolean) { return run(
 export async function deletePp30(id: string) { return run(call('select delete_pp30($1)', id), TAX_PATHS, 'accounts.write'); }
 
 // ===== M27.5 จัดการเอกสารภาษีซื้อ (สถานะใบกำกับภาษีต่อเอกสาร) =====
-export async function setPurchaseVatStatus(type: string, id: string, status: string, inv?: { invoice_no?: string; invoice_date?: string }) {
+export async function setPurchaseVatStatus(type: string, id: string, status: string, inv?: { invoice_no?: string; invoice_date?: string; vat_form?: string; base_amount?: number }) {
   return run(call('select set_purchase_vat_status($1,$2,$3,$4::jsonb)', type, id, status, JSON.stringify(inv ?? {})),
     ['/tax/purchase-vat', '/reports/purchase-tax', '/expenses', '/purchases'], 'accounts.write');
 }
+
+// ===== M27.5 ภ.พ.36 =====
+const PP36_PATHS = ['/tax/filings', '/tax/purchase-vat', '/reports/purchase-tax', '/journals', '/ledger/transactions', '/reports/trial-balance', '/reports/balance-sheet'];
+export async function filePp36(month: string, docs: { type: string; id: string }[]) { return run(call('select file_pp36($1::date,$2::jsonb)', `${month}-01`, JSON.stringify(docs)), PP36_PATHS, 'accounts.write'); }
+export async function payPp36(id: string, date: string, account: string) { return run(call('select pay_pp36($1,$2::date,$3)', id, date, account), PP36_PATHS, 'accounts.write'); }
+export async function resetPp36Payment(id: string) { return run(call('select reset_pp36_payment($1)', id), PP36_PATHS, 'accounts.write'); }
+export async function deletePp36(id: string) { return run(call('select delete_pp36($1)', id), PP36_PATHS, 'accounts.write'); }

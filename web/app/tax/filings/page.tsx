@@ -4,11 +4,11 @@ import { can } from '@/lib/permissions';
 import { getDb, today } from '@/lib/db';
 import { money } from '@/lib/format';
 import { ActionButton } from '@/components/ActionButton';
-import { Pp30Create, Pp30Pay } from '@/components/Pp30Forms';
-import { deletePp30, resetPp30Payment, setPp30Refund } from '@/lib/actions';
+import { Pp30Create, Pp30Pay, Pp36Create } from '@/components/Pp30Forms';
+import { deletePp30, resetPp30Payment, setPp30Refund, deletePp36, resetPp36Payment } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
-export default async function Filings() {
+export default async function Filings({ searchParams }: { searchParams: { form?: string; month?: string } }) {
   const user = await requirePage('reports.read');
   const db = await getDb();
   const rows = await db.q<any>(`select id, to_char(period_month,'MM-YYYY') m, period_month::text pm, output_vat::float8 o, input_vat::float8 i, result, amount::float8 amt,
@@ -17,9 +17,39 @@ export default async function Filings() {
   const canW = can(user.role, 'accounts.write');
   const prev = new Date(today() + 'T00:00:00Z'); prev.setUTCMonth(prev.getUTCMonth() - 1);
   const status = (r: any) => r.result === 'payable' ? (r.paid ? `ชำระภาษีแล้ว ${r.paid}` : 'รอชำระภาษี') : r.result === 'refund' ? (r.refund_recorded ? 'บันทึกขอคืนแล้ว' : 'รอขอคืน') : 'ไม่มียอดชำระ';
+  const is36 = searchParams.form === '36';
+  if (is36) {
+    const month = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : prev.toISOString().slice(0, 7);
+    const f36 = await db.q<any>(`select id, to_char(period_month,'MM-YYYY') m, base_amount::float8 b, vat_amount::float8 v, paid_date::text paid from pp36_filings where status='filed' order by period_month desc, created_at desc`);
+    const cand = (await db.q<any>(`select t.doc_type type, t.doc_id id, t.invoice_date::text date, t.invoice_no inv, t.vendor_name vendor, t.base_amount::float8 base, t.vat_amount::float8 vat
+        from purchase_tax_invoices t where t.vat_form='PP36' and to_char(t.invoice_date,'YYYY-MM')=$1
+         and not exists (select 1 from pp36_filing_docs f where f.doc_type=t.doc_type and f.doc_id=t.doc_id)
+         and not exists (select 1 from expenses e where t.doc_type='EXP' and e.id=t.doc_id and e.status in ('rejected','cancelled'))
+         and not exists (select 1 from goods_receipts g where t.doc_type='RI' and g.id=t.doc_id and g.status in ('rejected','cancelled'))
+         order by t.invoice_date, t.invoice_no`, [month]));
+    return (
+      <>
+        <div className="top"><div><h1>เตรียมแบบภาษีรายเดือน</h1><p className="sub">แบบ ภ.พ.36 (ซื้อสินค้า/บริการจากต่างประเทศ) · ฐานภาษี = มูลค่าที่จ่ายจริง VAT 7% · ลงบัญชีวันสิ้นเดือน (ตัด VAT เดิมเป็นต้นทุน + บันทึกเจ้าหนี้สรรพากร)</p></div></div>
+        <div className="tabs noprint"><Link href="/tax/filings">ภ.พ.30</Link><Link href="/tax/filings?form=36" className="on">ภ.พ.36</Link></div>
+        {canW && <>
+          <form className="row-inline" method="get"><input type="hidden" name="form" value="36" /><label className="f">เดือนที่ยื่นแบบ<input type="month" name="month" defaultValue={month} /></label><button className="btn">ดูใบกำกับ</button></form>
+          <Pp36Create month={month} docs={cand} /></>}
+        <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
+          <table><thead><tr><th>เดือนที่ยื่นแบบ</th><th>แบบ</th><th className="num">ยอดซื้อต่างประเทศ</th><th className="num">ภาษีที่ต้องชำระ</th><th>สถานะ</th><th /></tr></thead>
+            <tbody>{f36.map(r => <tr key={r.id}><td>{r.m}</td><td>ภ.พ.36</td><td className="num">{money(r.b)}</td><td className="num">{money(r.v)}</td><td>{r.paid ? `ชำระภาษีแล้ว ${r.paid}` : 'รอชำระภาษี'}</td>
+              <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{canW && <>
+                {!r.paid && r.v > 0 && <Pp30Pay kind="36" id={r.id} accounts={banks} defaultDate={today()} />}
+                {r.paid && <ActionButton action={resetPp36Payment.bind(null, r.id)} label="รีเซ็ตการชำระ" variant="ghost" confirmText="รีเซ็ตการบันทึกชำระ?" />}
+                {!r.paid && <ActionButton action={deletePp36.bind(null, r.id)} label="ลบแบบ" variant="danger" confirmText="ลบแบบ? รายการบัญชีของแบบจะถูกกลับรายการ (-R)" />}</>}</td></tr>)}
+              {f36.length === 0 && <tr><td colSpan={6} className="empty">ยังไม่มีแบบ ภ.พ.36</td></tr>}</tbody></table>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div className="top"><div><h1>เตรียมแบบภาษีรายเดือน</h1><p className="sub">แบบ ภ.พ.30 รายเดือน · ย้ายภาษีซื้อและหักกลบภาษีขาย ลงบัญชีวันสิ้นเดือน · ดูรายละเอียดที่ <Link href="/reports/sales-tax">ภาษีขาย</Link> / <Link href="/reports/purchase-tax">ภาษีซื้อ</Link></p></div></div>
+      <div className="tabs noprint"><Link href="/tax/filings" className="on">ภ.พ.30</Link><Link href="/tax/filings?form=36">ภ.พ.36</Link></div>
       {canW && <Pp30Create defaultMonth={prev.toISOString().slice(0, 7)} />}
       <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
         <table><thead><tr><th>เดือนที่ยื่นแบบ</th><th>แบบ</th><th className="num">ภาษีขาย</th><th className="num">ภาษีซื้อ</th><th className="num">ภาษีที่ต้องชำระ / ขอคืน</th><th>สถานะ</th><th /></tr></thead>

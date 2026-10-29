@@ -1,1 +1,1 @@
-export const VAT_STATUS: [string, string][] = [['wait', 'รอใบกำกับภาษี'], ['received', 'รับใบกำกับภาษีแล้ว'], ['pp36', 'รอยื่น ภ.พ.36'], ['receipt', 'รอใบเสร็จรับเงิน'], ['waived', 'ไม่ใช้สิทธิขอคืน']];
+export const VAT_STATUS: [string, string][] = [['wait', 'รอใบกำกับภาษี'], ['received', 'รับใบกำกับภาษีแล้ว'], ['waived', 'ไม่ใช้สิทธิขอคืน']];

@@ -42,11 +42,11 @@ export const totals = (rows: { status: string; sub: number; vat: number }[]) =>
 
 // ---------- ภาษีซื้อตามเอกสาร (RI / EXP ที่มี VAT) ----------
 export type PurchaseTaxRow = { id: string; no: string; kind: 'RI' | 'EXP'; date: string; status: string; ref_no: string | null; name: string; tax_id: string | null;
-  inv_no: string | null; vat_form: string | null; inv_date: string | null; branch: string; sub: number; vat: number; created_at: any; href: string; rel: { no: string; kind: string; href: string }[] };
+  inv_no: string | null; vat_form: string | null; inv_date: string | null; inv_base: number | null; inv_vat: number | null; branch: string; sub: number; vat: number; created_at: any; href: string; rel: { no: string; kind: string; href: string }[] };
 
 export async function purchaseTaxRows(db: Db, range: [string, string] | null, statuses: string[], withCancel: boolean): Promise<PurchaseTaxRow[]> {
   const rows = await db.q<any>(`select d.*, coalesce(c.business_name, c.contact_name, '-') name, coalesce(t.vendor_tax_id, c.tax_id) tax_id, c.branch_code, c.is_cash_default,
-      t.invoice_no inv_no, t.vat_form, t.invoice_date inv_date from (
+      t.invoice_no inv_no, t.vat_form, t.invoice_date inv_date, t.base_amount inv_base, t.vat_amount inv_vat from (
         select 'RI' kind, g.id, g.ri_no no, g.ri_date date, g.contact_id, g.status, g.subtotal sub, g.vat, g.created_at, (select po.po_no from purchase_orders po where po.id = g.po_id) ref_no from goods_receipts g
         union all select 'EXP', e.id, e.exp_no, e.exp_date, e.contact_id, e.status, e.subtotal, e.vat, e.created_at, null from expenses e) d
       join contacts c on c.id = d.contact_id left join purchase_tax_invoices t on t.doc_type = d.kind and t.doc_id = d.id

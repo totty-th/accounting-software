@@ -1,9 +1,9 @@
 -- M27.5 จัดการเอกสารภาษีซื้อ (REA FA 29-10-2026): สถานะใบกำกับภาษีต่อเอกสาร RI/EXP ที่มี VAT
--- สถานะ: wait รอใบกำกับฯ (ค่าเริ่มต้น) · received รับใบกำกับฯ (มีข้อมูลใน purchase_tax_invoices) · pp36 รอยื่น ภ.พ.36 · receipt รอใบเสร็จ · waived ไม่ใช้สิทธิขอคืน
--- "ยื่นแบบแล้ว" คำนวณจากแบบ ภ.พ.30 ที่ยื่นแล้ว (ไม่เก็บ) · ป้ายสถานะไม่ลงบัญชี
+-- ตั้งสถานะเองได้ 3 แบบตาม FA: wait รอใบกำกับฯ (ค่าเริ่มต้น) · received รับใบกำกับฯ (มีข้อมูลใน purchase_tax_invoices) · waived ไม่ใช้สิทธิขอคืน
+-- "รอยื่น ภ.พ.36" เกิดจากการรับใบกำกับแบบ ภ.พ.36 · "ยื่นแบบแล้ว" คำนวณจากแบบ ภ.พ.30/ภ.พ.36 ที่ยื่น (ไม่เก็บ) · ป้ายสถานะไม่ลงบัญชี
 create table purchase_vat_flags (
   doc_type text not null check (doc_type in ('EXP','RI')), doc_id uuid not null,
-  flag text not null check (flag in ('pp36','receipt','waived')),
+  flag text not null check (flag in ('waived')),
   updated_at timestamptz not null default now(),
   primary key (doc_type, doc_id)
 );
@@ -22,7 +22,7 @@ begin
   elsif p_status = 'wait' then
     perform clear_purchase_tax_invoice(p_type, p_doc);
     delete from purchase_vat_flags where doc_type = p_type and doc_id = p_doc;
-  elsif p_status in ('pp36','receipt','waived') then
+  elsif p_status = 'waived' then
     insert into purchase_vat_flags(doc_type, doc_id, flag) values (p_type, p_doc, p_status)
     on conflict (doc_type, doc_id) do update set flag = excluded.flag, updated_at = now();
   else raise exception 'สถานะไม่ถูกต้อง'; end if;
