@@ -16,6 +16,7 @@ import { requirePage, canViewSalesDoc } from '@/lib/auth';
 import { can } from '@/lib/permissions';
 import { NoteBox, FileUpload, FileRemove, WhtPick, DeliveryForm } from '@/components/DocExtras';
 import { STATUS } from '@/lib/status';
+import { CashCollectForm } from '@/components/CashCollectForm';
 
 const EV: Record<string, string> = { delivery: 'แก้ข้อมูลจัดส่ง', created: 'สร้างเอกสาร', status: 'เปลี่ยนสถานะ', note: 'แก้ไขโน้ตภายใน', file_added: 'แนบไฟล์', file_removed: 'ลบไฟล์แนบ', wht: 'เปลี่ยนอัตราหัก ณ ที่จ่าย' };
 
@@ -31,6 +32,8 @@ export default async function SalesDetail({ params }: { params: { id: string } }
   const h = headers(), host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
   const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
   const link = tok ? `${proto}://${host}/s/${tok}` : null;
+  const banks = (await db.q<{ id: string; bank_name: string; account_no: string }>(
+    `select b.id, b.bank_name, b.account_no from bank_accounts b join accounts a on a.id=b.account_id where b.is_active order by a.code`)).map(b => ({ id: b.id, label: `${b.bank_name} ${b.account_no}` }));
   const x = (await db.q<any>('select internal_note, wht_rate from sales_docs where id=$1', [v.doc.id]))[0];
   const files = await db.q<any>('select id, filename, size from sales_doc_files where doc_id=$1 order by created_at', [v.doc.id]);
   const events = await db.q<any>(`select e.event, e.detail, e.at, u.display_name from doc_events e left join app_users u on u.id=e.actor_id
@@ -56,7 +59,7 @@ export default async function SalesDetail({ params }: { params: { id: string } }
       <div className="top noprint">
         <div><h1>{v.doc.doc_no} <Pill s={v.doc.status} /></h1>
           <p className="sub"><Link href={`/sales?type=${v.doc.doc_type}`}>← {DOC_TYPE[v.doc.doc_type]}</Link></p></div>
-        <ActsMenu>
+        <ActsMenu dropdown>
           <PrintButton />
           <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf`}>ดาวน์โหลด PDF</a>
           <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a>
@@ -67,6 +70,7 @@ export default async function SalesDetail({ params }: { params: { id: string } }
       <div className="detail">
         <DocSheet v={v} />
         <aside className="side-panels noprint">
+          {can(user.role, 'sales.write') && v.doc.doc_type === 'CA' && v.doc.status === 'pending_collect' && <CashCollectForm id={v.doc.id} total={+v.doc.total} banks={banks} />}
           <section className="panel">
             <h3>ลิงก์แชร์</h3>
             {link ? (

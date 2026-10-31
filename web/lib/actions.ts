@@ -134,7 +134,7 @@ export const quoteToInvoice = async (id: string) => run(call('select quotation_t
 export const createDeposit = async (id: string, net: number, kind: 'INV' | 'CA' | 'BL' = 'INV') => run(u => callAs(u.id, 'create_deposit_doc($1,$2,$3::date,$4::numeric)', id, kind, today(), net), ALL, 'sales.write');
 export const createFinalInvoice = async (id: string, kind: 'INV' | 'CA' | 'BL' = 'INV') => run(u => callAs(u.id, 'create_final_invoice($1,$2::date,$3)', id, today(), kind), ALL, 'sales.write');
 export const convertDepositBl = async (id: string) => run(u => callAs(u.id, 'convert_deposit_bl($1,$2::date)', id, today()), ALL, 'sales.write');
-export const collectCash = async (id: string) => run(call('select collect_cash_sale($1,$2::date)', id, today()), ALL, 'sales.write');
+export const collectCash = async (id: string, bankAccountId?: string) => run(call('select collect_cash_sale($1,$2::date,$3::uuid)', id, today(), bankAccountId ?? null), ALL, 'sales.write');
 export const resetCash = async (id: string) => run(call('select reset_cash_sale($1)', id), ALL, 'sales.write');
 
 export const createReceipt = async (inv: string) => run(call('select create_receipt_from_invoice($1,$2::date)', inv, today()), ALL, 'receipts.write');

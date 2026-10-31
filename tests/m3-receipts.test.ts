@@ -185,6 +185,15 @@ describe('SAL-07 ขายสด เก็บเงิน/รีเซ็ต/ย
     const tb = await one<any>(`select coalesce(sum(abs(closing)),0) s from trial_balance('2026-10-01','2026-10-31',false)`);
     expect(+tb.s).toBe(0);
   });
+  it('M27.11: เก็บเงินเลือกช่องทาง — โอนเข้าบัญชีธนาคารที่เลือก · ไม่ระบุ = 11112 · บัญชีไม่มี = ข้อความไทย', async () => {
+    const acc = (await one<any>(`insert into accounts(code,name,type) values ('11121','ธนาคารทดสอบ','asset') returning id`)).id;
+    const bk = (await one<any>(`insert into bank_accounts(account_id,bank_name,account_no,account_name) values ($1,'ธ.ทดสอบ','111','บ') returning id`, [acc])).id;
+    const ca = (await one<{ id: string }>(`select create_sales_doc('CA',$1::date,null,$2::jsonb) as id`, [D, JSON.stringify(svc(1000))])).id;
+    expect(await err(db.query('select collect_cash_sale($1,$2::date,$3::uuid)', [ca, D, '00000000-0000-0000-0000-000000000000']))).toContain('ไม่พบบัญชีธนาคาร');
+    await call('select collect_cash_sale($1,$2::date,$3::uuid)', [ca, D, bk]);
+    expect(await entries((await sd(ca)).collect_voucher_id)).toEqual([['11121', 1070, 0], ['11319', 0, 1070]]);
+    await call('select reset_cash_sale($1)', [ca]); await call('select cancel_sales_doc($1)', [ca]);
+  });
 });
 
 describe('DEP มัดจำ (AT-04)', () => {

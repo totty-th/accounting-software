@@ -2,6 +2,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { filePp30, payPp30, filePp36, payPp36 } from '@/lib/actions';
+import { dateTh } from '@/lib/format';
 
 export type Pp30Doc = { type: string; id: string; date: string; inv: string; vendor: string; vat: number; form: 'PP30' | 'PP36'; rd?: string };
 
@@ -17,7 +18,7 @@ export function Pp30Create({ month, docs, outputVat }: { month: string; docs: Pp
       <table><thead><tr><th style={{ width: 30 }}><input type="checkbox" aria-label="เลือกทั้งหมด" checked={docs.length > 0 && sel.length === docs.length} onChange={e => setSel(e.target.checked ? docs.map(key) : [])} /></th>
         <th>วันที่ใบกำกับ</th><th>เลขที่ใบกำกับ</th><th>ผู้จำหน่าย</th><th>แบบ</th><th className="num">ภาษีมูลค่าเพิ่ม</th></tr></thead>
         <tbody>{docs.map(d => <tr key={key(d)}><td><input type="checkbox" aria-label={`เลือก ${d.inv}`} checked={sel.includes(key(d))} onChange={e => setSel(e.target.checked ? [...sel, key(d)] : sel.filter(x => x !== key(d)))} /></td>
-          <td>{d.date}</td><td className="no">{d.inv}{d.rd && <small> · ใบเสร็จ {d.rd}</small>}</td><td>{d.vendor}</td><td>{d.form === 'PP36' ? 'ภ.พ.36' : 'ภ.พ.30'}</td><td className="num">{f(d.vat)}</td></tr>)}
+          <td>{dateTh(d.date)}</td><td className="no">{d.inv}{d.rd && <small> · ใบเสร็จ {d.rd}</small>}</td><td>{d.vendor}</td><td>{d.form === 'PP36' ? 'ภ.พ.36' : 'ภ.พ.30'}</td><td className="num">{f(d.vat)}</td></tr>)}
           {docs.length === 0 && <tr><td colSpan={6} className="empty">ไม่มีใบกำกับภาษีซื้อที่รอใช้สิทธิ์ในเดือนนี้ (รับใบกำกับที่หน้า จัดการเอกสารภาษีซื้อ · ภ.พ.36 ต้องชำระและบันทึกใบเสร็จสรรพากรก่อน)</td></tr>}</tbody></table>
       <div style={{ padding: 10, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <span>ภาษีขายที่ยังไม่ยื่น {f(outputVat)}</span><span>ภาษีซื้อที่เลือก {f(inp)}</span><b>{net >= 0 ? `ภาษีที่ต้องชำระ ${f(net)}` : `ภาษีที่ขอคืน ${f(-net)}`}</b>
@@ -52,7 +53,7 @@ export function Pp36Create({ month, docs }: { month: string; docs: { type: strin
       <table><thead><tr><th style={{ width: 30 }}><input type="checkbox" aria-label="เลือกทั้งหมด" checked={docs.length > 0 && sel.length === docs.length} onChange={e => setSel(e.target.checked ? docs.map(key) : [])} /></th>
         <th>วันที่ใบกำกับ</th><th>เลขที่ใบกำกับ</th><th>ผู้จำหน่าย</th><th className="num">มูลค่าที่จ่ายจริง</th><th className="num">ภาษีมูลค่าเพิ่ม (7%)</th></tr></thead>
         <tbody>{docs.map(d => <tr key={key(d)}><td><input type="checkbox" aria-label={`เลือก ${d.inv}`} checked={sel.includes(key(d))} onChange={e => setSel(e.target.checked ? [...sel, key(d)] : sel.filter(x => x !== key(d)))} /></td>
-          <td>{d.date}</td><td className="no">{d.inv}</td><td>{d.vendor}</td><td className="num">{f(d.base)}</td><td className="num">{f(d.vat)}</td></tr>)}
+          <td>{dateTh(d.date)}</td><td className="no">{d.inv}</td><td>{d.vendor}</td><td className="num">{f(d.base)}</td><td className="num">{f(d.vat)}</td></tr>)}
           {docs.length === 0 && <tr><td colSpan={6} className="empty">ไม่มีใบกำกับแบบ ภ.พ.36 ที่รอยื่นในเดือนนี้ (บันทึกที่หน้า จัดการเอกสารภาษีซื้อ)</td></tr>}</tbody></table>
       <div style={{ padding: 10, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <span>ยอดซื้อต่างประเทศที่เลือก {f(base)}</span><b>ภาษีที่ต้องชำระ {f(vat)}</b>

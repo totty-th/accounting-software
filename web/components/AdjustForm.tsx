@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ADJUST_REASONS } from '@/lib/adjust-reasons';
 
@@ -24,6 +24,7 @@ export function AdjustForm({ type, refId, contactId, refNo, refTotal, refSubtota
   const [reason, setReason] = useState('');
   const [other, setOther] = useState('');
   const set = (i: number, p: Partial<(typeof rows)[number]>) => setRows(rs => rs.map((r, k) => (k === i ? { ...r, ...p } : r)));
+  useEffect(() => { setErr(null); }, [rows, reason, other, date, group]);   // ข้อความตรวจสอบเก่าหายเมื่อผู้ใช้แก้ฟอร์ม
   const pickGroup = (g: 'goods' | 'service') => { setGroup(g); setReason(''); };
 
   const t = useMemo(() => {
@@ -66,7 +67,7 @@ export function AdjustForm({ type, refId, contactId, refNo, refTotal, refSubtota
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table className="lines" style={{ minWidth: 780 }}>
-          <thead><tr><th style={{ width: 40 }} /><th>รายการในใบแจ้งหนี้</th><th className="num" style={{ width: 100 }}>จำนวน</th><th className="num" style={{ width: 130 }}>ราคาต่อหน่วย</th><th style={{ width: 150 }}>สต็อก</th><th className="num" style={{ width: 120 }}>รวม</th></tr></thead>
+          <thead><tr><th style={{ width: 40 }} /><th>รายการในใบแจ้งหนี้ (ติ๊กรายการที่จะ{type === 'CN' ? 'ลด' : 'เพิ่ม'})</th><th className="num" style={{ width: 110 }}>จำนวนที่{type === 'CN' ? 'ลด' : 'เพิ่ม'}</th><th className="num" style={{ width: 140 }}>ราคา/หน่วยที่{type === 'CN' ? 'ลด' : 'เพิ่ม'}</th><th style={{ width: 150 }}>สต็อก</th><th className="num" style={{ width: 130 }}>รวมที่{type === 'CN' ? 'ลด' : 'เพิ่ม'}</th></tr></thead>
           <tbody>{lines.map((l, i) => (
             <tr key={i}>
               <td><input type="checkbox" checked={rows[i].on} onChange={e => set(i, { on: e.target.checked })} aria-label={`เลือก ${l.description}`} /></td>

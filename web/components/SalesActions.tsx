@@ -33,7 +33,7 @@ export function SalesActions({ d, role, detail = false }: { d: any; role: Role; 
     }
   }
   if (W && d.doc_type === 'QT' && s === 'approved') out.push(b('ดำเนินการแล้ว', A.closeQuotation.bind(null, d.id), 'ghost', 'c'));
-  if (W && d.doc_type === 'CA' && s === 'pending_collect') out.push(b('เก็บเงิน', A.collectCash.bind(null, d.id), ''));
+  if (W && d.doc_type === 'CA' && s === 'pending_collect' && !detail && d.doc_no) out.push(<a key="cc" className="btn sm" href={`/sales/${d.doc_no}`}>เก็บเงิน…</a>);   // เลือกช่องทางรับเงินที่หน้ารายละเอียด
   if (W && d.doc_type === 'CA' && s === 'collected') out.push(b('รีเซ็ต', A.resetCash.bind(null, d.id)));
   if (W && d.doc_type === 'BL' && d.is_deposit && s === 'billed') out.push(b('สร้างใบแจ้งหนี้มัดจำ (ลงบัญชี)', A.convertDepositBl.bind(null, d.id), ''));
   if (W && (d.doc_type === 'CN' || d.doc_type === 'DN') && s === 'cancelled') out.push(b('รีเซ็ต', A.restoreSalesDoc.bind(null, d.id), '', 'c'));

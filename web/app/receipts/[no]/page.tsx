@@ -11,7 +11,7 @@ import { PrintButton, CopyBox } from '@/components/ShareTools';
 import { ActionButton } from '@/components/ActionButton';
 import { CollectForm } from '@/components/CollectForm';
 import { loadReceiptView, receiptIdByNo } from '@/lib/receipt-view';
-import { createReceiptShareLink, revokeReceiptShareLink } from '@/lib/actions';
+import { createReceiptShareLink, revokeReceiptShareLink, resetReceipt, cancelReceipt } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,9 +36,11 @@ export default async function ReceiptDetail({ params }: { params: { no: string }
     <>
       <div className="top noprint">
         <div><h1>{v.receipt.receipt_no} <Pill s={v.receipt.status} /></h1><p className="sub"><Link href="/receipts">← ใบเสร็จและการรับเงิน</Link></p></div>
-        <ActsMenu><PrintButton />
+        <ActsMenu dropdown><PrintButton />
           <a className="btn ghost" href={`/receipts/${no}/pdf`}>ดาวน์โหลด PDF</a>
-          <a className="btn ghost" href={`/receipts/${no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a></ActsMenu>
+          <a className="btn ghost" href={`/receipts/${no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a>
+          {W && v.receipt.status === 'collected' && <ActionButton label="รีเซ็ต (กลับเป็นรอเก็บเงิน)" variant="ghost" confirmText="รีเซ็ตใบเสร็จ? รายการเก็บเงินจะถูกกลับรายการ" action={resetReceipt.bind(null, id)} />}
+          {W && v.receipt.status !== 'cancelled' && <ActionButton label="ยกเลิกใบเสร็จ" variant="danger" confirmText="ยกเลิกใบเสร็จ?" action={cancelReceipt.bind(null, id)} />}</ActsMenu>
       </div>
       <div className="detail">
         <ReceiptSheet v={v} />

@@ -39,11 +39,11 @@ async function Pick({ type, contact }: { type: 'CN' | 'DN'; contact?: string }) 
   const contacts = await db.q(`select distinct c.id, c.business_name, c.contact_name from contacts c join sales_docs d on d.contact_id=c.id
     where d.doc_type='INV' order by 2, 3`);
   const invs = contact ? await db.q(`select d.doc_no, d.doc_date, d.total, d.status, d.is_deposit, c.business_name, c.contact_name,
-      exists(select 1 from sales_docs x where x.ref_doc_id=d.id and x.doc_type='CN') has_cn,
+      exists(select 1 from sales_docs x where x.ref_doc_id=d.id and x.doc_type='CN') has_cn, sales_doc_has_active_receipt(d.id) has_receipt,
       exists(select 1 from billing_note_items b join sales_docs bl on bl.id=b.billing_id and bl.status<>'cancelled' where b.invoice_id=d.id) in_bl
     from sales_docs d join contacts c on c.id=d.contact_id where d.doc_type='INV' and d.contact_id=$1 order by d.doc_date desc, d.doc_no desc`, [contact]) : [];
   // เหตุที่เลือกไม่ได้ (ตรงกับเงื่อนไขในฟังก์ชันฐานข้อมูล ซึ่งตรวจซ้ำอีกชั้น)
-  const why = (r: any) => r.status === 'cancelled' ? 'ใบแจ้งหนี้ถูกยกเลิก' : r.is_deposit ? 'ใบแจ้งหนี้มัดจำ' : r.in_bl ? 'อยู่ในใบวางบิลแล้ว'
+  const why = (r: any) => r.status === 'cancelled' ? 'ใบแจ้งหนี้ถูกยกเลิก' : r.is_deposit ? 'ใบแจ้งหนี้มัดจำ' : r.in_bl ? 'อยู่ในใบวางบิลแล้ว' : type === 'CN' && r.has_receipt ? 'มีใบเสร็จแล้ว ออกใบลดหนี้ไม่ได้ (ยกเลิกใบเสร็จก่อน)'
     : type === 'DN' && r.status !== 'awaiting_payment' ? 'ต้องเป็นใบแจ้งหนี้ที่รอเก็บเงิน' : type === 'CN' && r.has_cn ? 'มีใบลดหนี้แล้ว (1 ใบแจ้งหนี้ ออกได้ 1 ใบ)' : '';
   return (
     <>

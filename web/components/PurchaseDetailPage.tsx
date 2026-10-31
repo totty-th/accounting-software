@@ -51,7 +51,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
     <>
       <div className="top noprint">
         <div><h1>{v.no} <Pill s={pillKey} /></h1><p className="sub"><Link href={back}>← {backName}</Link></p></div>
-        <ActsMenu>
+        <ActsMenu dropdown>
           <a className="btn ghost" href={`/purchases/${kind.toLowerCase()}/${id}/pdf`} target="_blank">ดาวน์โหลด PDF</a>
           {kind === 'PO' && W && st === 'pending' && <Link className="btn ghost" href={`/purchases/orders/${id}/edit`}>แก้ไข</Link>}
           {kind === 'PO' && W && <ActionButton label="สร้างซ้ำ" variant="ghost" action={A.duplicatePurchaseOrder.bind(null, id)} />}

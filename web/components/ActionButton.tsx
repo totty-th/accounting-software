@@ -19,7 +19,7 @@ export function ActionButton({ action, label, variant = '', confirmText, after }
   return (
     <>
       <button className={`btn sm ${variant}`} disabled={pending}
-        onClick={() => (confirmText && !armed ? (setArmed(true), setTimeout(() => setArmed(false), 4000)) : fire())}>
+        onClick={() => (confirmText && !armed ? (setArmed(true), setTimeout(() => setArmed(false), 10000)) : fire())}>
         {pending ? '...' : armed ? 'กดอีกครั้งเพื่อยืนยัน' : label}
       </button>
       {armed && confirmText && confirmText.length > 1 && <div className="toast" role="alert">{confirmText}</div>}
