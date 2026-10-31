@@ -45,4 +45,12 @@ describe('M27.5 ภ.พ.36', () => {
     expect(await err(db.query(`select file_pp36('2026-10-01','[]'::jsonb)`))).toContain('อย่างน้อย 1');
     expect(await err(db.query(`select file_pp36('2026-10-01',$1::jsonb)`, [JSON.stringify([{ type: 'RI', id: '00000000-0000-0000-0000-000000000000' }])]))).toContain('ไม่มีใบกำกับ');
   });
+  it('M27.10: เอกสารที่รายการไม่มี VAT (0%) ยื่น ภ.พ.36 ไม่ได้ ได้ข้อความไทย ไม่ใช่ error ฐานข้อมูล', async () => {
+    const c = (await one<any>(`select id from contacts limit 1`)).id;
+    const uv = (await one<any>(`select post_voucher('UV','2026-10-24','ต่างประเทศไม่มี VAT','MANUAL','y','[{"account":"51111","debit":2000},{"account":"21399","credit":2000}]'::jsonb) v`)).v;
+    const r0 = (await one<any>(`insert into goods_receipts(ri_no, ri_date, contact_id, status, subtotal, vat, total, uv_voucher_id) values ('RI-F2','2026-10-24',$1,'approved',2000,0,2000,$2) returning id`, [c, uv])).id;
+    await db.query(`select set_purchase_tax_invoice('RI',$1,$2::jsonb)`, [r0, JSON.stringify({ invoice_no: 'F-2', invoice_date: '2026-10-24', vat_form: 'PP36' })]);
+    expect(await err(db.query(`select file_pp36('2026-10-01',$1::jsonb)`, [JSON.stringify([{ type: 'RI', id: r0 }])]))).toContain('ไม่มีภาษีซื้อ ภ.พ.36');
+    expect((await one<any>('select count(*)::int n from pp36_filing_docs where doc_id=$1', [r0])).n).toBe(0);   // ฟังก์ชันล้มเหลวทั้งชุด ไม่ทิ้งแบบค้าง
+  });
 });

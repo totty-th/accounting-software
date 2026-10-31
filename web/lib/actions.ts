@@ -35,7 +35,7 @@ async function run(fn: (u: AuthUser) => Promise<unknown>, paths: string[], gate:
     let m = String(e?.message ?? e).replace(/^error:\s*/i, '').replace(/^PERIOD_LOCKED:\s*/, '');
     // ข้อความข้อจำกัดของฐานข้อมูลที่ไม่ผ่านด่านตรวจหน้าจอ → ภาษาไทย
     const c = /violates check constraint "(\w+)"/.exec(m)?.[1];
-    if (c) m = CONSTRAINT_TH[c] ?? 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบค่าที่กรอก';
+    if (c) m = CONSTRAINT_TH[c] ?? `ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบค่าที่กรอก (รหัสข้อจำกัด ${c})`;
     else if (/violates (unique|foreign key|not-null)/.test(m)) m = 'ข้อมูลซ้ำหรือไม่ครบ กรุณาตรวจสอบค่าที่กรอก';
     return { error: m };
   }
