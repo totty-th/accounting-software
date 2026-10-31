@@ -31,8 +31,8 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
   const st = h.status as string;
   const pillKey = kind === 'PO' && st === 'pending' ? 'pending_approval' : st;
   const taxInv = kind !== 'PO' ? (await db.q<any>(`select * from purchase_tax_invoices where doc_type=$1 and doc_id=$2`, [kind, id]))[0] : undefined;
-  const pays = kind !== 'PO' ? await db.q<any>(`select p.*, b.bank_name, b.account_no, cc.card_name, cc.last4 from purchase_payments p
-      left join bank_accounts b on b.id=p.bank_account_id left join credit_cards cc on cc.id=p.credit_card_id where p.doc_type=$1 and p.doc_id=$2 order by p.line_no`, [kind, id]) : [];
+  const pays = kind !== 'PO' ? await db.q<any>(`select p.*, b.bank_name, b.account_no, cc.card_name, cc.last4, pf.fund_name from purchase_payments p
+      left join bank_accounts b on b.id=p.bank_account_id left join credit_cards cc on cc.id=p.credit_card_id left join petty_funds pf on pf.id=p.petty_fund_id where p.doc_type=$1 and p.doc_id=$2 order by p.line_no`, [kind, id]) : [];
   const vouchers = await db.q<any>(`select voucher_no from journal_vouchers where id = any($1::uuid[]) order by voucher_no`, [[h.uv_voucher_id, h.pv_voucher_id].filter(Boolean)]);
   const banks = (await db.q(`select id, bank_name, account_no from bank_accounts where is_active order by bank_name`)).map(b => ({ id: b.id as string, label: `${b.bank_name} ${b.account_no}` }));
   const cards = (await db.q(`select id, card_name, last4 from credit_cards where is_active order by card_name`)).map(c => ({ id: c.id as string, label: `${c.card_name} ****${c.last4}` }));
@@ -99,7 +99,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
           {kind !== 'PO' && <section className="panel"><h3>บันทึกการชำระเงิน</h3>
             {pays.length ? <table style={{ minWidth: 0 }}><thead><tr><th>วันที่</th><th>ช่องทาง</th><th className="num">ยอด</th></tr></thead>
               <tbody>{pays.map((p: any) => <tr key={p.line_no}><td>{dateTh(p.pay_date)}</td>
-                <td>{METHOD[p.method]}{p.bank_name ? ` ${p.bank_name} ${p.account_no}` : ''}{p.card_name ? ` ${p.card_name} ****${p.last4}` : ''}</td><td className="num">{money(p.amount)}</td></tr>)}</tbody></table>
+                <td>{METHOD[p.method]}{p.bank_name ? ` ${p.bank_name} ${p.account_no}` : ''}{p.card_name ? ` ${p.card_name} ****${p.last4}` : ''}{p.fund_name ? ` ${p.fund_name}` : ''}{p.cheque_no ? ` เลขที่ ${p.cheque_no}` : ''}</td><td className="num">{money(p.amount)}</td></tr>)}</tbody></table>
               : <p className="sub">{st === 'paid' ? 'จ่ายแล้ว (รายละเอียดช่องทางไม่ได้บันทึกไว้)' : 'ยังไม่มีการชำระเงิน'}</p>}</section>}
           <section className="panel"><h3>เอกสารที่เกี่ยวข้อง</h3><ul className="rel">
             {po && <li>มาจากใบสั่งซื้อ <Link href={`/purchases/orders/${po.id}`}>{po.po_no}</Link></li>}

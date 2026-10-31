@@ -36,6 +36,18 @@ describe('M27.9 บัญชีเงินสดย่อย', () => {
   });
 });
 
+describe('M27.10 เงินสดย่อยห้ามติดลบ', () => {
+  it('ตัดเงินสดย่อยเกินยอดคงเหลือถูกปฏิเสธ · ไม่เกินทำได้', async () => {
+    const id = (await q(`select create_petty_fund('TEST Petty', 5000) id`))[0].id;
+    const code = (await q(`select a.code from petty_funds f join accounts a on a.id=f.account_id where f.id=$1`, [id]))[0].code;
+    await q(`select topup_petty_fund($1,'2026-10-29',1000,'11112')`, [id]);
+    await expect(q(`select bank_transfer($1,'11112','2026-10-29',1040)`, [code])).rejects.toThrow(/เงินสดย่อย.*ไม่พอ/);
+    expect(await bal(code)).toBe(1000);
+    await q(`select bank_transfer($1,'11112','2026-10-29',1000)`, [code]);
+    expect(await bal(code)).toBe(0);
+  });
+});
+
 describe('M27.9 บัตรเครดิตและบัญชีเช็คจ่าย', () => {
   it('บัตรเครดิต: แก้ไข/ไม่ใช้งาน/ลบ (ลบได้เมื่อไม่มีรายการ)', async () => {
     const id = (await q(`select create_credit_card('กสิกรไทย','1234','วิศร','TEST Card',20000,0,3) id`))[0].id;

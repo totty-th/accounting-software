@@ -1,9 +1,11 @@
 'use client';
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { createCreditCard, createPettyFund } from '@/lib/actions';
 
 // ตั้งค่าบัตรเครดิตจ่าย (เปิดบัญชีเจ้าหนี้บัตร 21379.NN ให้อัตโนมัติ)
 export function CardForm() {
+  const router = useRouter();
   const [v, setV] = useState({ bank: '', last4: '', holder: '', name: '', limit: '', statementDay: '0', dueDay: '1' });
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -11,6 +13,7 @@ export function CardForm() {
   const save = () => start(async () => {
     const r = await createCreditCard({ bank: v.bank, last4: v.last4, holder: v.holder, name: v.name, limit: Number(v.limit),
       statementDay: Number(v.statementDay), dueDay: Number(v.dueDay) });
+    if (!r.error) { setV({ bank: '', last4: '', holder: '', name: '', limit: '', statementDay: '0', dueDay: '1' }); router.refresh(); }
     setMsg(r.error ?? 'บันทึกบัตรแล้ว');
   });
   return (

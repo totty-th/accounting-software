@@ -186,8 +186,10 @@ describe('M18.2 เช็คและเงินสดย่อย', () => {
   it('เงินสดย่อย: เปิดบัญชี 11149.01 และ Cr บัญชีนั้น', async () => {
     const f = (await one<any>(`select create_petty_fund('TEST Petty',5000,'วิศรุต') id`)).id;
     const id = await exp(1000);
+    await one(`select topup_petty_fund($1, current_date, 2000, '11112')`, [f]);   // M27.10: ต้องมีเงินในเงินสดย่อยก่อนจ่าย
     const { v } = await payEx(id, [{ method: 'petty', petty_fund_id: f, amount: 1070 }]);
     expect(await entries(v)).toEqual([['21399', 1070, 0], ['11149.01', 0, 1070]]);
+    expect(await err(payEx(await exp(1000), [{ method: 'petty', petty_fund_id: f, amount: 1070 }]))).toContain('ไม่พอ');
     expect(await err(payEx(await exp(100), [{ method: 'petty', amount: 107 }]))).toContain('วงเงินสดย่อย');
   });
   it('เช็ค: PV วันจ่าย Dr เจ้าหนี้/Cr 21329.01 + PV วันตัดบัญชี Dr 21329.01/Cr ธนาคาร', async () => {

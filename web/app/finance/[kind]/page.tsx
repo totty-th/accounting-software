@@ -65,7 +65,7 @@ export default async function Finance({ params, searchParams }: { params: { kind
               <div className="row"><span>{kind === 'cheque' ? 'เช็ครอตัดจ่าย' : kind === 'petty-cash' ? 'ยอดเงินคงเหลือ' : 'ยอดในระบบ'}</span><Link href={`/finance/${kind}/${r.id}`}><b>{money(r.bal)}</b></Link></div>
             </div>); })}
       </div>
-      {canEdit && <FinAdd kind={kind} banks={banks.map(b => ({ id: b.id, label: `${b.bank_name} ${b.account_no}` }))} />}
+      {canEdit && <FinAdd kind={kind} banks={banks.filter(b => kind !== 'cheque' || !rows.some((r: any) => r.id === b.id)).map(b => ({ id: b.id, label: `${b.bank_name} ${b.account_no}` }))} />}
     </>
   );
 }

@@ -11,13 +11,32 @@ export type Result = { error?: string; ok?: true };
 type Gate = Perm | Perm[] | ((u: AuthUser) => boolean | Promise<boolean>);
 const NO_PERM = 'ไม่มีสิทธิ์ทำรายการนี้';
 const who = new AsyncLocalStorage<string>();
+const CONSTRAINT_TH: Record<string, string> = {
+  credit_cards_last4_check: 'เลข 4 ตัวท้ายต้องเป็นตัวเลข 4 หลัก',
+  credit_cards_statement_day_check: 'วันสรุปยอดต้องอยู่ระหว่าง 0–31 (0 = สิ้นเดือน)',
+  credit_cards_due_day_check: 'วันครบกำหนดชำระต้องอยู่ระหว่าง 1–31',
+};
+/** ตรวจฟอร์มบัตรเครดิตก่อนส่งฐานข้อมูล: คืนข้อความไทยเมื่อไม่ผ่าน */
+function cardError(p: { bank: string; last4: string; name: string; limit: number; statementDay: number; dueDay: number }): string | null {
+  if (!p.bank.trim()) return 'ต้องระบุธนาคาร';
+  if (!/^[0-9]{4}$/.test(p.last4)) return CONSTRAINT_TH.credit_cards_last4_check;
+  if (!p.name.trim()) return 'ต้องระบุชื่อบัตร';
+  if (!Number.isFinite(p.limit) || p.limit < 0) return 'วงเงินต้องเป็นตัวเลขและไม่ติดลบ';
+  if (!Number.isInteger(p.statementDay) || p.statementDay < 0 || p.statementDay > 31) return CONSTRAINT_TH.credit_cards_statement_day_check;
+  if (!Number.isInteger(p.dueDay) || p.dueDay < 1 || p.dueDay > 31) return CONSTRAINT_TH.credit_cards_due_day_check;
+  return null;
+}
 async function run(fn: (u: AuthUser) => Promise<unknown>, paths: string[], gate: Gate): Promise<Result> {
   const u = await currentUser();
   if (!u) return { error: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' };
   const ok = typeof gate === 'function' ? await gate(u) : ([] as Perm[]).concat(gate).some(p => can(u.role, p));
   if (!ok) return { error: NO_PERM };
   try { await who.run(u.id, () => fn(u)); } catch (e: any) {
-    const m = String(e?.message ?? e).replace(/^error:\s*/i, '').replace(/^PERIOD_LOCKED:\s*/, '');
+    let m = String(e?.message ?? e).replace(/^error:\s*/i, '').replace(/^PERIOD_LOCKED:\s*/, '');
+    // ข้อความข้อจำกัดของฐานข้อมูลที่ไม่ผ่านด่านตรวจหน้าจอ → ภาษาไทย
+    const c = /violates check constraint "(\w+)"/.exec(m)?.[1];
+    if (c) m = CONSTRAINT_TH[c] ?? 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบค่าที่กรอก';
+    else if (/violates (unique|foreign key|not-null)/.test(m)) m = 'ข้อมูลซ้ำหรือไม่ครบ กรุณาตรวจสอบค่าที่กรอก';
     return { error: m };
   }
   paths.forEach(p => revalidatePath(p));
@@ -154,7 +173,7 @@ const FIN = ['/finance/petty-cash', '/finance/credit-card', '/finance/cheque', '
 export const createPettyFund = async (p: { name: string; limit: number; responsible: string }) =>
   run(call('select create_petty_fund($1,$2,$3)', p.name, p.limit, p.responsible || null), ['/expenses', '/purchases', ...FIN], 'master.write');
 export const createCreditCard = async (p: { bank: string; last4: string; holder: string; name: string; limit: number; statementDay: number; dueDay: number }) =>
-  run(call('select create_credit_card($1,$2,$3,$4,$5,$6,$7)', p.bank, p.last4, p.holder, p.name, p.limit, p.statementDay, p.dueDay),
+  cardError(p) ? { error: cardError(p)! } : run(call('select create_credit_card($1,$2,$3,$4,$5,$6,$7)', p.bank, p.last4, p.holder, p.name, p.limit, p.statementDay, p.dueDay),
     ['/expenses', '/purchases', ...FIN], 'master.write');
 // เมนูการเงิน (M27.9): เติมเงินสดย่อย · แก้ไข/ไม่ใช้งาน/ลบ ของเงินสดย่อย บัตรเครดิต และบัญชีเช็คจ่าย
 export const topupPetty = async (p: { id: string; date: string; amount: number; from: string }) =>
@@ -164,7 +183,7 @@ export const updatePetty = async (p: { id: string; name: string; limit: number; 
 export const setPettyActive = async (id: string, active: boolean) => run(call('select set_petty_fund_active($1,$2)', id, active), FIN, 'master.write');
 export const deletePetty = async (id: string) => run(call('select delete_petty_fund($1)', id), FIN, 'master.write');
 export const updateCard = async (p: { id: string; bank: string; last4: string; holder: string; name: string; limit: number; statementDay: number; dueDay: number }) =>
-  run(call('select update_credit_card($1,$2,$3,$4,$5,$6,$7,$8)', p.id, p.bank, p.last4, p.holder, p.name, p.limit, p.statementDay, p.dueDay), FIN, 'master.write');
+  cardError(p) ? { error: cardError(p)! } : run(call('select update_credit_card($1,$2,$3,$4,$5,$6,$7,$8)', p.id, p.bank, p.last4, p.holder, p.name, p.limit, p.statementDay, p.dueDay), FIN, 'master.write');
 export const setCardActive = async (id: string, active: boolean) => run(call('select set_credit_card_active($1,$2)', id, active), FIN, 'master.write');
 export const deleteCard = async (id: string) => run(call('select delete_credit_card($1)', id), FIN, 'master.write');
 export const addChequeAccount = async (bank: string) => run(call('select add_cheque_account($1)', bank), FIN, 'master.write');
