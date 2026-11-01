@@ -577,3 +577,12 @@ export const updateClosing = async (id: string, p: { date: string; from: string;
   run(call('select update_period_closing($1,$2::date,$3::date,$4::date,$5)', id, p.date, p.from, p.to, p.equity), [...CL, `/settings/close-year/${id}`], 'accounts.write');
 export const approveClosing = async (id: string) => run(call('select approve_period_closing($1)', id), [...CL, `/settings/close-year/${id}`], 'accounts.write');
 export const deleteClosing = async (id: string) => run(call('select delete_period_closing($1)', id), [...CL, `/settings/close-year/${id}`], 'accounts.write');
+
+// เปลี่ยนสถานะใบกำกับภาษีซื้อหลายรายการ (แบบ FA: ไม่ใช้สิทธิขอคืน / กลับเป็นรอใบกำกับฯ) — รับใบกำกับฯ ต้องกรอกเลขที่ใบกำกับ จึงทำทีละรายการ
+export async function bulkPurchaseVatStatus(items: { type: string; id: string }[], status: 'waived' | 'wait') {
+  return run(async () => {
+    if (!['waived', 'wait'].includes(status)) throw new Error('สถานะไม่ถูกต้อง');
+    const db = await getDb();
+    for (const it of items) await db.q('select set_purchase_vat_status($1,$2,$3,$4::jsonb)', [it.type, it.id, status, '{}']);
+  }, ['/tax/purchase-vat', '/reports/purchase-tax', '/expenses', '/purchases'], 'accounts.write');
+}

@@ -118,8 +118,8 @@ export default async function Home({ searchParams }: { searchParams: { p?: strin
   const alerts: Alert[] = [];
   if (ar.over > 0) alerts.push({ lv: 'bad', text: `ลูกหนี้เกินกำหนดชำระ ${money(ar.over)} บาท`, href: '/reports/ar' });
   if (cashTotal < 0) alerts.push({ lv: 'bad', text: `เงินสดและเงินฝากติดลบ ${money(cashTotal)} บาท ตรวจรายการจ่ายเงิน`, href: '/reports/trial-balance' });
-  if (!pp30) alerts.push({ lv: 'warn', text: `ยังไม่ยื่น ภ.พ.30 ของเดือน ${monLabel(pm)}`, href: '/tax/filings' });
-  else if (pp30.result === 'payable' && !pp30.paid_date) alerts.push({ lv: 'warn', text: `ภ.พ.30 ${monLabel(pm)} ยื่นแล้ว รอชำระ ${money(pp30.amount)} บาท`, href: '/tax/filings' });
+  if (!pp30) alerts.push({ lv: 'warn', text: `ยังไม่ยื่น ภ.พ.30 ของเดือน ${monLabel(pm)}`, href: '/tax/filings?form=30' });
+  else if (pp30.result === 'payable' && !pp30.paid_date) alerts.push({ lv: 'warn', text: `ภ.พ.30 ${monLabel(pm)} ยื่นแล้ว รอชำระ ${money(pp30.amount)} บาท`, href: '/tax/filings?form=30' });
   for (const w of wht) alerts.push({ lv: 'warn', text: `หัก ณ ที่จ่าย ${monLabel(pm)} (${w.form_code}) ${money(w.amt)} บาท ${w.n} ฉบับ ตรวจการนำส่ง`, href: '/wht' });
   if (N(todo.qt) > 0) alerts.push({ lv: 'warn', text: `ใบเสนอราคารออนุมัติ ${todo.qt} ใบ`, href: '/sales?type=QT' });
   if (N(todo.alerts) > 0) alerts.push({ lv: 'warn', text: `ขายสินค้าเกินคงเหลือ ${todo.alerts} ครั้ง`, href: '/stock' });

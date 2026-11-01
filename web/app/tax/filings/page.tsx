@@ -19,6 +19,26 @@ export default async function Filings({ searchParams }: { searchParams: { form?:
   const status = (r: any) => r.result === 'payable' ? (r.paid ? `ชำระภาษีแล้ว ${dateTh(r.paid)}` : 'รอชำระภาษี') : r.result === 'refund' ? (r.refund_recorded ? 'บันทึกขอคืนแล้ว' : 'รอขอคืน') : 'ไม่มียอดชำระ';
   const is36 = searchParams.form === '36';
   const month30 = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : prev.toISOString().slice(0, 7);
+  if (!['30', '36'].includes(searchParams.form ?? '')) {
+    // แสดงทั้งหมด (แบบ FA): ภ.พ.30 + ภ.พ.36 รวมในตารางเดียว เรียงเดือนที่ยื่นแบบล่าสุดก่อน · "สร้างใหม่" เลือกแบบ
+    const a36 = await db.q<any>(`select id, period_month::text pm, to_char(period_month,'MM-YYYY') m, vat_amount::float8 v, paid_date::text paid, created_at::text ca from pp36_filings where status='filed'`);
+    const all = [
+      ...rows.map(r => ({ k: `30-${r.id}`, pm: r.pm, ord: r.seq, ca: '', paid: r.paid as string | null, m: `${r.m}${r.seq > 0 ? ` (ยื่นเพิ่มเติม-${r.seq})` : ' (ยื่นปกติ)'}`, form: 'ภ.พ.30', out: money(r.o), inp: money(r.i), st: status(r), href: '/tax/filings?form=30' })),
+      ...a36.map(r => ({ k: `36-${r.id}`, pm: r.pm, ord: 0, ca: r.ca, paid: r.paid as string | null, m: r.m, form: 'ภ.พ.36', out: '-', inp: money(r.v), st: r.paid ? `ชำระภาษีแล้ว ${dateTh(r.paid)}` : 'รอชำระภาษี', href: '/tax/filings?form=36' })),
+    ].sort((x, y) => (y.pm.localeCompare(x.pm)) || (y.ord - x.ord) || y.ca.localeCompare(x.ca));
+    return (
+      <>
+        <div className="top"><div><h1>เตรียมแบบภาษีรายเดือน</h1><p className="sub">รวมแบบ ภ.พ.30 และ ภ.พ.36 ที่เตรียมไว้ · ลงบัญชีวันสิ้นเดือน · ชำระ/รีเซ็ต/ลบ ทำที่แท็บของแต่ละแบบ</p></div>
+          {canW && <div className="noprint" style={{ display: 'flex', gap: 8 }}><Link className="btn" href="/tax/filings?form=30">สร้าง ภ.พ.30</Link><Link className="btn ghost" href="/tax/filings?form=36">สร้าง ภ.พ.36</Link></div>}</div>
+        <div className="tabs noprint"><Link href="/tax/filings" className="on">แสดงทั้งหมด</Link><Link href="/tax/filings?form=30">ภ.พ.30</Link><Link href="/tax/filings?form=36">ภ.พ.36</Link></div>
+        <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
+          <table><thead><tr><th>วันที่ชำระภาษี</th><th>เดือนที่ยื่นแบบภาษี</th><th>แบบฟอร์มภาษี</th><th className="num">มูลค่าภาษีขาย</th><th className="num">มูลค่าภาษีซื้อ</th><th>สถานะ</th></tr></thead>
+            <tbody>{all.map(r => <tr key={r.k}><td>{r.paid ? dateTh(r.paid) : 'ยังไม่กำหนดวันชำระภาษี'}</td><td><Link href={r.href}>{r.m}</Link></td><td>{r.form}</td><td className="num">{r.out}</td><td className="num">{r.inp}</td><td>{r.st}</td></tr>)}
+              {all.length === 0 && <tr><td colSpan={6} className="empty">ยังไม่มีแบบภาษี</td></tr>}</tbody></table>
+        </div>
+      </>
+    );
+  }
   if (is36) {
     const month = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : prev.toISOString().slice(0, 7);
     const f36 = await db.q<any>(`select id, to_char(period_month,'MM-YYYY') m, base_amount::float8 b, vat_amount::float8 v, paid_date::text paid from pp36_filings where status='filed' order by period_month desc, created_at desc`);
@@ -31,7 +51,7 @@ export default async function Filings({ searchParams }: { searchParams: { form?:
     return (
       <>
         <div className="top"><div><h1>เตรียมแบบภาษีรายเดือน</h1><p className="sub">แบบ ภ.พ.36 (ซื้อสินค้า/บริการจากต่างประเทศ) · ฐานภาษี = มูลค่าที่จ่ายจริง VAT 7% · ลงบัญชีวันสิ้นเดือน (ตัด VAT เดิมเป็นต้นทุน + บันทึกเจ้าหนี้สรรพากร)</p></div></div>
-        <div className="tabs noprint"><Link href="/tax/filings">ภ.พ.30</Link><Link href="/tax/filings?form=36" className="on">ภ.พ.36</Link></div>
+        <div className="tabs noprint"><Link href="/tax/filings">แสดงทั้งหมด</Link><Link href="/tax/filings?form=30">ภ.พ.30</Link><Link href="/tax/filings?form=36" className="on">ภ.พ.36</Link></div>
         {canW && <>
           <form className="row-inline" method="get"><input type="hidden" name="form" value="36" /><label className="f">เดือนที่ยื่นแบบ<input type="month" name="month" defaultValue={month} /></label><button className="btn">ดูใบกำกับ</button></form>
           <Pp36Create month={month} docs={cand} /></>}
@@ -62,7 +82,7 @@ export default async function Filings({ searchParams }: { searchParams: { form?:
   return (
     <>
       <div className="top"><div><h1>เตรียมแบบภาษีรายเดือน</h1><p className="sub">แบบ ภ.พ.30 รายเดือน · ย้ายภาษีซื้อและหักกลบภาษีขาย ลงบัญชีวันสิ้นเดือน · ดูรายละเอียดที่ <Link href="/reports/sales-tax">ภาษีขาย</Link> / <Link href="/reports/purchase-tax">ภาษีซื้อ</Link></p></div></div>
-      <div className="tabs noprint"><Link href="/tax/filings" className="on">ภ.พ.30</Link><Link href="/tax/filings?form=36">ภ.พ.36</Link></div>
+      <div className="tabs noprint"><Link href="/tax/filings">แสดงทั้งหมด</Link><Link href="/tax/filings?form=30" className="on">ภ.พ.30</Link><Link href="/tax/filings?form=36">ภ.พ.36</Link></div>
       {canW && <>
         <form className="row-inline" method="get"><label className="f">เดือนที่ยื่นแบบ<input type="month" name="month" defaultValue={month30} /></label><button className="btn">ดูใบกำกับ</button></form>
         <Pp30Create key={month30} month={month30} docs={cand30} outputVat={out30} /></>}

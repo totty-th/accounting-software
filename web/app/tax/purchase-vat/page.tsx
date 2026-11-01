@@ -7,11 +7,11 @@ import { periodRange } from '@/lib/period';
 import { reportPeriod } from '@/lib/report-filter';
 import { purchaseTaxRows, filingInfo } from '@/lib/tax-report';
 import { ReportFilter } from '@/components/ReportFilter';
-import { VatStatusCell } from '@/components/VatStatusCell';
-import { VAT_STATUS } from '@/lib/vat-status';
+import { VatTable, type VatRow } from '@/components/VatTable';
+import { VAT_KEYS, VAT_CLAIM, vatKey, claimBucket } from '@/lib/vat-status';
 
 export const dynamic = 'force-dynamic';
-type Sp = { period?: string; from?: string; to?: string; st?: string; q?: string };
+type Sp = { period?: string; from?: string; to?: string; st?: string | string[]; q?: string; claim?: string };
 export default async function PurchaseVat({ searchParams }: { searchParams: Sp }) {
   const user = await requirePage('reports.read');
   const period = reportPeriod(searchParams.period);
@@ -23,6 +23,7 @@ export default async function PurchaseVat({ searchParams }: { searchParams: Sp }
   const f36 = new Map((await db.q<any>(`select d.doc_type, d.doc_id, d.rd_receipt_no rd, (p.pv_voucher_id is not null) paid from pp36_filing_docs d join pp36_filings p on p.id=d.filing_id`)).map(x => [`${x.doc_type}:${x.doc_id}`, x as { rd: string | null; paid: boolean }]));
   const used30 = new Set((await db.q<any>('select doc_type, doc_id from pp30_filing_docs')).map(x => `${x.doc_type}:${x.doc_id}`));
   const q = (searchParams.q ?? '').trim().toLowerCase();
+  const sts = ([] as string[]).concat(searchParams.st ?? []).filter(x => VAT_KEYS.some(k => k[0] === x));
   const view = rows.map(r => {
     const flag = flags.get(`${r.kind}:${r.id}`);
     const status = flag ?? (r.inv_no ? 'received' : 'wait');
@@ -30,8 +31,9 @@ export default async function PurchaseVat({ searchParams }: { searchParams: Sp }
     const k = `${r.kind}:${r.id}`, x36 = f36.get(k);
     const filed = used30.has(k) || (is36 ? false : status === 'received' && !f36.has(k) && filing(dateIso(r.date), r.created_at).status === 'ยื่นแบบภาษีแล้ว');
     const stage = is36 && !filed ? (!x36 ? 'pp36' : !x36.paid ? 'f36' : x36.rd ? 'rddone' : 'rdwait') : '';
-    return { ...r, st: status, filed, p36: stage === 'pp36', stage, rd: x36?.rd ?? '' };
-  }).filter(r => (!searchParams.st || (searchParams.st === 'filed' ? r.filed : searchParams.st === 'pp36' ? r.p36 : r.st === searchParams.st && !r.filed && !r.p36))
+    const o = { ...r, st: status, filed, p36: stage === 'pp36', stage, rd: x36?.rd ?? '' };
+    return { ...o, key: vatKey(o), claim: filed || status === 'waived' ? '' : claimBucket(dateIso(r.date), today()) };
+  }).filter(r => (sts.length === 0 || sts.includes(r.key)) && (!searchParams.claim || r.claim === searchParams.claim)
     && (!q || [r.no, r.name, r.inv_no ?? '', r.tax_id ?? ''].some(s => s.toLowerCase().includes(q))));
   const total = view.reduce((s, r) => s + (r.vat_form === 'PP36' && r.inv_vat != null ? Number(r.inv_vat) : r.vat), 0), canW = can(user.role, 'accounts.write');
   return (
@@ -42,18 +44,18 @@ export default async function PurchaseVat({ searchParams }: { searchParams: Sp }
         {searchParams.period && <input type="hidden" name="period" value={searchParams.period} />}
         {searchParams.from && <input type="hidden" name="from" value={searchParams.from} />}{searchParams.to && <input type="hidden" name="to" value={searchParams.to} />}
         <label className="f">ค้นหา<input name="q" defaultValue={searchParams.q ?? ''} placeholder="เลขที่เอกสาร, ผู้จำหน่าย, เลขใบกำกับ" /></label>
-        <label className="f">สถานะ<select name="st" defaultValue={searchParams.st ?? ''}><option value="">ทั้งหมด</option>{VAT_STATUS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}<option value="pp36">รอยื่น ภ.พ.36</option><option value="filed">ยื่นแบบแล้ว</option></select></label>
+        <fieldset className="f" style={{ border: 0, padding: 0 }}><legend style={{ fontSize: 12 }}>สถานะ</legend>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{VAT_KEYS.map(([k, l, c]) => <label key={k} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <input type="checkbox" name="st" value={k} defaultChecked={sts.includes(k)} /><i style={{ width: 9, height: 9, borderRadius: 5, background: c, display: 'inline-block' }} />{l}</label>)}</div></fieldset>
+        <label className="f">รอใช้สิทธิ์<select name="claim" defaultValue={searchParams.claim ?? ''}><option value="">ทั้งหมด</option>{VAT_CLAIM.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
         <button className="btn">ค้นหา</button>
+        {(sts.length > 0 || searchParams.claim || q) && <Link className="btn ghost" href="/tax/purchase-vat">ล้างตัวกรอง</Link>}
       </form>
       <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
         <div style={{ padding: 10 }}>รายการทั้งหมด {view.length} รายการ</div>
-        <table><thead><tr><th>วันที่เอกสาร</th><th>เลขที่เอกสาร</th><th>ผู้จำหน่าย</th><th className="num">มูลค่า</th><th className="num">ภาษีมูลค่าเพิ่ม</th><th>สถานะใบกำกับภาษี</th></tr></thead>
-          <tbody>{view.map(r => <tr key={`${r.kind}${r.id}`}>
-            <td>{dateTh(r.date)}</td><td className="no"><Link href={r.href}>{r.no}</Link>{r.inv_no && <div className="sub">{r.inv_no}</div>}</td><td>{r.name}</td>
-            <td className="num">{money(r.vat_form === 'PP36' && r.inv_base != null ? r.inv_base : r.sub)}</td><td className="num">{money(r.vat_form === 'PP36' && r.inv_vat != null ? r.inv_vat : r.vat)}</td>
-            <td><VatStatusCell type={r.kind} id={r.id} status={r.st} filed={r.filed} stage={r.stage} rd={r.rd} form={r.vat_form ?? ''} invNo={r.inv_no ?? ''} docDate={dateIso(r.date)} docTotal={r.sub + r.vat} canWrite={canW} /></td></tr>)}
-            {view.length === 0 && <tr><td colSpan={6} className="empty">ไม่พบเอกสาร</td></tr>}
-            <tr style={{ fontWeight: 700 }}><td colSpan={4}>ยอดรวมภาษีซื้อทั้งหมด</td><td className="num">{money(total)}</td><td /></tr></tbody></table>
+        <VatTable canWrite={canW} totalTxt={money(total)} rows={view.map((r): VatRow => ({ kind: r.kind, id: r.id, href: r.href, no: r.no, dateTxt: dateTh(r.date), docDate: dateIso(r.date), inv_no: r.inv_no ?? null, name: r.name,
+          baseTxt: money(r.vat_form === 'PP36' && r.inv_base != null ? r.inv_base : r.sub), vatTxt: money(r.vat_form === 'PP36' && r.inv_vat != null ? r.inv_vat : r.vat),
+          st: r.st, filed: r.filed, stage: r.stage, rd: r.rd, form: r.vat_form ?? '', docTotal: r.sub + r.vat, key: r.key }))} />
       </div>
     </>
   );

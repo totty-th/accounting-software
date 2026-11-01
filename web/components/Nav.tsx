@@ -71,10 +71,10 @@ const GROUPS: Group[] = [
     { href: '/reports/balance-sheet', label: 'งบฐานะการเงิน', perms: R },
     { href: '/ledger/transactions', label: 'รายการเคลื่อนไหว', perms: R },
     { head: 'บริหารภาษีมูลค่าเพิ่ม', href: '/tax/purchase-vat', label: 'จัดการเอกสารภาษีซื้อ', perms: R },
-    { href: '/tax/filings', label: 'เตรียมแบบภาษีรายเดือน (ภ.พ.30)', perms: R },
-    { href: '/reports/output-tax', label: 'รายงานภาษีขาย ภ.พ.30', perms: R },
-    { href: '/reports/input-tax', label: 'รายงานภาษีซื้อ ภ.พ.30', perms: R },
+    { href: '/tax/filings', label: 'เตรียมแบบภาษีรายเดือน', perms: R },
     { href: '/reports/foreign-input-tax', label: 'รายงานภาษีซื้อ ภ.พ.36', perms: R },
+    { href: '/reports/input-tax', label: 'รายงานภาษีซื้อ ภ.พ.30', perms: R },
+    { href: '/reports/output-tax', label: 'รายงานภาษีขาย ภ.พ.30', perms: R },
     { head: 'หัก ณ ที่จ่าย', href: '/tax/wht-submission', label: 'ยื่นหัก ณ ที่จ่ายออนไลน์', perms: R }] },
   { key: 'set', label: 'ตั้งค่า', c: 'var(--grey)', items: [
     { href: '/settings/company', label: 'ข้อมูลบริษัท', perms: ['settings.company'] },
