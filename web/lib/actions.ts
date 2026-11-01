@@ -596,3 +596,5 @@ export async function bulkReceiveTaxInvoices(rows: { type: string; id: string; i
     await (await getDb()).q(`select set_purchase_vat_status(x->>'type', (x->>'id')::uuid, 'received', x - 'type' - 'id') from jsonb_array_elements($1::jsonb) x`, [JSON.stringify(rows)]);
   }, ['/tax/purchase-vat', '/reports/purchase-tax', '/expenses', '/purchases'], 'accounts.write');
 }
+export const resetWhtCert = async (id: string) => run(call('select reset_wht_cert($1)', id), ['/wht'], 'wht.write');
+export const activateWhtCert = async (id: string) => run(call('select activate_wht_cert($1)', id), ['/wht'], 'wht.write');

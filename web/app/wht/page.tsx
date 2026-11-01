@@ -2,9 +2,8 @@ import { can } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
-import { Pill } from '@/components/Pill';
+import { WhtStatus } from '@/components/WhtStatus';
 import { WhtForm, type WhtInit } from '@/components/WhtForm';
-import { ActionButton } from '@/components/ActionButton';
 import * as A from '@/lib/actions';
 
 const CATS: [string, string][] = [['1', '1. เงินเดือน ค่าจ้าง 40(1)'], ['2', '2. ค่านายหน้า 40(2)'], ['3', '3. ค่าลิขสิทธิ์ 40(3)'],
@@ -13,7 +12,7 @@ const FORM_TH: Record<string, string> = { PND3: 'ภงด 3', PND53: 'ภงด
 const CONDS: [string, string][] = [['withhold', 'หัก ณ ที่จ่าย'], ['forever', 'ออกให้ตลอดไป'], ['once', 'ออกให้ครั้งเดียว'], ['other', 'อื่น ๆ']];
 
 type SP = { q?: string; status?: string; dup?: string };
-const STAT: [string, string][] = [['', 'แสดงทั้งหมด'], ['active', 'ดำเนินการแล้ว'], ['cancelled', 'ยกเลิก']];
+const STAT: [string, string][] = [['', 'แสดงทั้งหมด'], ['active', 'ดำเนินการแล้ว'], ['pending', 'รอดำเนินการ'], ['cancelled', 'ยกเลิก']];
 export default async function Wht({ searchParams }: { searchParams: SP }) {
   const user = await requirePage('wht.read');
   const W = can(user.role, 'wht.write');
@@ -47,21 +46,21 @@ export default async function Wht({ searchParams }: { searchParams: SP }) {
         <span className="sub">{rows.length} รายการ · ภาษีที่หักรวม (ไม่นับที่ยกเลิก) {money(rows.filter(r => r.status === 'active').reduce((a, r) => a + Number(r.wht_amount), 0))}</span>
       </form>
       {rows.length === 0 && <div className="panel empty">{all.length ? 'ไม่พบรายการตามตัวกรอง' : 'ยังไม่มีหนังสือรับรอง (จ่ายค่าใช้จ่ายที่มีหัก ณ ที่จ่ายแล้วจะขึ้นที่นี่ หรือสร้างใบอิสระด้านบน)'}</div>}
-      {rows.length > 0 && <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
-        <table><thead><tr><th>วันที่</th><th>เลขที่เอกสาร</th><th>ผู้ถูกหัก ณ ที่จ่าย</th><th>แบบฟอร์ม / อัตรา</th><th className="num">ฐานภาษี / ภาษีที่หัก</th><th>สถานะ</th><th /></tr></thead>
+      {rows.length > 0 && <form action="/wht/pdf" method="get" target="_blank" className="panel" style={{ padding: 0, overflowX: 'auto' }}>
+        <div className="noprint" style={{ padding: 8 }}><button className="btn sm ghost" title="เลือกแถวแล้วกด เพื่อรวม 50 ทวิ เป็น PDF ไฟล์เดียว (เฉพาะสถานะดำเนินการแล้ว)">พิมพ์ / ดาวน์โหลด PDF รวมที่เลือก</button></div>
+        <table><thead><tr><th style={{ width: 28 }} /><th>วันที่</th><th>เลขที่เอกสาร</th><th>ผู้ถูกหัก ณ ที่จ่าย</th><th>แบบฟอร์ม / อัตรา</th><th className="num">ฐานภาษี / ภาษีที่หัก</th><th>สถานะ</th><th /></tr></thead>
           <tbody>{rows.map(r => (
             <tr key={r.id} style={r.status === 'cancelled' ? { opacity: 0.5 } : undefined}>
-              <td>{dateTh(r.pay_date)}</td><td className="no">{r.cert_no}{r.exp_no && <div className="sub">{r.exp_no}</div>}</td><td>{partyName(r)}</td>
+              <td><input type="checkbox" name="ids" value={r.id} style={{ width: 'auto' }} aria-label={`เลือก ${r.cert_no}`} /></td><td>{dateTh(r.pay_date)}</td><td className="no">{r.cert_no}{r.exp_no && <div className="sub">{r.exp_no}</div>}</td><td>{partyName(r)}</td>
               <td>{FORM_TH[r.form_code] ?? r.form_code}<div className="sub">{rateOf(r.id)}</div></td>
               <td className="num">{money(r.base_amount)}<div className="sub">{money(r.wht_amount)}</div></td>
-              <td><Pill s={r.status === 'active' ? 'paid' : 'cancelled'} />{r.status === 'active' && r.missing?.length ? <div><span title={r.missing.join(' · ')} style={{ color: 'var(--orange)' }}>⚠ ข้อมูลไม่ครบ ({r.missing.length})</span></div> : null}</td>
+              <td><WhtStatus id={r.id} status={r.status} linked={!!r.expense_id} canWrite={W} />{r.status === 'active' && r.missing?.length ? <div><span title={r.missing.join(' · ')} style={{ color: 'var(--orange)' }}>⚠ ข้อมูลไม่ครบ ({r.missing.length})</span></div> : null}</td>
               <td className="noprint"><details style={{ position: 'relative' }}><summary className="btn sm ghost" style={{ listStyle: 'none', cursor: 'pointer' }}>⋯</summary>
                 <div className="panel" style={{ position: 'absolute', right: 0, zIndex: 5, minWidth: 190, padding: 6, display: 'grid', gap: 4 }}>
                   {r.status === 'active' && !r.missing?.length && <a className="btn sm ghost" href={`/wht/${r.id}/pdf`} target="_blank">พิมพ์ / ดาวน์โหลด PDF 50 ทวิ</a>}
                   {r.status === 'active' && <a className="btn sm ghost" href={`#d-${r.id}`}>แก้ไขรายละเอียดในแบบ</a>}
                   {W && <a className="btn sm ghost" href={`/wht?dup=${r.id}`}>สร้างซ้ำ</a>}
-                  {W && r.status === 'active' && !r.expense_id && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={A.cancelWhtCert.bind(null, r.id)} />}
-                </div></details></td></tr>))}</tbody></table></div>}
+                </div></details></td></tr>))}</tbody></table></form>}
       {[0].map(() => {
         const rs = rows.filter(r => r.status === 'active');
         return (
