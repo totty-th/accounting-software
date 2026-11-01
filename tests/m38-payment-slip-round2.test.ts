@@ -75,3 +75,24 @@ describe('M38 ใบเตรียมจ่าย รอบ 2', () => {
     expect((await events(s1)).length).toBeGreaterThan(0);
   });
 });
+
+describe('M38 หัก ณ ที่จ่ายในหน้าจ่าย (RI)', () => {
+  it('หักบางส่วน: PV เจ้าหนี้เต็ม/หัก/จ่ายสุทธิ · ออกใบหัก ณ ที่จ่ายฐานก่อน VAT · ยกเลิกใบ → ใบหักถูกยกเลิก', async () => {
+    await call(`insert into accounts(code,name,type) values ('11500','สินค้า','asset') on conflict do nothing`);
+    const p = (await one<any>(`insert into products(code,name,kind,purchase_price) values ('T','T','goods_stock',500) returning id`)).id;
+    const r = (await one<any>('select create_goods_receipt($1::date,$2,$3::jsonb) id', [D, v1, JSON.stringify([{ product_id: p, qty: 1, unit_price: 500 }])])).id;
+    const s = await slip([{ type: 'RI', id: r }]);   // รวม VAT 535
+    expect(await err(call('select pay_payment_slip_vendor($1,$2,$3::date,$4::jsonb,15,true)', [s, v1, D, JSON.stringify([{ method: 'cash', amount: 535 }])]))).toContain('ไม่เท่ายอดจ่ายสุทธิ');
+    await call('select pay_payment_slip_vendor($1,$2,$3::date,$4::jsonb,15,true)', [s, v1, D, JSON.stringify([{ method: 'cash', amount: 520 }])]);
+    expect(await tb('27124')).toBe(-15); expect(await tb('11112')).toBe(-520); expect(await tb('21311')).toBe(0);
+    const c = await one<any>('select * from wht_certs where ri_id=$1', [r]);
+    expect([+c.base_amount, +c.wht_amount, c.form_code, c.income_category, c.status]).toEqual([500, 15, 'PND53', '5', 'active']);
+    await call('select cancel_payment_slip($1)', [s]);
+    expect((await one<any>('select status from wht_certs where ri_id=$1', [r])).status).toBe('cancelled');
+    expect(await tb('27124')).toBe(0); expect(+(await one<any>('select wht_paid from goods_receipts where id=$1', [r])).wht_paid).toBe(0);
+  });
+  it('ไม่ติ๊กสร้างใบ → ลง PV แต่ไม่มีใบ · ค่าใช้จ่ายล้วนใส่ยอดหักไม่ได้', async () => {
+    const e = await ex(v1, 100); const s0 = await slip([{ type: 'EXP', id: e }]);
+    expect(await err(call('select pay_payment_slip_vendor($1,$2,$3::date,null,5,true)', [s0, v1, D]))).toContain('ใบรับสินค้าเท่านั้น');
+  });
+});

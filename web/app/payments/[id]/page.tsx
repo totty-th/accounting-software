@@ -3,7 +3,7 @@ import { can } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { money, dateTh, dateIso, partyName } from '@/lib/format';
-import { PayForm } from '@/components/PayForm';
+import { SlipPay } from '@/components/SlipPay';
 import { PurchaseDocTools } from '@/components/PurchaseDocTools';
 import { SlipStatus } from '@/components/SlipStatus';
 import { SLIP_TH, SLIP_COLOR } from '@/lib/slip-state';
@@ -26,7 +26,7 @@ export default async function SlipPage({ params }: { params: { id: string } }) {
   const its = items.filter(i => i.slip_id === s.id);
   const byVendor = [...new Set(its.map(i => i.contact_id as string))].map(cid => {
     const mine = its.filter(i => i.contact_id === cid);
-    return { cid, name: partyName(mine[0]), net: mine.filter(i => !i.paid).reduce((a, i) => a + Number(i.net), 0), paid: mine.every(i => i.paid) };
+    return { cid, name: partyName(mine[0]), net: mine.filter(i => !i.paid).reduce((a, i) => a + Number(i.net), 0), paid: mine.every(i => i.paid), hasRi: mine.some(i => i.doc_type === 'RI' && !i.paid) };
   });
   const pays = await db.q<any>(`select p.*, i.doc_no from purchase_payments p join payment_slip_items x on x.doc_type=p.doc_type and x.doc_id=p.doc_id
       cross join lateral slip_doc_info(x.doc_type, x.doc_id) i
@@ -69,7 +69,7 @@ export default async function SlipPage({ params }: { params: { id: string } }) {
         {pays.length === 0 && its.some(i => i.paid) && <p className="sub">จ่ายเงินสดเต็มจำนวน (ไม่ได้ระบุช่องทาง)</p>}
         {editable && byVendor.filter(v => !v.paid).map(v => (
           <details key={v.cid} open={byVendor.length === 1}><summary className="btn sm">เพิ่มการชำระเงิน {v.name} ({money(v.net)})</summary>
-            <PayForm net={v.net} banks={banks} cards={cards} petties={petties} onPay={A.payPaymentSlipVendor.bind(null, s.id, v.cid)} /></details>))}
+            <SlipPay slip={s.id} contact={v.cid} net={v.net} hasRi={v.hasRi} banks={banks} cards={cards} petties={petties} /></details>))}
         {byVendor.every(v => v.paid) && <p className="sub">จ่ายครบทุกเอกสารแล้ว · ต้องการแก้ไขให้ "รีเซ็ต" แล้วจ่ายใหม่</p>}
       </div>
       <div className="panel" id="history"><h3>ประวัติเอกสาร</h3>

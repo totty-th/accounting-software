@@ -350,8 +350,8 @@ export async function createPaymentSlip(p: { date: string; due: string; docs: { 
   return run(call('select create_payment_slip($1::date,$2::date,$3::jsonb,$4,$5,$6,$7)', p.date, p.due || null, JSON.stringify(p.docs),
     p.preparer || null, p.requester || null, p.approver || null, p.reason || null), SLIP, 'expenses.write');
 }
-export const payPaymentSlipVendor = async (slip: string, contact: string, payments?: PurchasePay[]) =>
-  run(call('select pay_payment_slip_vendor($1,$2,$3::date,$4::jsonb)', slip, contact, today(), payJson(payments)), SLIP, 'expenses.write');
+export const payPaymentSlipVendor = async (slip: string, contact: string, payments?: PurchasePay[], wht = 0, cert = true) =>
+  run(call('select pay_payment_slip_vendor($1,$2,$3::date,$4::jsonb,$5::numeric,$6::boolean)', slip, contact, today(), payJson(payments), wht, cert), SLIP, 'expenses.write');
 export const cancelPaymentSlip = async (id: string) => run(call('select cancel_payment_slip($1)', id), SLIP, 'expenses.write');
 
 // ---- M18.4 ใบกำกับภาษีที่ได้รับ · WT อิสระ · ลิงก์แชร์ PO/RI/PAY ----
