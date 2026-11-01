@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { requirePage } from '@/lib/auth';
 import { can } from '@/lib/permissions';
 import { getDb, today } from '@/lib/db';
-import { money } from '@/lib/format';
+import { money, dateTh } from '@/lib/format';
 import { ActionButton } from '@/components/ActionButton';
 import { Pp30Create, Pp30Pay, Pp36Create } from '@/components/Pp30Forms';
 import { deletePp30, resetPp30Payment, setPp30Refund, deletePp36, resetPp36Payment } from '@/lib/actions';
@@ -16,7 +16,7 @@ export default async function Filings({ searchParams }: { searchParams: { form?:
   const banks = await db.q<any>(`select code, name from accounts where type='asset' and code like '111%' and is_active order by code`);
   const canW = can(user.role, 'accounts.write');
   const prev = new Date(today() + 'T00:00:00Z'); prev.setUTCMonth(prev.getUTCMonth() - 1);
-  const status = (r: any) => r.result === 'payable' ? (r.paid ? `ชำระภาษีแล้ว ${r.paid}` : 'รอชำระภาษี') : r.result === 'refund' ? (r.refund_recorded ? 'บันทึกขอคืนแล้ว' : 'รอขอคืน') : 'ไม่มียอดชำระ';
+  const status = (r: any) => r.result === 'payable' ? (r.paid ? `ชำระภาษีแล้ว ${dateTh(r.paid)}` : 'รอชำระภาษี') : r.result === 'refund' ? (r.refund_recorded ? 'บันทึกขอคืนแล้ว' : 'รอขอคืน') : 'ไม่มียอดชำระ';
   const is36 = searchParams.form === '36';
   const month30 = /^\d{4}-\d{2}$/.test(searchParams.month ?? '') ? searchParams.month! : prev.toISOString().slice(0, 7);
   if (is36) {
@@ -37,7 +37,7 @@ export default async function Filings({ searchParams }: { searchParams: { form?:
           <Pp36Create month={month} docs={cand} /></>}
         <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
           <table><thead><tr><th>เดือนที่ยื่นแบบ</th><th>แบบ</th><th className="num">ยอดซื้อต่างประเทศ</th><th className="num">ภาษีที่ต้องชำระ</th><th>สถานะ</th><th /></tr></thead>
-            <tbody>{f36.map(r => <tr key={r.id}><td>{r.m}</td><td>ภ.พ.36</td><td className="num">{money(r.b)}</td><td className="num">{money(r.v)}</td><td>{r.paid ? `ชำระภาษีแล้ว ${r.paid}` : 'รอชำระภาษี'}</td>
+            <tbody>{f36.map(r => <tr key={r.id}><td>{r.m}</td><td>ภ.พ.36</td><td className="num">{money(r.b)}</td><td className="num">{money(r.v)}</td><td>{r.paid ? `ชำระภาษีแล้ว ${dateTh(r.paid)}` : 'รอชำระภาษี'}</td>
               <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{canW && <>
                 {!r.paid && r.v > 0 && <Pp30Pay kind="36" id={r.id} accounts={banks} defaultDate={today()} />}
                 {r.paid && <ActionButton action={resetPp36Payment.bind(null, r.id)} label="รีเซ็ตการชำระ" variant="ghost" confirmText="รีเซ็ตการบันทึกชำระ?" />}
