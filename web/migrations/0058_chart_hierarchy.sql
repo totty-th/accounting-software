@@ -252,7 +252,7 @@ begin
   if v_code = '' and coalesce(btrim(p_name), '') = '' then raise exception 'ไม่สามารถบันทึกได้ เนื่องจากข้อมูลไม่ถูกต้อง/ไม่ครบถ้วน: กรุณากรอกรหัสบัญชี และกรุณากรอกชื่อบัญชี'; end if;
   if v_code = '' then raise exception 'ไม่สามารถบันทึกได้ เนื่องจากข้อมูลไม่ถูกต้อง/ไม่ครบถ้วน: กรุณากรอกรหัสบัญชี'; end if;
   if coalesce(btrim(p_name), '') = '' then raise exception 'ไม่สามารถบันทึกได้ เนื่องจากข้อมูลไม่ถูกต้อง/ไม่ครบถ้วน: กรุณากรอกชื่อบัญชี'; end if;
-  if v_code !~ '^[0-9]{5}(\.[0-9]{1,3})?$' then raise exception 'รหัสบัญชีต้องเป็นเลข 5 หลัก เช่น 53012 หรือ 53012.01'; end if;
+  if v_code !~ '^[0-9][0-9.]*$' or length(v_code) > 9 then raise exception 'รหัสบัญชีต้องเป็นตัวเลขและจุด ยาวไม่เกิน 9 ตัวอักษร เช่น 53012 หรือ 53012.01'; end if;
   if exists (select 1 from accounts where code = v_code) then raise exception 'เลขรหัสผังบัญชีต้องไม่ซ้ำกัน'; end if;
   if p_parent is not null then
     select id, type into v_parent, v_type from accounts where code = p_parent and is_control;
@@ -287,6 +287,7 @@ declare a accounts;
 begin
   select * into a from accounts where id = p_id;
   if not found then raise exception 'ไม่พบบัญชี'; end if;
+  if a.is_seed then raise exception 'ลบไม่ได้ บัญชีนี้เป็นบัญชีในผังเริ่มต้น'; end if;
   if exists (select 1 from journal_lines where account_id = p_id) then raise exception 'ลบไม่ได้ บัญชีนี้มีรายการบัญชีแล้ว'; end if;
   if exists (select 1 from accounts where parent_id = p_id) then raise exception 'ลบไม่ได้ บัญชีนี้มีบัญชีลูกอยู่'; end if;
   if exists (select 1 from expense_lines where account_code = a.code) then raise exception 'ลบไม่ได้ บัญชีนี้ถูกใช้ในเอกสารค่าใช้จ่าย'; end if;
@@ -297,3 +298,5 @@ begin
   end if;
   delete from accounts where id = p_id;
 end $$;
+alter table accounts add column is_seed boolean not null default false;
+update accounts set is_seed = true;

@@ -84,7 +84,7 @@ export function ChartManager({ nodes }: { nodes: ChartNode[] }) {
             <button className="btn sm ghost" aria-label="ปิด" onClick={() => { setOpen(false); r.refresh(); }}>✕</button></div>
           {!cur && !parent && <div className="sub">เลือกกลุ่มบัญชีทางซ้าย แล้วกด "+ สร้างผังบัญชี" หรือเลือกบัญชีเพื่อแก้ไข</div>}
           {(cur || parent) && <>
-            <label className="f">รหัสบัญชี *<input value={f.code} disabled={!!cur} onChange={e => setF({ ...f, code: e.target.value })} /></label>
+            <label className="f">รหัสบัญชี *<input value={f.code} disabled={!!cur} maxLength={9} inputMode="decimal" onChange={e => setF({ ...f, code: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
             <label className="f">ชื่อบัญชี *<input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></label>
             <label className="f">คำอธิบายบัญชี<textarea rows={3} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} /></label>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" style={{ width: 'auto' }} checked={f.en} onChange={e => setF({ ...f, en: e.target.checked })} /> คำอธิบายภาษาอังกฤษ</label>

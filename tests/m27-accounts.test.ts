@@ -21,7 +21,7 @@ describe('M27.3 บริหารผังบัญชี', () => {
     await db.query(`select create_account('11101.01','เงินฝากย่อย')`);
     expect((await one<any>(`select type from accounts where code='11101.01'`)).type).toBe('asset');
     expect(await err(db.query(`select create_account('53777','ซ้ำ')`))).toContain('ต้องไม่ซ้ำกัน');
-    expect(await err(db.query(`select create_account('9','x')`))).toContain('เลข 5 หลัก');
+    expect(await err(db.query(`select create_account('A9','x')`))).toContain('ตัวเลขและจุด');
     expect(await err(db.query(`select create_account('61000','x')`))).toContain('ขึ้นต้นด้วย 1-5');
     expect(await err(db.query(`select create_account('53013','  ')`))).toContain('กรุณากรอกชื่อบัญชี');
   });

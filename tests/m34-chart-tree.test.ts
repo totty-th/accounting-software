@@ -58,7 +58,14 @@ describe('M34 บริหารผังบัญชีแบบ FA (ต้น�
     const used = (await one<any>(`select id from accounts where code='11199'`)).id;
     expect(await err(pg.query(`select delete_account($1)`, [used]))).toContain('มีรายการบัญชีแล้ว');
     const sys = (await one<any>(`select a.id from system_accounts s join accounts a on a.code = s.account_code where not exists (select 1 from journal_lines l where l.account_id = a.id) and not exists (select 1 from accounts c where c.parent_id = a.id) limit 1`));
-    if (sys) expect(await err(pg.query(`select delete_account($1)`, [sys.id]))).toContain('ระบบ');
+    if (sys) expect(await err(pg.query(`select delete_account($1)`, [sys.id]))).toContain('ลบไม่ได้');
+    // ผังเริ่มต้นลบไม่ได้แม้ไม่มีรายการ (ต้นแบบไม่แสดงปุ่มลบ)
+    const seed = (await one<any>(`select id from accounts where is_seed and not is_control and not exists (select 1 from journal_lines l where l.account_id = accounts.id) limit 1`));
+    expect(await err(pg.query(`select delete_account($1)`, [seed.id]))).toContain('ผังเริ่มต้น');
+    // รหัสรับเฉพาะตัวเลข/จุด ยาวไม่เกิน 9 ตัวอักษร
+    expect(await err(pg.query(`select create_account('12345678.9','x',null,'31000')`))).toContain('ไม่เกิน 9');
+    expect(await err(pg.query(`select create_account('AB123','x',null,'31000')`))).toContain('ตัวเลขและจุด');
+    await pg.query(`select delete_account(create_account('1.2.3.4','รหัสหลายจุด',null,'31000'))`);
   });
   it('รายการบัญชี: ไม่รวมบัญชีคุม · ชื่อกลุ่มระดับ 2/3 · ยอดเดบิต−เครดิต · ค้นด้วยชื่อกลุ่ม', async () => {
     const r = await glList(db, { q: '', types: [], from: '2026-01-01', to: '2026-12-31', all: true, desc: false });

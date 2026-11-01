@@ -26,7 +26,7 @@ export default async function Accounts({ searchParams }: { searchParams: SP }) {
   const canW = can(user.role, 'accounts.write');
   const nodes = canW ? await db.q<any>(
     `select a.id, a.code, a.name, a.name_en, a.description, a.description_en, a.parent_id, a.is_control, a.is_active,
-            not (exists (select 1 from journal_lines l where l.account_id = a.id) or exists (select 1 from accounts c where c.parent_id = a.id)
+            not (a.is_seed or exists (select 1 from journal_lines l where l.account_id = a.id) or exists (select 1 from accounts c where c.parent_id = a.id)
               or exists (select 1 from system_accounts s where s.account_code = a.code) or exists (select 1 from expense_lines e where e.account_code = a.code)
               or exists (select 1 from bank_accounts b where b.account_id = a.id) or exists (select 1 from petty_funds b where b.account_id = a.id)
               or exists (select 1 from credit_cards b where b.account_id = a.id) or exists (select 1 from cheque_accounts b where b.account_id = a.id)) deletable
