@@ -18,13 +18,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const co = await companyOf(db);
   const exp = await db.q<any>(`select * from (
       select e.exp_date dt, e.exp_no no, coalesce(c.business_name, c.contact_name) who, e.due_date due, (select l.category from expense_lines l where l.expense_id = e.id order by l.line_no limit 1) cat, e.subtotal amt, e.status
-        from expenses e left join contacts c on c.id = e.contact_id where e.project = $1
+        from expenses e left join contacts c on c.id = e.contact_id where e.project = $1 and e.status not in ('cancelled','rejected')
       union all
       select g.ri_date, g.ri_no, coalesce(c.business_name, c.contact_name), g.due_date, null, g.subtotal, g.status
-        from goods_receipts g left join contacts c on c.id = g.contact_id where g.project = $1) x
+        from goods_receipts g left join contacts c on c.id = g.contact_id where g.project = $1 and g.status not in ('cancelled','rejected')) x
     where dt between $2::date and $3::date order by dt, no`, [p.name, from, to]);
   const rev = await db.q<any>(`select d.doc_date dt, d.doc_no no, coalesce(c.business_name, c.contact_name) who, d.due_date due, case when d.doc_type = 'CN' then -d.subtotal else d.subtotal end amt, d.status
-      from sales_docs d left join contacts c on c.id = d.contact_id where d.project = $1 and d.doc_type in ('INV','CA','CN') and d.doc_date between $2::date and $3::date order by d.doc_date, d.doc_no`, [p.name, from, to]);
+      from sales_docs d left join contacts c on c.id = d.contact_id where d.project = $1 and d.status <> 'cancelled' and d.doc_type in ('INV','CA','CN') and d.doc_date between $2::date and $3::date
+      order by d.doc_date, case d.doc_type when 'INV' then 1 when 'CN' then 2 else 3 end, d.doc_no`, [p.name, from, to]);
   const L: string[][] = [['รายงานตามโปรเจ็ค'], ['ชื่อบริษัท', co.name], ['เลขผู้เสียภาษี :', co.tax_id ?? ''], ['ชื่อโปรเจ็ค', p.name], []];
   const sec = (title: string, rows: any[], cat: boolean, label: string) => {
     if (!rows.length) return;
