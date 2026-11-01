@@ -5,6 +5,7 @@ import { periodRange } from '@/lib/period';
 import { reportPeriod, pickStatuses, pgArr, SALES_BUCKETS, periodLabel } from '@/lib/report-filter';
 import { addAcctSheet, acctDocs, companyOf, faSheet, faHead, faFormat, send, xDate } from '@/lib/fa-xlsx';
 import { STATUS } from '@/lib/status';
+import { employeeReport } from '@/lib/sales-by-employee';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,6 +23,38 @@ export async function GET(req: Request) {
   const withCancel = list.includes('cancelled');
   const db = await getDb();
   const sg = `case when d.doc_type='CN' then -1 else 1 end`;
+  if (mode === 'employee' || mode === 'employeedetail') {   // ยอดขายแยกตามพนักงาน: สรุป = 1 แถว/พนักงาน · ละเอียด = แตกเอกสารใต้พนักงาน (ตามไฟล์ Excel ของต้นแบบ)
+    const er = await employeeReport(db, { range, statuses: list, emp: g('emp') ?? '' });
+    const co2 = await companyOf(db), pl2 = periodLabel(range), full = mode === 'employeedetail', xb = new ExcelJS.Workbook();
+    const ws2 = faSheet(xb, 'SalesBySalespersonReport', 'รายงานยอดขายตามพนักงาน', co2, pl2, full ? 8 : 5, 0);
+    if (full) {
+      faHead(ws2, ['พนักงานขาย', 'เลขที่เอกสาร', 'ชื่อลูกค้า', 'วันที่', 'มูลค่า', 'ภาษีมูลค่าเพิ่ม', 'ยอดรวมสุทธิ', 'เอกสารอ้างอิงรับมัดจำ', 'สถานะ']);
+      for (const gp of er.groups) {
+        ws2.addRow([gp.name]).font = { bold: true };
+        for (const d of gp.docs) ws2.addRow([null, d.no, d.party, xDate(d.date), d.sub, d.vat, d.total, d.dep_doc ?? '', STATUS[d.status]?.[0] ?? d.status]);
+      }
+      ws2.addRow([null, null, 'ยอดรวม', null, er.totals.sub, er.totals.vat, er.totals.total]).font = { bold: true };   // ยังไม่ทดสอบ: ต้นแบบมีพนักงานคนเดียว จึงใส่แถวยอดรวมท้ายตารางแถวเดียว
+      faFormat(ws2, [22, 20, 30, 13, 14, 14, 14, 22, 16], [4], [5, 6, 7]);
+    } else {
+      faHead(ws2, ['พนักงานขาย', 'มูลค่า', 'ภาษีมูลค่าเพิ่ม', 'ยอดรวมสุทธิ']);
+      for (const gp of er.groups) ws2.addRow([gp.name, gp.sub, gp.vat, gp.total]);
+      ws2.addRow(['ยอดรวม', er.totals.sub, er.totals.vat, er.totals.total]).font = { bold: true };
+      faFormat(ws2, [26, 16, 16, 16], [], [2, 3, 4]);
+    }
+    const wa = faSheet(xb, 'Accounting Document', 'รายงานยอดขายตามพนักงาน', co2, pl2, full ? 8 : 5, 0);
+    if (full) {
+      faHead(wa, ['ผู้ทำรายการ', 'เลขที่เอกสาร', 'ผู้ติดต่อ', 'วัน/เดือน/ปี', 'ชื่อบัญชี', 'มูลค่า', 'สถานะ']);
+      for (const gp of er.acct) { wa.addRow([gp.name]).font = { bold: true }; for (const d of gp.docs) wa.addRow([null, d.no, '', xDate(d.date), d.account, d.val, d.status === 'cancelled' ? 'ยกเลิก' : 'อนุมัติแล้ว']); }
+      wa.addRow([null, null, 'ยอดรวม', null, null, er.acctTotal]).font = { bold: true };
+      faFormat(wa, [22, 20, 20, 13, 32, 14, 14], [4], [6]);
+    } else {
+      faHead(wa, ['ผู้ทำรายการ', 'มูลค่า']);
+      for (const gp of er.acct) wa.addRow([gp.name, gp.sub]);
+      wa.addRow(['ยอดรวม', er.acctTotal]).font = { bold: true };
+      faFormat(wa, [26, 16], [], [2]);
+    }
+    return send(xb, full ? 'รายงานยอดขายตามพนักงาน_แบบละเอียด' : 'รายงานยอดขายตามพนักงาน');
+  }
   const rows = await db.q<any>(`select d.doc_no, d.doc_type, d.doc_date, d.status, d.project, d.note, d.internal_note, d.salesperson, d.ref_no,
       d.subtotal*(${sg}) sub, d.vat*(${sg}) vat, d.total*(${sg}) total, d.discount_total*(${sg}) disc,
       c.business_name, c.contact_name, c.tax_id, c.branch_code, c.branch_name,

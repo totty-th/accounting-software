@@ -11,9 +11,11 @@ import { requirePage } from '@/lib/auth';
 import { ReportTools } from '@/components/ReportTools';
 import { ProductGroups } from '@/components/ProductGroups';
 import { acctDocs } from '@/lib/fa-xlsx';
+import { employeeReport, NO_EMP } from '@/lib/sales-by-employee';
+import { EmployeeGroups } from '@/components/EmployeeGroups';
 
 export const dynamic = 'force-dynamic';
-type Sp = { view?: string; tab?: string; period?: string; from?: string; to?: string; type?: string; st?: string | string[] };
+type Sp = { view?: string; emp?: string; tab?: string; period?: string; from?: string; to?: string; type?: string; st?: string | string[] };
 const ST_BUCKETS = SALES_BUCKETS;
 const ST_OPTS: [string, string][] = [['wait', 'รอเก็บเงิน'], ['done', 'เก็บเงินแล้ว'], ['rcpt', 'เปิดใบเสร็จแล้ว'], ['split', 'แบ่งจ่าย'], ['ok', 'อนุมัติแล้ว/ใช้งาน (ใบลดหนี้/ใบเพิ่มหนี้)'], ['cancelled', 'ยกเลิก (แสดงแต่ไม่นับยอด)']];
 // รายงานสรุปยอดขาย: INV + ขายสด + ใบเพิ่มหนี้ เป็นบวก, ใบลดหนี้เป็นลบ · ไม่รวมใบเสนอราคา/ใบวางบิล/เอกสารที่ยกเลิก/ใบมัดจำ (มัดจำไม่ใช่รายได้)
@@ -56,7 +58,7 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
     for (const d of docs) { const g = m.get(d.name) ?? { name: d.name, n: 0, sub: 0, vat: 0, total: 0, docs: [] }; g.n++; g.sub += +d.sub; g.vat += +d.vat; g.total += +d.total; g.docs.push(d); m.set(d.name, g); }
     rows = [...m.values()].sort((a, b) => b.total - a.total);
   }
-  if (view === 'employee') rows = await db.q(`select * from sales_by_salesperson($1::date,$2::date,$3::text[])`, [range?.[0] ?? null, range?.[1] ?? null, pgArr(stList)]); // ไม่กรองตามประเภทเอกสาร (ให้ผลรวมตรงยอดบัญชีเสมอ)
+  const emp = view === 'employee' ? await employeeReport(db, { range, statuses: stList, emp: searchParams.emp ?? '' }) : null;   // ไม่กรองตามประเภทเอกสาร (ให้ผลรวมตรงยอดบัญชีเสมอ)
   // ยอดขายตามสินค้า (แบบ FA): แท็บเอกสารขาย = กลุ่มสินค้า กางดูเอกสารได้ · แท็บเอกสารบัญชี = ใบสำคัญที่ลงรายได้ตรง (JV) กลุ่มตามบัญชี
   let acct: any[] = [], acctTotal = 0, salesTotal = 0;
   const tab = searchParams.tab === 'acct' ? 'acct' : 'sales';
@@ -79,13 +81,19 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
     <>
       <div className="top"><div><h1>รายงานขาย</h1><p className="sub">ใบลดหนี้นับเป็นลบ · ไม่รวมเอกสารที่ยกเลิก ใบเสนอราคา ใบวางบิล และใบมัดจำ</p></div></div>
       <div className="tabs noprint">{VIEWS.map(([k, v]) => <Link key={k} href={q({ view: k })} className={view === k ? 'on' : ''}>{v}</Link>)}</div>
-      <ReportFilter period={period} from={searchParams.from} to={searchParams.to} groups={[{ label: 'เอกสารขาย', options: ST_OPTS }]} selected={stSel} hidden={{ view }} selects={[{ name: 'type', label: 'ประเภทเอกสาร', value: type, options: [['', 'ทั้งหมด'], ...TYPES.map(k => [k, DOC_TYPE[k]] as [string, string])] }]} />
+      <ReportFilter period={period} from={searchParams.from} to={searchParams.to} groups={[{ label: 'เอกสารขาย', options: ST_OPTS }]} selected={stSel} hidden={{ view, tab: view === 'employee' ? tab : '' }} selects={view === 'employee'
+        ? [{ name: 'emp', label: 'พนักงาน', value: searchParams.emp ?? '', options: [['', 'พนักงานทั้งหมด'], ...(emp?.emps ?? []).map(n => [n === 'ไม่ระบุพนักงาน' ? NO_EMP : n, n] as [string, string])] }]
+        : [{ name: 'type', label: 'ประเภทเอกสาร', value: type, options: [['', 'ทั้งหมด'], ...TYPES.map(k => [k, DOC_TYPE[k]] as [string, string])] }]} />
       <div className="panel">
-        <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {tot.n} เอกสาร</div>
+        <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {emp ? emp.totals.docs + emp.acctDocs : tot.n} เอกสาร</div>
         <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 8 }}>
+          {emp ? <>
+            <div title={`เอกสารขาย ${money(emp.totals.sub)} · เอกสารบัญชี ${money(emp.acctTotal)}`}><div className="sub">ยอดรวมก่อนภาษี (ขาย+บัญชี) ⓘ</div><strong>{money(emp.totals.sub + emp.acctTotal)}</strong><div className="sub">เอกสารขาย {money(emp.totals.sub)} · เอกสารบัญชี {money(emp.acctTotal)}</div></div>
+            <div><div className="sub">ภาษีมูลค่าเพิ่ม</div><strong>{money(emp.totals.vat)}</strong></div>
+            <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(emp.totals.total + emp.acctTotal)}</strong></div></> : <>
           <div><div className="sub">มูลค่าก่อนภาษี</div><strong>{money(tot.sub)}</strong></div>{view === 'product' && <div title={`เอกสารขาย ${money(salesTotal)} · เอกสารบัญชี ${money(acctTotal)}`}><div className="sub">ยอดรวมก่อนภาษี (ขาย+บัญชี) ⓘ</div><strong>{money(salesTotal + acctTotal)}</strong><div className="sub">เอกสารขาย {money(salesTotal)} · เอกสารบัญชี {money(acctTotal)}</div></div>}
           <div><div className="sub">ภาษีมูลค่าเพิ่ม</div><strong>{money(tot.vat)}</strong></div>
-          <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(tot.total)}</strong></div>
+          <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(tot.total)}</strong></div></>}
         </div>
       </div>
       {rc && <div className="panel" style={{ marginTop: 14 }}>
@@ -100,10 +108,15 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
           <div className="sub" style={{ marginTop: 8 }}>รายการบัญชีรายได้ที่ลงตรง (ไม่ผ่านเอกสารขาย เช่น ใบสำคัญทั่วไป) รวม {money(rc.gl.manual)} · ไม่นับในยอดขายข้างบน</div>
           <ul className="rel">{rc.gl.manual_items.map((m: any) => <li key={m.voucher_no + m.code}>{m.voucher_no} {dateTh(m.date)} · {m.code} {m.name} · {money(m.amount)}</li>)}</ul></>}
       </div>}
-      <ReportTools exportBase="/reports/sales/export" modes={view === 'product' ? [['product', 'Excel (สรุป)'], ['productdetail', 'Excel (แบบละเอียด)']] : [['summary', 'Excel (สรุป)'], ['detail', 'Excel (แบบละเอียด)']]} title="รายงานขาย" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
+      <ReportTools exportBase="/reports/sales/export" modes={view === 'employee' ? [['employee', 'Excel (สรุป)'], ['employeedetail', 'Excel (แบบละเอียด)']] : view === 'product' ? [['product', 'Excel (สรุป)'], ['productdetail', 'Excel (แบบละเอียด)']] : [['summary', 'Excel (สรุป)'], ['detail', 'Excel (แบบละเอียด)']]} title="รายงานขาย" meta={[['ช่วงเวลา :', range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด']]} />
       <div data-report className="panel" style={{ padding: 0, overflowX: 'auto', marginTop: 4 }}>
+        {emp && <div className="tabs noprint" style={{ padding: '8px 12px 0' }}><Link href={q({ tab: 'sales' })} className={tab === 'sales' ? 'on' : ''}>เอกสารขาย ({emp.totals.docs})</Link><Link href={q({ tab: 'acct' })} className={tab === 'acct' ? 'on' : ''}>เอกสารบัญชี ({emp.acctDocs})</Link></div>}
         {view === 'product' && <div className="tabs noprint" style={{ padding: '8px 12px 0' }}><Link href={q({ tab: 'sales' })} className={tab === 'sales' ? 'on' : ''}>เอกสารขาย ({rows.reduce((t, g) => t + g.docs.length, 0)})</Link>{type === '' && <Link href={q({ tab: 'acct' })} className={tab === 'acct' ? 'on' : ''}>เอกสารบัญชี ({acct.reduce((t, g) => t + g.docs.length, 0)})</Link>}</div>}
-        {view === 'product' && tab === 'acct' ? (acct.length === 0 ? <div className="empty">ไม่มีเอกสารบัญชีในช่วงที่เลือก</div> : <ProductGroups cols={['เลขที่เอกสาร', 'วันที่', 'คำอธิบาย', '', 'มูลค่า']} groups={acct.map(g => ({ name: g.name, qty: null, unit: null, sub: g.sub, docs: g.docs.map((v: any) => ({ no: v.no, href: '', a: dateTh(v.dt), b: v.memo ?? '', qty: null, unit: null, net: +v.val })) }))} total={acctTotal} />) : rows.length === 0 ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : view === 'summary' ? (
+        {emp ? (tab === 'acct'
+          ? <EmployeeGroups cols={['เลขที่เอกสาร', 'ชื่อบัญชี', '']} netLabel="มูลค่า" groups={emp.acct.map(g => ({ name: g.name, label: g.name, net: g.sub, rows: g.docs.map(d => ({ no: d.no, date: dateTh(d.date), party: d.account, net: d.val, status: d.status })) }))} />
+          : <EmployeeGroups cols={['เลขที่เอกสาร', 'ชื่อลูกค้า/ชื่อโปรเจ็ค', '']} netLabel="มูลค่าก่อนภาษี" groups={emp.groups.map(g => ({ name: g.name, label: `${g.name} (จำนวนลูกค้าที่ขายได้ ${g.customers} ราย)`, net: g.sub,
+              rows: g.docs.map(d => ({ no: d.no, href: `/sales/${d.no}`, date: dateTh(d.date), party: d.party, sub: d.project, net: d.sub, status: d.status, pdf: true })) }))} />
+        ) : view === 'product' && tab === 'acct' ? (acct.length === 0 ? <div className="empty">ไม่มีเอกสารบัญชีในช่วงที่เลือก</div> : <ProductGroups cols={['เลขที่เอกสาร', 'วันที่', 'คำอธิบาย', '', 'มูลค่า']} groups={acct.map(g => ({ name: g.name, qty: null, unit: null, sub: g.sub, docs: g.docs.map((v: any) => ({ no: v.no, href: '', a: dateTh(v.dt), b: v.memo ?? '', qty: null, unit: null, net: +v.val })) }))} total={acctTotal} />) : rows.length === 0 && !emp ? <div className="empty">ไม่มีข้อมูลในช่วงที่เลือก</div> : view === 'summary' ? (
           <DocRows partyLabel="ลูกค้า" vatLabel="ภาษีมูลค่าเพิ่ม" rows={rows.map(r => ({ key: r.id, href: `/sales/${r.doc_no}`, no: r.doc_no, date: dateTh(r.doc_date), party: partyName(r),
             net: Number(r.sub), vat: Number(r.vat), total: Number(r.total), status: r.status, dim: r.status === 'cancelled',
             lines: (lineMap.get(r.id) ?? []).map((l: any) => ({ d: l.description, q: `${Number(l.qty).toLocaleString('th-TH', { maximumFractionDigits: 4 })} × ${money(l.unit_price)}`, net: Number(l.amount) })) }))} />
@@ -112,9 +125,6 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
             {rows.map(r => <tbody key={r.name}><tr><td><details><summary style={{ cursor: 'pointer' }}>{r.name}</summary>
               <ul className="rel">{r.docs.map((d: any) => <li key={d.doc_no}><Link href={`/sales/${d.doc_no}`}>{d.doc_no}</Link> · {dateTh(d.doc_date)} · {money(d.sub)} · <Pill s={d.status} /></li>)}</ul></details></td>
               <td className="num">{r.n}</td><td className="num">{money(r.sub)}</td><td className="num">{money(r.vat)}</td><td className="num">{money(r.total)}</td></tr></tbody>)}</table>
-        ) : view === 'employee' ? (
-          <table><thead><tr><th>พนักงานขาย</th><th className="num">จำนวนลูกค้า</th><th className="num">จำนวนเอกสาร</th><th className="num">มูลค่า</th><th className="num">ภาษีมูลค่าเพิ่ม</th><th className="num">ยอดรวมสุทธิ</th></tr></thead>
-            <tbody>{rows.map(r => <tr key={r.salesperson}><td>{r.salesperson}</td><td className="num">{r.customer_count}</td><td className="num">{r.doc_count}</td><td className="num">{money(r.sub)}</td><td className="num">{money(r.vat)}</td><td className="num">{money(r.total)}</td></tr>)}</tbody></table>
         ) : (
           <ProductGroups cols={['เลขที่เอกสาร', 'ชื่อลูกค้า/ชื่อโปรเจ็ค', 'จำนวน', 'ราคาต่อหน่วย', 'มูลค่าก่อนภาษี']} groups={rows.map(g => ({ name: g.name, qty: g.qty, unit: g.qty ? g.sub / g.qty : 0, sub: g.sub,
             docs: g.docs.map((d: any) => ({ no: d.doc_no, href: `/sales/${d.doc_no}`, a: d.party, b: '', qty: +d.qty, unit: +d.qty ? +d.net / +d.qty : 0, net: +d.net })) }))} total={salesTotal} />
