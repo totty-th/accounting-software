@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { getDb, today } from '@/lib/db';
 import { can } from '@/lib/permissions';
 import { money, dateTh } from '@/lib/format';
-import { closingRange, CLOSING_MODES, STATUS_TH } from '@/lib/closing';
+import { closingRange, STATUS_TH } from '@/lib/closing';
+import { ClosingPicker } from '@/components/ClosingPicker';
 import { ClosingActions } from '@/components/ClosingForm';
 
-type Q = { mode?: string; month?: string; year?: string; from?: string; to?: string; date?: string; eq?: string };
+type Q = { m?: string; month?: string; from?: string; to?: string; date?: string; eq?: string };
 
 /** หน้าสร้าง/ดู/แก้เอกสารปิดบัญชีรายได้และค่าใช้จ่าย: วันที่ปิด · รอบปิดบัญชี (เดือน/ช่วงวันที่/ปี) · บัญชีบันทึกผลต่าง · แสดงข้อมูล */
 export async function ClosingDoc({ id, q, role }: { id?: string; q: Q; role: string }) {
@@ -16,10 +17,11 @@ export async function ClosingDoc({ id, q, role }: { id?: string; q: Q; role: str
   const [def] = await db.q<any>(`select closing_default_account() code`);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(q.date ?? '') ? q.date! : doc?.d ?? today();
   const eq = eqs.some(a => a.code === q.eq) ? q.eq! : doc?.equity_account ?? def.code;
-  const hasQ = !!(q.mode || q.from || q.month || q.year);
-  const base = doc ? { mode: 'range', from: doc.f, to: doc.t } : closingRange({}, today());
-  const rg = hasQ ? closingRange(q, today()) : base;
-  const shown = !!doc || hasQ;
+  // ค่าเริ่มต้น = เดือนปัจจุบัน และโหลดยอดให้ทันที (แบบ FA) · เอกสารที่เปิดดูใช้รอบของเอกสาร
+  const rg = doc && (approved || !(q.m || q.from)) ? { m: 'range', from: doc.f, to: doc.t } : closingRange(q, today());
+  const shown = true;
+  // รอบทับกับเอกสารเดิม: แจ้งตั้งแต่ตอนแสดงข้อมูล พร้อมลิงก์ไปเอกสารนั้น (FA ทำแบบเดียวกัน)
+  const [clash] = approved || !rg.from ? [] : await db.q<any>(`select id, doc_no from period_closings where deleted_at is null and ($3::uuid is null or id <> $3) and period_from <= $2::date and period_to >= $1::date order by created_at limit 1`, [rg.from, rg.to, doc?.id ?? null]);
   let rev: any[] = [], exp: any[] = [], eqLine: any = null;
   if (approved) {
     const ls = await db.q<any>(`select a.code, a.name, a.type, (l.debit - l.credit)::float8 dr from journal_lines l join accounts a on a.id = l.account_id where l.voucher_id = $1 order by l.line_no`, [doc.voucher_id]);
@@ -34,7 +36,6 @@ export async function ClosingDoc({ id, q, role }: { id?: string; q: Q; role: str
   const total = Math.max(expT, 0) + Math.max(-net, 0);
   const eqName = eqs.find(a => a.code === eq)?.name ?? '';
   const canW = can(role as any, 'accounts.write');
-  const years = Array.from({ length: 8 }, (_, i) => Number(today().slice(0, 4)) + 1 - i);
   const Group = ({ title, rows, t, side }: { title: string; rows: any[]; t: number; side: 'dr' | 'cr' }) => (
     <>
       <tr style={{ background: 'var(--bg2, #f3f5f8)', fontWeight: 600 }}><td colSpan={2}>{title}</td><td className="num">{side === 'dr' ? money(t) : ''}</td><td className="num">{side === 'cr' ? money(t) : ''}</td></tr>
@@ -48,7 +49,7 @@ export async function ClosingDoc({ id, q, role }: { id?: string; q: Q; role: str
         <div className="noprint" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {doc && <a className="btn ghost" href={`/settings/close-year/${doc.id}/xlsx`}>⬇ ดาวน์โหลด Excel</a>}
           {approved && <Link className="btn ghost" href={`/journals/${doc.voucher_id}`}>ดูใบสำคัญ {doc.voucher_no}</Link>}
-          {(!doc || !approved) && shown && (rev.length + exp.length > 0) && <ClosingActions id={doc?.id} status={doc?.status} canWrite={canW} vals={{ date, from: rg.from, to: rg.to, equity: eq }} />}
+          {(!doc || !approved) && !clash && (rev.length + exp.length > 0) && <ClosingActions id={doc?.id} status={doc?.status} canWrite={canW} vals={{ date, from: rg.from, to: rg.to, equity: eq }} />}
           {approved && <ClosingActions id={doc.id} status="approved" canWrite={canW} vals={{ date, from: doc.f, to: doc.t, equity: eq }} />}</div></div>
       <div className="panel">
         {approved ? (
@@ -57,20 +58,12 @@ export async function ClosingDoc({ id, q, role }: { id?: string; q: Q; role: str
             <label className="f">รอบปิดบัญชี<input readOnly value={`${dateTh(doc.f)} - ${dateTh(doc.t)}`} /></label>
             <label className="f">บัญชีสำหรับบันทึกผลต่าง<input readOnly value={`${doc.equity_account} / ${eqLine?.name ?? eqName}`} /></label></div>
         ) : (
-          <form method="get" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label className="f">วันที่ปิดบัญชี<input type="date" name="date" defaultValue={date} /></label>
-            <label className="f">รอบปิดบัญชี<select name="mode" defaultValue={rg.mode}>{CLOSING_MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-            <label className="f">เดือน (เมื่อเลือก "เดือน")<input type="month" name="month" defaultValue={rg.from.slice(0, 7)} /></label>
-            <label className="f">ปี (เมื่อเลือก "ปี")<select name="year" defaultValue={rg.from.slice(0, 4)}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select></label>
-            <label className="f">ตั้งแต่ (เมื่อเลือก "ช่วงวันที่")<input type="date" name="from" defaultValue={rg.from} /></label>
-            <label className="f">ถึง<input type="date" name="to" defaultValue={rg.to} /></label>
-            <label className="f">บัญชีสำหรับบันทึกผลต่าง<select name="eq" defaultValue={eq}>{eqs.map(a => <option key={a.code} value={a.code}>{a.code} / {a.name}</option>)}</select></label>
-            <button className="btn">แสดงข้อมูล</button></form>
+          <ClosingPicker v={{ m: rg.m, from: rg.from, to: rg.to, date, eq }} today={today()} eqs={eqs} />
         )}
       </div>
-      {!shown && <div className="panel empty">เลือก "รอบปิดบัญชี" เพื่อแสดงยอดรายได้และค่าใช้จ่าย แล้วคลิก "แสดงข้อมูล"</div>}
-      {shown && rev.length + exp.length === 0 && <div className="panel empty">ไม่พบรายการรายได้/ค่าใช้จ่ายในช่วงที่เลือก</div>}
-      {shown && rev.length + exp.length > 0 && (
+      {clash && <div className="panel" role="alert" style={{ borderLeft: '4px solid var(--red, #d33)' }}>ไม่สามารถดำเนินการต่อได้ เนื่องจากมีการปิดบัญชีรายได้และค่าใช้จ่ายในช่วงนี้แล้ว กรุณาอัปเดตข้อมูลที่เอกสาร <Link href={`/settings/close-year/${clash.id}`}><b>{clash.doc_no}</b></Link> หรือเลือกช่วงวันที่อื่น</div>}
+      {shown && !clash && rev.length + exp.length === 0 && <div className="panel empty">ไม่พบรายการรายได้/ค่าใช้จ่ายในช่วงที่เลือก</div>}
+      {shown && !clash && rev.length + exp.length > 0 && (
         <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
           <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div><b style={{ fontSize: 18 }}>{co?.name}</b><div className="sub">ช่วงเวลา {dateTh(approved ? doc.f : rg.from)} - {dateTh(approved ? doc.t : rg.to)}</div></div>
