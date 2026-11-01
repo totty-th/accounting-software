@@ -207,7 +207,7 @@ export default async function Home({ searchParams }: { searchParams: { p?: strin
           {recent.length === 0 ? <div className="empty">ยังไม่มีเอกสาร</div> : (
             <table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>ลูกค้า</th><th>วันที่</th><th className="num">ยอดรวม</th><th>สถานะ</th></tr></thead>
               <tbody>{recent.map(r => (
-                <tr key={r.id}><td className="no">{r.doc_no}</td><td>{DOC_TYPE[r.doc_type]}</td><td>{partyName(r)}</td>
+                <tr key={r.id}><td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link></td><td>{DOC_TYPE[r.doc_type]}</td><td>{partyName(r)}</td>
                   <td>{dateTh(r.doc_date)}</td><td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td></tr>))}</tbody></table>)}
         </Group>)}
     </div>
