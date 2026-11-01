@@ -598,3 +598,8 @@ export async function bulkReceiveTaxInvoices(rows: { type: string; id: string; i
 }
 export const resetWhtCert = async (id: string) => run(call('select reset_wht_cert($1)', id), ['/wht'], 'wht.write');
 export const activateWhtCert = async (id: string) => run(call('select activate_wht_cert($1)', id), ['/wht'], 'wht.write');
+export const receivePaymentSlip = async (id: string) => run(call('select receive_payment_slip($1)', id), SLIP, 'expenses.write');
+export const resetPaymentSlip = async (id: string) => run(call('select reset_payment_slip($1)', id), SLIP, 'expenses.write');
+export const deletePaymentSlip = async (id: string) => run(call('select delete_payment_slip($1)', id), SLIP, 'expenses.write');
+export const updatePaymentSlip = async (id: string, p: { due: string; preparer: string; requester: string; approver: string; reason: string; note: string; internal: string }) =>
+  run(call('select update_payment_slip($1,$2::date,$3,$4,$5,$6,$7,$8)', id, p.due || null, p.preparer, p.requester, p.approver, p.reason, p.note, p.internal), SLIP, 'expenses.write');
