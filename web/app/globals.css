@@ -328,3 +328,11 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
 .cdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle}
 .cpills{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
 .cpill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:var(--c);white-space:nowrap}
+
+/* รายงานใบรับสินค้าแยกตามสินค้า: แถวสินค้าพับ/ขยายได้ */
+.rbp{border-top:1px solid var(--line)}
+.rbp>summary{display:grid;grid-template-columns:minmax(0,3fr) 1fr 1fr 1fr;gap:8px;padding:10px 14px;cursor:pointer;list-style:none;align-items:center}
+.rbp>summary::-webkit-details-marker{display:none}
+.rbp>summary::before{content:'▸';position:absolute;margin-left:-12px;color:var(--muted)}
+.rbp[open]>summary::before{content:'▾'}.rbp[open]{background:color-mix(in srgb,var(--brand) 5%,var(--surface))}
+.rbp table{min-width:0}

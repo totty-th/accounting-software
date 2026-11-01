@@ -74,7 +74,7 @@ export default async function PurchaseReport({ searchParams }: { searchParams: S
   const href = (r: any) => r.k === 'RI' ? `/purchases/ri/${r.id}` : `/expenses/${r.id}`;
   return (
     <>
-      <div className="top"><div><h1>รายงานซื้อและค่าใช้จ่าย</h1><p className="sub">มูลค่าก่อน VAT · ไม่รวมเอกสารที่ไม่อนุมัติ/ยกเลิก · ใบรับสินค้าเป็นสินค้าคงเหลือ ไม่ใช่ค่าใช้จ่ายจนกว่าจะขาย · ภาษีซื้อแยกต่างหาก</p></div></div>
+      <div className="top"><div><h1>{kind === 'RI' ? 'รายงานใบรับสินค้า' : 'รายงานสรุปค่าใช้จ่าย'}</h1><p className="sub">มูลค่าก่อน VAT · ไม่รวมเอกสารที่ไม่อนุมัติ/ยกเลิก · ใบรับสินค้าเป็นสินค้าคงเหลือ ไม่ใช่ค่าใช้จ่ายจนกว่าจะขาย · ภาษีซื้อแยกต่างหาก</p></div></div>
       <div className="tabs noprint">
         <Link href={q({ doc: '' })} className={!isAcct ? 'on' : ''}>เอกสารซื้อ ({tot.n})</Link>
         <Link href={q({ doc: 'acct' })} className={isAcct ? 'on' : ''}>เอกสารบัญชี ({acctAll.length})</Link></div>
