@@ -66,7 +66,9 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     wrap(v.company?.address ?? '', 9.5, 280).forEach((ln, i) => draw(page, ln, L, y - 15 - i * 12, 9.5, { color: grey }));
     const addrN = wrap(v.company?.address ?? '', 9.5, 280).length;
     if (v.company?.tax_id) draw(page, `เลขประจำตัวผู้เสียภาษี ${v.company.tax_id}`, L, y - 15 - addrN * 12, 9.5, { color: grey });
-    const ttl = wrap((!dlv && dz?.title) || t.title, 16, 175); ttl.forEach((ln, i) => draw(page, ln, R, y - i * 19, 16, { bold: true, right: true, color: col }));
+    const ttl = (() => { const raw = (!dlv && dz?.title) || t.title; const out: string[] = []; let cur = '';
+      for (const tok of raw.split(/(?<=\/)/)) { if (cur && width(cur + tok, 16, true) > 175) { out.push(cur); cur = tok; } else cur += tok; }
+      if (cur) out.push(cur); return out.flatMap(l => (width(l, 16, true) > 175 ? wrap(l, 16, 165) : [l])); })(); ttl.forEach((ln, i) => draw(page, ln, R, y - i * 19, 16, { bold: true, right: true, color: col }));
     if (dlv || dz?.copy_mark !== false) draw(page, label, R, y - 18 - (ttl.length - 1) * 19, 10.5, { right: true, color: grey });
     y -= 78;
     // ลูกค้า + เลขที่/วันที่
