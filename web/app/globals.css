@@ -316,3 +316,15 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
 .empty.sm{padding:12px}
 .dash .cards{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 .dv-mini,.dv-table table{min-width:0}.dv-table{overflow-x:auto}
+
+/* สมุดรายชื่อ: ชิปกรองสี + ป้ายสถานะ (โทนสีแบบ monday) */
+.cfilters{display:flex;flex-wrap:wrap;gap:10px 22px;margin:0 0 14px}
+.cfilters>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.cfilters small{color:var(--muted);font-weight:600;margin-right:2px}
+.cchip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px 5px 10px;border-radius:999px;border:1.5px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,var(--surface));color:var(--fg);font-size:13.5px;font-weight:600;text-decoration:none}
+.cchip i{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.cchip b{font-weight:700;font-size:12px;background:color-mix(in srgb,var(--c) 22%,transparent);border-radius:999px;padding:0 7px}
+.cchip.on{background:var(--c);border-color:var(--c);color:#fff}.cchip.on i{background:#fff}.cchip.on b{background:rgba(255,255,255,.28)}
+.cdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle}
+.cpills{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.cpill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:var(--c);white-space:nowrap}
