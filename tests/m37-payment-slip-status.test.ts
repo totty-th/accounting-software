@@ -48,8 +48,7 @@ describe('M37 สถานะใบเตรียมจ่ายตามต้
     await call('select pay_payment_slip_vendor($1,$2,$3::date)', [s, v1, D]);
     expect(await st('expenses', e)).toBe('paid'); expect(await st('goods_receipts', r)).toBe('paid');
     await call('select receive_payment_slip($1)', [s]); expect((await slipOf(s)).receipt_received).toBe(true);
-    expect(await err(call('select cancel_payment_slip($1)', [s]))).toContain('รีเซ็ตก่อน');
-    expect(await err(call('select delete_payment_slip($1)', [s]))).toContain('รีเซ็ตก่อน');
+    expect(await err(call('select delete_payment_slip($1)', [s]))).toContain('ไม่สามารถลบเอกสารได้');
     await call('select reset_payment_slip($1)', [s]);
     expect((await slipOf(s)).receipt_received).toBe(false);
     expect(await st('expenses', e)).not.toBe('paid'); expect(await st('goods_receipts', r)).not.toBe('paid');
@@ -63,9 +62,9 @@ describe('M37 สถานะใบเตรียมจ่ายตามต้
     const h = await slipOf(s); expect([h.preparer, h.reason, h.note, h.internal_note]).toEqual(['ผู้จัดเตรียม', 'เหตุผล', 'หมายเหตุ', 'โน้ต']);
     await call('select delete_payment_slip($1)', [s]);
     expect(+(await one<any>('select count(*) c from payment_slips')).c).toBe(0);
-    const s2 = await slip([{ type: 'EXP', id: e }]); expect(s2).toBeTruthy();
+    const e2 = await ex(v1, 500); const s2 = await slip([{ type: 'EXP', id: e2 }]); expect(s2).toBeTruthy();
     await call('select cancel_payment_slip($1)', [s2]);
     expect(await err(call('select update_payment_slip($1,$2::date,null,null,null,null,null,null)', [s2, D]))).toContain('ยกเลิกแล้ว');
-    await call('select delete_payment_slip($1)', [s2]);   // ลบใบที่ยกเลิกได้
+    expect(await err(call('select delete_payment_slip($1)', [s2]))).toContain('ไม่สามารถลบเอกสารได้');   // ใบที่ยกเลิกลบไม่ได้ (รอบ 2)
   });
 });

@@ -9,8 +9,8 @@ import { cancelPaymentSlip, receivePaymentSlip, resetPaymentSlip, deletePaymentS
 export function SlipStatus({ id, state, canWrite }: { id: string; state: SlipState; canWrite: boolean }) {
   const router = useRouter(); const [pending, start] = useTransition(); const [err, setErr] = useState<string | null>(null);
   const opts: [string, string][] = state === 'pending' ? [['pay', 'ชำระเงิน'], ['cancel', 'ยกเลิก']]
-    : state === 'paid' ? [['receive', 'รับใบเสร็จแล้ว'], ['edit', 'แก้ไขข้อมูลการชำระ'], ['reset', 'รีเซ็ต']]
-    : state === 'received' ? [['edit', 'แก้ไขข้อมูลการชำระ'], ['reset', 'รีเซ็ต']] : [];
+    : state === 'paid' ? [['receive', 'รับใบเสร็จแล้ว'], ['edit', 'แก้ไขข้อมูลการชำระ'], ['reset', 'รีเซ็ต'], ['cancel', 'ยกเลิก']]
+    : state === 'received' ? [['edit', 'แก้ไขข้อมูลการชำระ'], ['reset', 'รีเซ็ต'], ['cancel', 'ยกเลิก']] : [];
   const go = (v: string) => {
     if (v === 'pay' || v === 'edit') { router.push(`/payments/${id}#pay`); return; }
     start(async () => {

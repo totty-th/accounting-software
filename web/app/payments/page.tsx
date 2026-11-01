@@ -52,7 +52,7 @@ export default async function Payments({ searchParams }: { searchParams: { q?: s
                   <a className="btn sm ghost" href={`/purchases/pay/${r.id}/pdf`} target="_blank">พิมพ์ / PDF</a>
                   <a className="btn sm ghost" href={`/purchases/pay/${r.id}/pdf?download=1`}>ดาวน์โหลด</a>
                   <a className="btn sm ghost" href={`/payments/${r.id}#share`}>แชร์</a>
-                  {W && (r.state === 'pending' || r.state === 'cancelled') && <SlipDelete id={r.id} />}
+                  {W && r.state === 'pending' && <SlipDelete id={r.id} />}
                 </div></details></td></tr>))}</tbody></table>
           <p className="sub" style={{ marginTop: 8 }}>{rows.length} ใบ · ยอดจ่ายสุทธิรวม (ไม่รวมที่ยกเลิก) {money(total)}</p></div>)}
     </>

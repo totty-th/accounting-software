@@ -603,3 +603,6 @@ export const resetPaymentSlip = async (id: string) => run(call('select reset_pay
 export const deletePaymentSlip = async (id: string) => run(call('select delete_payment_slip($1)', id), SLIP, 'expenses.write');
 export const updatePaymentSlip = async (id: string, p: { due: string; preparer: string; requester: string; approver: string; reason: string; note: string; internal: string }) =>
   run(call('select update_payment_slip($1,$2::date,$3,$4,$5,$6,$7,$8)', id, p.due || null, p.preparer, p.requester, p.approver, p.reason, p.note, p.internal), SLIP, 'expenses.write');
+export const addSlipDoc = async (slip: string, type: string, doc: string) => run(call('select add_slip_doc($1,$2,$3)', slip, type, doc), SLIP, 'expenses.write');
+export const removeSlipDoc = async (slip: string, line: number) => run(call('select remove_slip_doc($1,$2)', slip, line), SLIP, 'expenses.write');
+export const renamePaymentSlip = async (id: string, no: string) => run(call('select rename_payment_slip($1,$2)', id, no.trim()), SLIP, 'expenses.write');

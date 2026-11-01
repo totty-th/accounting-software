@@ -8,6 +8,7 @@ import { PurchaseDocTools } from '@/components/PurchaseDocTools';
 import { SlipStatus } from '@/components/SlipStatus';
 import { SLIP_TH, SLIP_COLOR } from '@/lib/slip-state';
 import { SlipEdit } from '@/components/SlipEdit';
+import { SlipDocs, SlipRemove, SlipRename } from '@/components/SlipDocs';
 import { slipRows } from '@/lib/payment-slips';
 import * as A from '@/lib/actions';
 
@@ -34,10 +35,17 @@ export default async function SlipPage({ params }: { params: { id: string } }) {
   const cards = (await db.q(`select id, card_name, last4 from credit_cards where is_active order by card_name`)).map(c => ({ id: c.id as string, label: `${c.card_name} ****${c.last4}` }));
   const petties = (await db.q(`select id, fund_name from petty_funds where is_active order by fund_name`)).map(f => ({ id: f.id as string, label: f.fund_name as string }));
   const editable = W && s.status === 'active';
+  const events = await db.q<any>('select at, text from payment_slip_events where slip_id=$1 order by id desc', [s.id]);
+  const canEditDocs = editable && its.length > 0 && its.every(i => !i.paid);
+  const cands = canEditDocs ? (await db.q<any>(`select 'EXP' t, e.id, i.doc_no from expenses e cross join lateral slip_doc_info('EXP', e.id) i
+      where e.contact_id=$1 and i.payable and not exists (select 1 from payment_slip_items x where x.doc_type='EXP' and x.doc_id=e.id)
+    union all select 'RI', g.id, i.doc_no from goods_receipts g cross join lateral slip_doc_info('RI', g.id) i
+      where g.contact_id=$1 and i.payable and not exists (select 1 from payment_slip_items x where x.doc_type='RI' and x.doc_id=g.id) order by 3`, [its[0].contact_id]))
+    .map(c => ({ key: `${c.t}:${c.id}`, label: c.doc_no as string })) : [];
   return (
     <>
       <div className="top"><div>
-        <h1>{editable ? 'แก้ไขใบเตรียมจ่าย/ใบสำคัญจ่าย' : 'ใบเตรียมจ่าย/ใบสำคัญจ่าย'} <span className="no">{s.pay_no}</span></h1>
+        <h1>{editable ? 'แก้ไขใบเตรียมจ่าย/ใบสำคัญจ่าย' : 'ใบเตรียมจ่าย/ใบสำคัญจ่าย'} <span className="no">{s.pay_no}</span> {editable && <SlipRename id={s.id} no={s.pay_no} />}</h1>
         <p className="sub"><a href="/payments">← กลับรายการ</a> · วันที่ {dateTh(s.pay_date)} · ผู้จ่าย {s.vendors.join(', ')}</p></div>
         <div className="acts" style={{ gap: 8 }}><SlipStatus id={s.id} state={s.state} canWrite={W} /></div></div>
       <div className="panel" id="share"><div className="acts" style={{ justifyContent: 'space-between' }}>
@@ -46,14 +54,15 @@ export default async function SlipPage({ params }: { params: { id: string } }) {
       <SlipEdit id={s.id} disabled={!editable}
         init={{ due: h.due_date ? dateIso(h.due_date) : '', preparer: h.preparer ?? '', requester: h.requester ?? '', approver: h.approver ?? '', reason: h.reason ?? '', note: h.note ?? '', internal: h.internal_note ?? '' }} />
       <div className="panel"><table>
-        <thead><tr><th>ลำดับ</th><th>วันที่เอกสาร</th><th>เลขที่เอกสาร</th><th>ผู้จำหน่าย</th><th>วันครบกำหนด</th><th className="num">ยอดรวมสุทธิ</th><th className="num">หัก ณ ที่จ่าย</th><th className="num">ยอดจ่าย</th><th>สถานะ</th></tr></thead>
+        <thead><tr><th>ลำดับ</th><th>วันที่เอกสาร</th><th>เลขที่เอกสาร</th><th>ผู้จำหน่าย</th><th>วันครบกำหนด</th><th className="num">ยอดรวมสุทธิ</th><th className="num">หัก ณ ที่จ่าย</th><th className="num">ยอดจ่าย</th><th>สถานะ</th>{canEditDocs && <th />}</tr></thead>
         <tbody>{its.map((i, k) => (
           <tr key={i.doc_id}><td>{k + 1}</td><td>{dateTh(i.doc_date)}</td>
             <td className="no"><a href={i.doc_type === 'EXP' ? `/expenses/${i.doc_id}` : `/purchases/ri/${i.doc_id}`}>{i.doc_no}</a></td>
             <td>{partyName(i)}</td><td>{i.due_date ? dateTh(i.due_date) : '-'}</td>
             <td className="num">{money(i.gross)}</td><td className="num">{Number(i.wht) ? money(i.wht) : '-'}</td><td className="num">{money(i.net)}</td>
-            <td>{i.paid ? 'ชำระเงินแล้ว' : 'ค้างจ่าย'}</td></tr>))}</tbody>
-        <tfoot><tr><td colSpan={5}>รวมรายการ {s.docs} รายการ</td><td className="num">{money(s.gross)}</td><td className="num">{money(s.wht)}</td><td className="num"><b>{money(s.net)}</b></td><td /></tr></tfoot></table></div>
+            <td>{i.paid ? 'ชำระเงินแล้ว' : 'ค้างจ่าย'}</td>{canEditDocs && <td>{its.length > 1 && <SlipRemove id={s.id} line={i.line_no} />}</td>}</tr>))}</tbody>
+        <tfoot><tr><td colSpan={5}>รวมรายการ {s.docs} รายการ</td><td className="num">{money(s.gross)}</td><td className="num">{money(s.wht)}</td><td className="num"><b>{money(s.net)}</b></td><td />{canEditDocs && <td />}</tr></tfoot></table>
+        {canEditDocs && <SlipDocs id={s.id} cands={cands} />}</div>
       <div className="panel" id="pay"><h3>บันทึกการชำระเงิน</h3>
         {pays.length > 0 && <table><thead><tr><th>วันที่ชำระ</th><th>เอกสาร</th><th>ช่องทางชำระ</th><th className="num">ยอดชำระ</th></tr></thead>
           <tbody>{pays.map((p, k) => <tr key={k}><td>{dateTh(p.pay_date)}</td><td className="no">{p.doc_no}</td><td>{METHOD[p.method] ?? p.method}</td><td className="num">{money(p.amount)}</td></tr>)}</tbody></table>}
@@ -63,6 +72,9 @@ export default async function SlipPage({ params }: { params: { id: string } }) {
             <PayForm net={v.net} banks={banks} cards={cards} petties={petties} onPay={A.payPaymentSlipVendor.bind(null, s.id, v.cid)} /></details>))}
         {byVendor.every(v => v.paid) && <p className="sub">จ่ายครบทุกเอกสารแล้ว · ต้องการแก้ไขให้ "รีเซ็ต" แล้วจ่ายใหม่</p>}
       </div>
+      <div className="panel" id="history"><h3>ประวัติเอกสาร</h3>
+        {events.length === 0 ? <p className="sub">ยังไม่มีประวัติ</p> : <table><thead><tr><th>วันที่-เวลา</th><th>รายการ</th></tr></thead>
+          <tbody>{events.map((e, k) => <tr key={k}><td>{new Date(e.at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}</td><td>{e.text}</td></tr>)}</tbody></table>}</div>
     </>
   );
 }
