@@ -13,7 +13,7 @@ export async function ClosingDoc({ id, q, role }: { id?: string; q: Q; role: str
   const db = await getDb();
   const [doc] = id ? await db.q<any>(`select c.*, c.closing_date::text d, c.period_from::text f, c.period_to::text t, v.voucher_no from period_closings c left join journal_vouchers v on v.id = c.voucher_id where c.id = $1 and c.deleted_at is null`, [id]) : [];
   const approved = doc?.status === 'approved';
-  const eqs = await db.q<any>(`select code, name from accounts where type = 'equity' and is_active order by code`);
+  const eqs = await db.q<any>(`select code, name from accounts where type = 'equity' and is_active and not is_control order by code`);
   const [def] = await db.q<any>(`select closing_default_account() code`);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(q.date ?? '') ? q.date! : doc?.d ?? today();
   const eq = eqs.some(a => a.code === q.eq) ? q.eq! : doc?.equity_account ?? def.code;

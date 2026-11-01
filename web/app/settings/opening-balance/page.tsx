@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function Opening() {
   const user = await requirePage('reports.read');
   const db = await getDb();
-  const accs = await db.q<any>(`select code, name from accounts where type in ('asset','liability','equity') and is_active order by code`);
+  const accs = await db.q<any>(`select code, name from accounts where type in ('asset','liability','equity') and is_active and not is_control order by code`);
   const [v] = await db.q<any>(`select v.id, v.voucher_date::text d from journal_vouchers v where v.source_type='OPENING' and v.reverses_id is null and not exists (select 1 from journal_vouchers r where r.reverses_id=v.id) order by v.created_at desc limit 1`);
   const cur: Record<string, { debit: number; credit: number }> = {};
   if (v) for (const l of await db.q<any>(`select a.code, l.debit::float8 debit, l.credit::float8 credit from journal_lines l join accounts a on a.id=l.account_id where l.voucher_id=$1`, [v.id])) cur[l.code] = l;

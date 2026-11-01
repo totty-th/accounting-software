@@ -17,7 +17,7 @@ export default async function Pnl({ searchParams: sp }: { searchParams: { year?:
   const from = custom ? sp.from! : `${year}-01-01`, to = custom ? sp.to! : `${year}-12-31`;
   const cur = shown ? await db.q<any>('select * from income_statement($1::date,$2::date)', [from, to]) : [];
   const prev = shown && cmp ? await db.q<any>('select * from income_statement($1::date,$2::date)', [shiftYear(from, -1), shiftYear(to, -1)]) : null;
-  const accts = shown && zero ? await db.q<any>('select code, name, type from accounts where is_active order by code') : [];
+  const accts = shown && zero ? await db.q<any>('select code, name, type from accounts where is_active and not is_control order by code') : [];
   const p = buildPnl(cur, prev, accts);
   const [co] = await db.q<any>('select name from company_profile');
   const label = custom ? `${dateTh(from)} - ${dateTh(to)}` : String(year);

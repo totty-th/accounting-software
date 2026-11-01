@@ -1,7 +1,7 @@
 import { apiUser } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { companyOf, send } from '@/lib/fa-xlsx';
-import { glList, glRange, glWorkbook, chartWorkbook, parseTypes } from '@/lib/gl';
+import { glList, glRange, glWorkbook, chartWorkbook, parseTypes, dmy } from '@/lib/gl';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,11 +16,11 @@ export async function GET(req: Request) {
   const list = await glList(db, { q: (p.get('q') ?? '').trim(), types: parseTypes(p.get('type') ?? ''), from: r.from, to: r.to, all: p.get('all') === '1', desc: false });
   const chosen = explicit.length ? list.filter(a => explicit.includes(a.code)) : list;
   if (p.get('mode') === 'chart') {
-    const wb = await chartWorkbook(db, { company: co, user: au.displayName, today: today(), rows: chosen });
+    const wb = await chartWorkbook(db, { company: co, user: au.displayName, now: `${dmy(today()).replace(/-/g, '/')} ${new Date(Date.now() + 7 * 3600e3).toISOString().slice(11, 16)}` });
     return send(wb, `${co}_ChartOfAccount`);
   }
   if (!chosen.length) return Response.json({ error: 'ไม่พบบัญชีที่ตรงกับเงื่อนไข' }, { status: 404 });
-  const g = await glWorkbook(db, { company: co, user: au.displayName, today: today(), codes: chosen.map(a => a.code), from: r.from, to: r.to, explicit: explicit.length > 0, withCancelled: p.get('cancelled') === '1' });
+  const g = await glWorkbook(db, { company: co, user: au.displayName, today: today(), codes: chosen.map(a => a.code), from: r.from, to: r.to, explicit: explicit.length > 0, withCancelled: p.get('cancelled') === '1', allDates: r.m === 'all' });
   const code = !g.first ? 'none' : g.first === g.last ? g.first : `${g.first}_${g.last}`;
-  return send(g.wb, `${co}_GL_${code}_${r.from.replace(/-/g, '')}_ถึง_${r.to.replace(/-/g, '')}`);
+  return send(g.wb, `${co}_GL_${code}${r.m === 'all' ? '_ทั้งหมด' : `_${r.from.replace(/-/g, '')}_ถึง_${r.to.replace(/-/g, '')}`}`);
 }

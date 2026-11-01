@@ -19,7 +19,7 @@ export default async function Reconcile({ params, searchParams }: { params: { id
      where s.bank_account_id=$1 and ($2::uuid is null or s.batch_id=$2) order by s.line_date, s.batch_id, s.line_no`, [b.id, batch]);
   const items = await db.q('select * from bank_book_items($1)', [b.id]);
   const st = (await db.q('select * from bank_reconcile_status($1,$2)', [b.id, batch]))[0];
-  const accts = await db.q(`select code, name, type from accounts where is_active and code <> $1 and code !~ '^11122\\.' order by code`, [b.code]);
+  const accts = await db.q(`select code, name, type from accounts where is_active and not is_control and code <> $1 and code !~ '^11122\\.' order by code`, [b.code]);
   return (
     <>
       <div className="top"><div>

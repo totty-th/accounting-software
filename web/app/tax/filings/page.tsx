@@ -13,7 +13,7 @@ export default async function Filings({ searchParams }: { searchParams: { form?:
   const db = await getDb();
   const rows = await db.q<any>(`select id, to_char(period_month,'MM-YYYY') m, period_month::text pm, seq, output_vat::float8 o, input_vat::float8 i, result, amount::float8 amt,
       paid_date::text paid, pv_voucher_id, refund_recorded from pp30_filings where status='filed' order by period_month desc, seq desc`);
-  const banks = await db.q<any>(`select code, name from accounts where type='asset' and code like '111%' and is_active order by code`);
+  const banks = await db.q<any>(`select code, name from accounts where type='asset' and code like '111%' and is_active and not is_control order by code`);
   const canW = can(user.role, 'accounts.write');
   const prev = new Date(today() + 'T00:00:00Z'); prev.setUTCMonth(prev.getUTCMonth() - 1);
   const status = (r: any) => r.result === 'payable' ? (r.paid ? `ชำระภาษีแล้ว ${dateTh(r.paid)}` : 'รอชำระภาษี') : r.result === 'refund' ? (r.refund_recorded ? 'บันทึกขอคืนแล้ว' : 'รอขอคืน') : 'ไม่มียอดชำระ';

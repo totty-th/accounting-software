@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export default async function NewJv({ searchParams }: { searchParams: { draft?: string } }) {
   await requirePage('journal.write');
   const db = await getDb();
-  const accounts = await db.q<any>('select code, name from accounts where is_active order by code');
+  const accounts = await db.q<any>('select code, name from accounts where is_active and not is_control order by code');
   const contacts = (await db.q<any>('select id, business_name, contact_name from contacts where not is_cash_default order by coalesce(business_name, contact_name)')).map(c => ({ id: c.id as string, name: partyName(c) }));
   let init: JvInit = { date: today(), contact_id: '', ref_no: '', memo: '', note: '', lines: [] };
   if (searchParams.draft) {

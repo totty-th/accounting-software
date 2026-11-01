@@ -495,12 +495,13 @@ export async function reverseJv(id: string) {
 
 // ===== M27.3 ผังบัญชี · ยอดเริ่มต้น · ล็อกงวด =====
 const ACC_PATHS = ['/accounts', '/settings/opening-balance', '/settings/lock', '/reports/trial-balance', '/reports/pnl', '/reports/balance-sheet'];
-export async function createAccount(p: { code: string; name: string; description?: string }) {
-  return run(call('select create_account($1,$2,$3)', p.code, p.name, p.description ?? null), ACC_PATHS, 'accounts.write');
+export async function createAccount(p: { code: string; name: string; description?: string; parent?: string | null; control?: boolean; nameEn?: string; descriptionEn?: string }) {
+  return run(call('select create_account($1,$2,$3,$4,$5,$6,$7)', p.code, p.name, p.description ?? null, p.parent ?? null, !!p.control, p.nameEn ?? null, p.descriptionEn ?? null), ACC_PATHS, 'accounts.write');
 }
-export async function updateAccount(p: { id: string; name: string; description?: string; active: boolean }) {
-  return run(call('select update_account($1,$2,$3,$4)', p.id, p.name, p.description ?? null, p.active), ACC_PATHS, 'accounts.write');
+export async function updateAccount(p: { id: string; name: string; description?: string; active: boolean; nameEn?: string; descriptionEn?: string }) {
+  return run(call('select update_account($1,$2,$3,$4,$5,$6)', p.id, p.name, p.description ?? null, p.active, p.nameEn ?? null, p.descriptionEn ?? null), ACC_PATHS, 'accounts.write');
 }
+export async function deleteAccount(id: string) { return run(call('select delete_account($1)', id), ACC_PATHS, 'accounts.write'); }
 export async function saveOpeningBalance(date: string, lines: { account: string; debit?: number; credit?: number }[]) {
   return run(call('select set_opening_balance($1::date,$2::jsonb)', date, JSON.stringify(lines)), [...ACC_PATHS, '/journals', '/ledger/transactions'], 'accounts.write');
 }

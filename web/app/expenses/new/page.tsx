@@ -10,7 +10,7 @@ export default async function NewExpense({ searchParams }: { searchParams: { po?
   const user = await requirePage('expenses.write');
   const { vendors } = await poFormData();
   const db = await getDb();
-  const accounts = (await db.q(`select code, name from accounts where type in ('expense','asset') and code not in ('11112','11311','11319','17111','17113','17114','17120') order by code`))
+  const accounts = (await db.q(`select code, name from accounts where type in ('expense','asset') and not is_control and code not in ('11112','11311','11319','17111','17113','17114','17120') order by code`))
     .map(a => ({ id: a.code as string, label: `${a.code} ${a.name}` }));
   const assetCats = (await db.q<any>(`select id, name from asset_categories where is_active order by sort_no`)).map(c => ({ id: c.id as string, label: c.name as string }));
   // สร้างจากใบสั่งซื้อ (แบบ FA): เติมผู้จำหน่าย/รายการ/เลขอ้างอิงจาก PO · ต้องเลือกหมวดเอง · ยังไม่บันทึก = PO ไม่เปลี่ยน

@@ -12,7 +12,7 @@ export default async function BalanceSheet({ searchParams: sp }: { searchParams:
   const years = await fiscalYears(db, today()), year = yearOf(sp.year, years), cmp = sp.cmp === '1', zero = sp.zero === '1', shown = sp.show === '1';
   const cur = shown ? await db.q<any>('select * from balance_sheet($1::date)', [`${year}-12-31`]) : [];
   const prev = shown && cmp ? await db.q<any>('select * from balance_sheet($1::date)', [`${year - 1}-12-31`]) : null;
-  const accts = shown && zero ? await db.q<any>('select code, name, type from accounts where is_active order by code') : [];
+  const accts = shown && zero ? await db.q<any>('select code, name, type from accounts where is_active and not is_control order by code') : [];
   const bs = buildBalanceSheet(cur, prev, accts);
   const [co] = await db.q<any>('select name from company_profile');
   return (

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { requirePage } from '@/lib/auth';
 import { can } from '@/lib/permissions';
 import { getDb, today } from '@/lib/db';
-import { AccountManager } from '@/components/AccountManager';
+import { ChartManager } from '@/components/ChartManager';
 import { GlBar } from '@/components/GlBar';
 import { GlSelectAll } from '@/components/GlSelectAll';
 import { faMoney, glList, glRange, parseTypes, rangeParams, typeTh } from '@/lib/gl';
@@ -24,19 +24,25 @@ export default async function Accounts({ searchParams }: { searchParams: SP }) {
   const qs = (o: Record<string, string | number>) => '/accounts?' + new URLSearchParams(Object.entries({ ...base, ...o }).filter(([, v]) => v !== '' && v != null).map(([k, v]) => [k, String(v)])).toString();
   const lq = new URLSearchParams(Object.entries(rangeParams(r))).toString();
   const canW = can(user.role, 'accounts.write');
+  const nodes = canW ? await db.q<any>(
+    `select a.id, a.code, a.name, a.name_en, a.description, a.description_en, a.parent_id, a.is_control, a.is_active,
+            not (exists (select 1 from journal_lines l where l.account_id = a.id) or exists (select 1 from accounts c where c.parent_id = a.id)
+              or exists (select 1 from system_accounts s where s.account_code = a.code) or exists (select 1 from expense_lines e where e.account_code = a.code)
+              or exists (select 1 from bank_accounts b where b.account_id = a.id) or exists (select 1 from petty_funds b where b.account_id = a.id)
+              or exists (select 1 from credit_cards b where b.account_id = a.id) or exists (select 1 from cheque_accounts b where b.account_id = a.id)) deletable
+       from accounts a order by a.code`) : [];
   return (
     <>
-      <div className="top"><div><h1>บัญชีแยกประเภท</h1><p className="sub">กดที่บัญชีเพื่อดูรายการเคลื่อนไหว · ยอดคงเหลือแสดงตามด้านปกติของบัญชี (ติดลบ = วงเล็บ) · งบแสดงฐานะ = ยอดสะสมถึงสิ้นช่วง · รายได้/ค่าใช้จ่าย = ยอดในช่วง</p></div>{canW && <AccountManager />}</div>
+      <div className="top"><div><h1>บัญชีแยกประเภท</h1><p className="sub">กดที่บัญชีเพื่อดูรายการเคลื่อนไหว · ยอดคงเหลือ = เดบิต − เครดิต (เครดิตสุทธิเป็นวงเล็บ) · งบแสดงฐานะ = ยอดสะสมถึงสิ้นช่วง · รายได้/ค่าใช้จ่าย = ยอดในช่วง</p></div>{canW && <ChartManager nodes={nodes} />}</div>
       <GlBar mode="list" label={r.label} from={r.from} to={r.to} types={types} total={rows.length} />
       <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
-        <table><thead><tr><th style={{ width: 28 }}><GlSelectAll /></th><th><Link href={qs({ sort: desc ? '' : 'desc', page: 1 })}>รหัสบัญชี {desc ? '↓' : '↑'}</Link></th><th>ชื่อ / รายละเอียด</th><th>หมวดบัญชี</th><th className="num">ยอดคงเหลือ</th><th className="noprint" /></tr></thead>
+        <table><thead><tr><th style={{ width: 28 }}><GlSelectAll /></th><th><Link href={qs({ sort: desc ? '' : 'desc', page: 1 })}>รหัสบัญชี {desc ? '↓' : '↑'}</Link></th><th>ชื่อ / รายละเอียด</th><th>กลุ่มบัญชี / ประเภท</th><th>หมวดบัญชี</th><th className="num">ยอดคงเหลือ</th></tr></thead>
           <tbody>{view.map(a => (
             <tr key={a.id} style={a.is_active ? undefined : { opacity: 0.55 }}>
               <td><input type="checkbox" data-sel value={a.code} style={{ width: 'auto' }} aria-label={`เลือก ${a.code}`} /></td>
               <td className="no"><Link href={`/accounts/${a.code}?${lq}`}>{a.code}</Link></td>
               <td><Link href={`/accounts/${a.code}?${lq}`}>{a.name}</Link>{!a.is_active && ' (ปิดใช้งาน)'}{a.description && <div className="sub">{a.description}</div>}</td>
-              <td>{typeTh(a.type)}</td><td className="num">{faMoney(a.bal)}</td>
-              <td className="noprint">{canW && <AccountManager edit={a} />}</td></tr>))}
+              <td>{a.g2}{a.g3 && <div className="sub">{a.g3}</div>}</td><td>{typeTh(a.type)}</td><td className="num">{faMoney(a.bal)}</td></tr>))}
             {view.length === 0 && <tr><td colSpan={6} className="empty">ไม่พบบัญชี</td></tr>}</tbody></table>
       </div>
       <div className="noprint" style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
