@@ -565,3 +565,15 @@ export async function postAssetDepreciation(year: number): Promise<Result & { n?
 }
 export const saveAssetCategory = async (id: string | null, data: Record<string, unknown>) =>
   run(call('select save_asset_category($1::uuid, $2::jsonb)', id, JSON.stringify(data)), AS, 'expenses.write');
+
+// ===== M31 ปิดงบบัญชีรายได้และค่าใช้จ่าย (เลือกช่วงวันที่ได้) =====
+const CL = [...ACC_PATHS, '/settings/close-year', '/journals', '/ledger/transactions'];
+export async function createClosing(p: { date: string; from: string; to: string; equity: string; approve: boolean }): Promise<Result & { id?: string }> {
+  let out: string | undefined;
+  const r = await run(async () => { out = (await (await getDb()).q<any>('select create_period_closing($1::date,$2::date,$3::date,$4,$5::boolean) as id', [p.date, p.from, p.to, p.equity || null, p.approve]))[0].id; }, CL, 'accounts.write');
+  return { ...r, id: out };
+}
+export const updateClosing = async (id: string, p: { date: string; from: string; to: string; equity: string }) =>
+  run(call('select update_period_closing($1,$2::date,$3::date,$4::date,$5)', id, p.date, p.from, p.to, p.equity), [...CL, `/settings/close-year/${id}`], 'accounts.write');
+export const approveClosing = async (id: string) => run(call('select approve_period_closing($1)', id), [...CL, `/settings/close-year/${id}`], 'accounts.write');
+export const deleteClosing = async (id: string) => run(call('select delete_period_closing($1)', id), [...CL, `/settings/close-year/${id}`], 'accounts.write');

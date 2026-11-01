@@ -65,7 +65,7 @@ const GROUPS: Group[] = [
   { key: 'acct', label: 'บริหารบัญชี', c: 'var(--teal)', items: [
     { head: 'สมุดบัญชี', href: '/journals', label: 'สมุดรายวัน', perms: R },
     { href: '/accounts', label: 'ผังบัญชี/บัญชีแยกประเภท', perms: R },
-    { href: '/settings/close-year', label: 'ปิดงบบัญชี (ปิดบัญชีสิ้นปี)', perms: R },
+    { href: '/settings/close-year', label: 'ปิดงบบัญชี (รายได้และค่าใช้จ่าย)', perms: R },
     { head: 'รายงานด้านบัญชี', href: '/reports/trial-balance', label: 'งบทดลอง', perms: R },
     { href: '/reports/pnl', label: 'งบกำไรขาดทุน', perms: R },
     { href: '/reports/balance-sheet', label: 'งบฐานะการเงิน', perms: R },
