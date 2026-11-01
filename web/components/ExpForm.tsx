@@ -13,8 +13,8 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2,
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
 /** ค่าใช้จ่าย: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) */
-export function ExpForm({ vendors: v0, accounts, today, purchaser, canCreateVendor, fromPo }: {
-  vendors: Vendor[]; accounts: Acc[]; today: string; purchaser: string; canCreateVendor: boolean;
+export function ExpForm({ vendors: v0, accounts, assetCats = [], today, purchaser, canCreateVendor, fromPo }: {
+  vendors: Vendor[]; accounts: Acc[]; assetCats?: Acc[]; today: string; purchaser: string; canCreateVendor: boolean;
   fromPo?: { id: string; no: string; header: Record<string, any>; lines: Line[] };
 }) {
   const router = useRouter();
@@ -50,7 +50,7 @@ export function ExpForm({ vendors: v0, accounts, today, purchaser, canCreateVend
   const ok = h.contact && act.length > 0 && act.every(l => l.description.trim() && l.account && Number(l.qty) > 0 && l.unit_price !== '');
   const submit = () => start(async () => {
     setErr(null);
-    const body = act.map(l => ({ description: l.description, account: l.account, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
+    const body = act.map(l => ({ description: l.description, ...(l.account.startsWith('asset:') ? { asset_category: l.account.slice(6) } : { account: l.account }), unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
       discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 }));
     const head = { ...h, credit_days: Number(h.credit_days) || 0 };
     const r = fromPo ? await saveExpenseFromPo(fromPo.id, head, body) : await saveExpenseFull(head, body);
@@ -106,7 +106,7 @@ export function ExpForm({ vendors: v0, accounts, today, purchaser, canCreateVend
           <tbody>{lines.map((l, i) => (
             <tr key={i} style={{ verticalAlign: 'top' }}><td>{i + 1}</td>
               <td><textarea aria-label={`รายละเอียด ${i + 1}`} rows={1} placeholder="รายละเอียด" value={l.description} onChange={e => setL(i, { description: e.target.value })} style={{ width: '100%' }} /></td>
-              <td><select aria-label={`หมวด ${i + 1}`} value={l.account} onChange={e => setL(i, { account: e.target.value })}><option value="">เลือกหมวด</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</select></td>
+              <td><select aria-label={`หมวด ${i + 1}`} value={l.account} onChange={e => setL(i, { account: e.target.value })}><option value="">เลือกหมวด</option>{assetCats.length > 0 && <optgroup label="สินทรัพย์ (สร้างทะเบียนสินทรัพย์ให้อัตโนมัติ)">{assetCats.map(a => <option key={a.id} value={`asset:${a.id}`}>{a.label}</option>)}</optgroup>}<optgroup label="ค่าใช้จ่ายและบัญชีอื่น">{accounts.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</optgroup></select>{l.account.startsWith('asset:') && <div className="sub" style={{ color: 'var(--amber, #b7791f)' }}>● สินทรัพย์ — ราคาก่อน VAT เข้าทะเบียนสินทรัพย์</div>}</td>
               <td><input aria-label={`จำนวน ${i + 1}`} inputMode="decimal" value={l.qty} onChange={e => setL(i, { qty: e.target.value })} /></td>
               <td><input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} /></td>
               <td><input aria-label={`ราคา ${i + 1}`} inputMode="decimal" value={l.unit_price} onChange={e => setL(i, { unit_price: e.target.value })} /></td>

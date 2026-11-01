@@ -32,7 +32,10 @@ const GROUPS: Group[] = [
   { key: 'exp', label: 'ค่าใช้จ่าย', c: 'var(--purple)', items: [
     { href: '/expenses', label: 'ค่าใช้จ่าย', perms: ['expenses.read'] },
     { href: '/wht', label: 'หัก ณ ที่จ่าย (50 ทวิ)', perms: ['wht.read'] },
-    { href: '/payments', label: 'ใบเตรียมจ่าย', perms: ['expenses.read'] }] },
+    { href: '/payments', label: 'ใบเตรียมจ่าย', perms: ['expenses.read'] },
+    { href: '/assets', label: 'จัดการสินทรัพย์', perms: ['expenses.read'], gap: true },
+    { href: '/assets/depreciation', label: 'บันทึกค่าเสื่อมราคา', perms: ['expenses.read'] },
+    { href: '/assets/categories', label: 'หมวดหมู่สินทรัพย์', perms: ['expenses.read'] }] },
   { key: 'stock', label: 'สินค้า', c: 'var(--blue)', items: [
     { href: '/products', label: 'สินค้า/บริการ', perms: ['master.read'] },
     { href: '/stock', label: 'สต็อก', perms: ['stock.read'] },

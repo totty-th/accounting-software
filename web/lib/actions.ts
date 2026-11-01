@@ -544,3 +544,24 @@ export async function setPp36Receipt(type: string, id: string, no: string, date:
 export async function createProject(name: string, contact: string) { return run(call('select create_project($1,$2::uuid)', name, contact || null), ['/reports/projects'], 'accounts.write'); }
 export async function updateProject(id: string, name: string, contact: string) { return run(call('select update_project($1,$2,$3::uuid)', id, name, contact || null), ['/reports/projects'], 'accounts.write'); }
 export async function deleteProject(id: string) { return run(call('select delete_project($1)', id), ['/reports/projects'], 'accounts.write'); }
+
+// ---------- M29 สินทรัพย์ถาวร ----------
+const AS = [...ALL, '/assets', '/assets/depreciation', '/assets/categories'];
+export async function createAsset(data: Record<string, unknown>): Promise<Result & { id?: string }> {
+  let out: string | undefined;
+  const r = await run(async () => { out = (await (await getDb()).q<any>('select create_asset($1::jsonb) as id', [JSON.stringify(data)]))[0].id; }, AS, 'expenses.write');
+  return { ...r, id: out };
+}
+export const updateAsset = async (id: string, data: Record<string, unknown>) => run(call('select update_asset($1, $2::jsonb)', id, JSON.stringify(data)), [...AS, `/assets/${id}`], 'expenses.write');
+export const setAssetStatus = async (id: string, status: 'in_use' | 'suspended') => run(call('select set_asset_status($1, $2)', id, status), [...AS, `/assets/${id}`], 'expenses.write');
+export const disposeAsset = async (id: string, p: { date: string; type: string; price: number; note: string }) =>
+  run(call('select dispose_asset($1, $2::date, $3, $4::numeric, $5)', id, p.date, p.type, p.price || 0, p.note), [...AS, `/assets/${id}`], 'expenses.write');
+export const reopenAsset = async (id: string) => run(call('select reopen_asset($1)', id), [...AS, `/assets/${id}`], 'expenses.write');
+export const deleteAsset = async (id: string) => run(call('select delete_asset($1)', id), AS, 'expenses.write');
+export async function postAssetDepreciation(year: number): Promise<Result & { n?: number }> {
+  let n: number | undefined;
+  const r = await run(async () => { n = (await (await getDb()).q<any>('select post_asset_depreciation($1::int) as n', [year]))[0].n; }, AS, 'expenses.write');
+  return { ...r, n };
+}
+export const saveAssetCategory = async (id: string | null, data: Record<string, unknown>) =>
+  run(call('select save_asset_category($1::uuid, $2::jsonb)', id, JSON.stringify(data)), AS, 'expenses.write');
