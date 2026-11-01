@@ -11,7 +11,7 @@ import { VatTable, type VatRow } from '@/components/VatTable';
 import { VAT_KEYS, VAT_CLAIM, vatKey, claimBucket } from '@/lib/vat-status';
 
 export const dynamic = 'force-dynamic';
-type Sp = { period?: string; from?: string; to?: string; st?: string | string[]; q?: string; claim?: string };
+type Sp = { period?: string; from?: string; to?: string; st?: string | string[]; q?: string; claim?: string; rate?: string };
 export default async function PurchaseVat({ searchParams }: { searchParams: Sp }) {
   const user = await requirePage('reports.read');
   const period = reportPeriod(searchParams.period);
@@ -34,6 +34,7 @@ export default async function PurchaseVat({ searchParams }: { searchParams: Sp }
     const o = { ...r, st: status, filed, p36: stage === 'pp36', stage, rd: x36?.rd ?? '' };
     return { ...o, key: vatKey(o), claim: filed || status === 'waived' ? '' : claimBucket(dateIso(r.date), today()) };
   }).filter(r => (sts.length === 0 || sts.includes(r.key)) && (!searchParams.claim || r.claim === searchParams.claim)
+    && (!searchParams.rate || (r.sub > 0 ? Math.round(r.vat / r.sub * 100) : 0) === Number(searchParams.rate))
     && (!q || [r.no, r.name, r.inv_no ?? '', r.tax_id ?? ''].some(s => s.toLowerCase().includes(q))));
   const total = view.reduce((s, r) => s + (r.vat_form === 'PP36' && r.inv_vat != null ? Number(r.inv_vat) : r.vat), 0), canW = can(user.role, 'accounts.write');
   return (
@@ -47,9 +48,10 @@ export default async function PurchaseVat({ searchParams }: { searchParams: Sp }
         <fieldset className="f" style={{ border: 0, padding: 0 }}><legend style={{ fontSize: 12 }}>สถานะ</legend>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{VAT_KEYS.map(([k, l, c]) => <label key={k} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             <input type="checkbox" name="st" value={k} defaultChecked={sts.includes(k)} /><i style={{ width: 9, height: 9, borderRadius: 5, background: c, display: 'inline-block' }} />{l}</label>)}</div></fieldset>
+        <label className="f">อัตรา VAT<select name="rate" defaultValue={searchParams.rate ?? ''}><option value="">ทั้งหมด</option><option value="7">7%</option><option value="0">0%</option></select></label>
         <label className="f">รอใช้สิทธิ์<select name="claim" defaultValue={searchParams.claim ?? ''}><option value="">ทั้งหมด</option>{VAT_CLAIM.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
         <button className="btn">ค้นหา</button>
-        {(sts.length > 0 || searchParams.claim || q) && <Link className="btn ghost" href="/tax/purchase-vat">ล้างตัวกรอง</Link>}
+        {(sts.length > 0 || searchParams.claim || searchParams.rate || q) && <Link className="btn ghost" href="/tax/purchase-vat">ล้างตัวกรอง</Link>}
       </form>
       <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
         <div style={{ padding: 10 }}>รายการทั้งหมด {view.length} รายการ</div>

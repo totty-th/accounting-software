@@ -586,3 +586,12 @@ export async function bulkPurchaseVatStatus(items: { type: string; id: string }[
     for (const it of items) await db.q('select set_purchase_vat_status($1,$2,$3,$4::jsonb)', [it.type, it.id, status, '{}']);
   }, ['/tax/purchase-vat', '/reports/purchase-tax', '/expenses', '/purchases'], 'accounts.write');
 }
+
+// รับใบกำกับภาษีหลายเอกสารพร้อมกัน (แผ่นงาน "ข้อมูลใบกำกับภาษีที่ได้รับ" แบบ FA): ต้องมีเลขที่ใบกำกับทุกแถว · ผิดแถวใด ทั้งชุดไม่บันทึก
+export async function bulkReceiveTaxInvoices(rows: { type: string; id: string; invoice_no: string; invoice_date: string; vat_form: string; vendor_tax_id: string; branch: string }[]) {
+  return run(async () => {
+    if (rows.some(r => !r.invoice_no.trim())) throw new Error('กรุณาระบุเลขที่ใบกำกับภาษีให้ครบทุกรายการ');
+    // คำสั่งเดียว = ทั้งชุดสำเร็จหรือไม่สำเร็จพร้อมกัน
+    await (await getDb()).q(`select set_purchase_vat_status(x->>'type', (x->>'id')::uuid, 'received', x - 'type' - 'id') from jsonb_array_elements($1::jsonb) x`, [JSON.stringify(rows)]);
+  }, ['/tax/purchase-vat', '/reports/purchase-tax', '/expenses', '/purchases'], 'accounts.write');
+}

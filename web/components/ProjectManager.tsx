@@ -9,11 +9,15 @@ export function ProjectManager({ edit, contacts }: { edit?: { id: string; name: 
   const r = useRouter(); const [open, setOpen] = useState(false);
   const [name, setName] = useState(edit?.name ?? ''); const [c, setC] = useState(edit?.contact_id ?? '');
   const [err, setErr] = useState<string | null>(null); const [p, start] = useTransition();
+  const [dl, setDl] = useState(false); const t0 = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); const [from, setFrom] = useState(t0); const [to, setTo] = useState(t0);
   const save = () => start(async () => { const x = edit ? await updateProject(edit.id, name, c) : await createProject(name, c);
     if (x.error) return setErr(x.error); setErr(null); setOpen(false); if (!edit) { setName(''); setC(''); } r.refresh(); });
   const del = () => start(async () => { const x = await deleteProject(edit!.id); if (x.error) setErr(x.error); else r.refresh(); });
   if (!open) return <span style={{ display: 'inline-flex', gap: 6 }}><button className={`btn ${edit ? 'sm ghost' : ''}`} onClick={() => setOpen(true)}>{edit ? 'แก้ไข' : 'สร้างโปรเจ็ค'}</button>
-    {edit && <button className="btn sm ghost" disabled={p} onClick={del}>ลบ</button>}{err && <span className="err" role="alert">{err}</span>}</span>;
+    {edit && <button className="btn sm ghost" onClick={() => setDl(true)}>ดาวน์โหลด CSV</button>}
+    {edit && <button className="btn sm ghost" disabled={p} onClick={del}>ลบ</button>}
+    {dl && edit && <span className="panel" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>ช่วงเวลา <input type="date" value={from} onChange={e => setFrom(e.target.value)} aria-label="จากวันที่" /> <input type="date" value={to} onChange={e => setTo(e.target.value)} aria-label="ถึงวันที่" />
+      <a className="btn sm" href={`/reports/projects/${edit.id}/csv?from=${from}&to=${to}`} onClick={() => setDl(false)}>ดาวน์โหลด</a><button className="btn sm ghost" onClick={() => setDl(false)}>ยกเลิก</button></span>}{err && <span className="err" role="alert">{err}</span>}</span>;
   return (
     <div className="panel" style={{ minWidth: 280 }}>
       <b>{edit ? 'แก้ไขโปรเจ็ค' : 'สร้างโปรเจ็ค'}</b>

@@ -32,4 +32,12 @@ describe('M27.5 สถานะเอกสารภาษีซื้อ', () =
     expect(await err(db.query(`select set_purchase_vat_status('RI',$1,'pp36')`, [ri]))).toContain('สถานะไม่ถูกต้อง');
     expect(await err(db.query(`select set_purchase_vat_status('RI',$1,'received','{}'::jsonb)`, [ri]))).toContain('เลขที่ใบกำกับ');
   });
+  it('รับใบกำกับหลายรายการในคำสั่งเดียว: สำเร็จทั้งชุด หรือล้มทั้งชุดถ้ามีรายการเสีย', async () => {
+    const bulk = `select set_purchase_vat_status(x->>'type', (x->>'id')::uuid, 'received', x - 'type' - 'id') from jsonb_array_elements($1::jsonb) x`;
+    const bad = JSON.stringify([{ type: 'RI', id: ri, invoice_no: 'TI-9', vat_form: 'PP30' }, { type: 'RI', id: exp0, invoice_no: 'TI-X' }]);
+    expect(await err(db.query(bulk, [bad]))).toContain('ไม่มี VAT');
+    expect((await one<any>('select count(*)::int n from purchase_tax_invoices where doc_id=$1', [ri])).n).toBe(0);
+    await db.query(bulk, [JSON.stringify([{ type: 'RI', id: ri, invoice_no: 'TI-9', invoice_date: '2026-10-07', vat_form: 'PP30' }])]);
+    expect((await one<any>('select invoice_no from purchase_tax_invoices where doc_id=$1', [ri])).invoice_no).toBe('TI-9');
+  });
 });

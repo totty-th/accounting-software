@@ -31,9 +31,10 @@ export function VatTable({ rows, totalTxt, canWrite }: { rows: VatRow[]; totalTx
           <button className="btn sm" disabled={p} onClick={() => setMenu(m => !m)}>⇄ เปลี่ยนสถานะ</button>
           {menu && <div className="panel" style={{ position: 'absolute', top: 40, left: 120, zIndex: 5, padding: 6, display: 'grid', gap: 4 }}>
             <small style={{ color: 'var(--muted)' }}>สถานะที่เปลี่ยนได้</small>
+            <button className="btn sm ghost" disabled={p} onClick={() => r.push(`/tax/purchase-vat/receive?ids=${[...sel].join(',')}`)}>รับใบกำกับภาษี</button>
             <button className="btn sm ghost" disabled={p} onClick={() => go('waived')}>ไม่ใช้สิทธิขอคืน</button>
             <button className="btn sm ghost" disabled={p} onClick={() => go('wait')}>รอใบกำกับภาษี</button>
-            <small style={{ color: 'var(--muted)', maxWidth: 200 }}>"รับใบกำกับภาษี" ต้องกรอกเลขที่ใบกำกับ จึงเปลี่ยนทีละรายการที่ช่องสถานะ</small></div>}
+</div>}
           {err && <span className="err" role="alert">{err}</span>}
         </div>)}
       <table><thead><tr>{canWrite && <th style={{ width: 28 }}><input type="checkbox" aria-label="เลือกทั้งหมด" checked={all} onChange={() => setSel(all ? new Set() : new Set(editable.map(k)))} /></th>}
