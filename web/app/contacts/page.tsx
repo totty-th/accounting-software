@@ -31,7 +31,7 @@ export default async function Contacts({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <div className="top"><div><h1>สมุดรายชื่อ</h1><p className="sub">ลูกค้าและผู้จำหน่าย ใช้ร่วมกันทั้งฝั่งขายและฝั่งซื้อ</p></div>
-        {can(user.role, 'contact.create') && <Link className="btn" href="/contacts/new">+ สร้างใหม่</Link>}</div>
+        {can(user.role, 'master.write') && <Link className="btn ghost" href="/contacts/import">นำเข้ารายชื่อ</Link>} {can(user.role, 'contact.create') && <Link className="btn" href="/contacts/new">+ สร้างใหม่</Link>}</div>
       <form className="filters" style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
         <input name="q" defaultValue={sp.q} placeholder="ค้นหาชื่อ ผู้ติดต่อ เลขผู้เสียภาษี รหัส อีเมล" style={{ minWidth: 280 }} />
         {(['type', 'kind', 'branch'] as const).map(k => sp[k] && <input key={k} type="hidden" name={k} value={sp[k]} />)}

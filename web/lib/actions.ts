@@ -606,3 +606,15 @@ export const updatePaymentSlip = async (id: string, p: { due: string; preparer: 
 export const addSlipDoc = async (slip: string, type: string, doc: string) => run(call('select add_slip_doc($1,$2,$3)', slip, type, doc), SLIP, 'expenses.write');
 export const removeSlipDoc = async (slip: string, line: number) => run(call('select remove_slip_doc($1,$2)', slip, line), SLIP, 'expenses.write');
 export const renamePaymentSlip = async (id: string, no: string) => run(call('select rename_payment_slip($1,$2)', id, no.trim()), SLIP, 'expenses.write');
+export async function importContacts(p: { file: string; rows: unknown[][]; map: Record<string, number> }) {
+  return run(async () => {
+    const { validateContacts } = await import('./contact-import');
+    const db = await getDb();
+    const ex = new Set((await db.q<any>(`select lower(btrim(business_name)) n, coalesce(branch_code,'') b from contacts where business_name is not null`)).map(r => `${r.n}|${r.b}`));
+    const v = validateContacts(p.rows, p.map as any, ex);
+    if (v.issues.length) throw new Error(`ไฟล์ยังมีข้อผิดพลาด ${v.issues.length} จุด — แก้ไขไฟล์แล้วนำเข้าใหม่`);
+    if (v.items.length === 0) throw new Error('รายชื่อทั้งหมดซ้ำกับที่มีในระบบ ไม่มีรายการให้นำเข้า');
+    await db.q('select import_contacts($1,$2::jsonb)', [p.file, JSON.stringify(v.items)]);
+  }, ['/contacts', '/contacts/import'], 'master.write');
+}
+export async function deleteContactImportBatch(id: string) { return run(call('select delete_contact_import_batch($1)', id), ['/contacts', '/contacts/import'], 'master.write'); }
