@@ -10,23 +10,23 @@ const bal = async (code: string) => (await one<any>(`select coalesce(sum(l.debit
 
 beforeAll(async () => {
   db = new PGlite(); for (const f of readdirSync(dir).sort()) await db.exec(readFileSync(new URL(f, dir), 'utf8'));
-  await db.exec(`insert into accounts(code,name,type) values ('11100','เงินสด','asset'),('21100','เจ้าหนี้','liability'),('31000','ทุน','equity'),('41000','รายได้','revenue')`);
+  await db.exec(`insert into accounts(code,name,type) values ('11100','เงินสด','asset'),('21100','เจ้าหนี้','liability'),('31000','ทุน','equity'),('41000','รายได้','revenue') on conflict (code) do update set name = excluded.name, type = excluded.type, is_control = false`);
 });
 
 describe('M27.3 บริหารผังบัญชี', () => {
   it('สร้างบัญชี: ชนิดมาจากหลักแรกของรหัส, รหัสซ้ำ/รูปแบบผิดถูกปฏิเสธ', async () => {
-    const { id } = await one<any>(`select create_account('53012','ค่าน้ำมัน','รถส่งของ') id`);
+    const { id } = await one<any>(`select create_account('53777','ค่าน้ำมัน','รถส่งของ') id`);
     const a = await one<any>('select * from accounts where id=$1', [id]);
     expect(a.type).toBe('expense'); expect(a.description).toBe('รถส่งของ');
     await db.query(`select create_account('11101.01','เงินฝากย่อย')`);
     expect((await one<any>(`select type from accounts where code='11101.01'`)).type).toBe('asset');
-    expect(await err(db.query(`select create_account('53012','ซ้ำ')`))).toContain('มีอยู่แล้ว');
+    expect(await err(db.query(`select create_account('53777','ซ้ำ')`))).toContain('ต้องไม่ซ้ำกัน');
     expect(await err(db.query(`select create_account('9','x')`))).toContain('เลข 5 หลัก');
-    expect(await err(db.query(`select create_account('61000','x')`))).toContain('เลข 5 หลัก');
-    expect(await err(db.query(`select create_account('53013','  ')`))).toContain('ต้องระบุชื่อ');
+    expect(await err(db.query(`select create_account('61000','x')`))).toContain('ขึ้นต้นด้วย 1-5');
+    expect(await err(db.query(`select create_account('53013','  ')`))).toContain('กรุณากรอกชื่อบัญชี');
   });
   it('แก้ชื่อได้ · ปิดใช้งานได้เมื่อยอดเป็นศูนย์ · ปิดไม่ได้เมื่อมียอด/ระบบอ้างอิง', async () => {
-    const id = (await one<any>(`select id from accounts where code='53012'`)).id;
+    const id = (await one<any>(`select id from accounts where code='53777'`)).id;
     await db.query(`select update_account($1,'ค่าน้ำมันรถ',null,true)`, [id]);
     expect((await one<any>('select name from accounts where id=$1', [id])).name).toBe('ค่าน้ำมันรถ');
     await db.query(`select update_account($1,'ค่าน้ำมันรถ',null,false)`, [id]);

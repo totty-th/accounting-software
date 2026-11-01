@@ -234,6 +234,7 @@ select v.code, v.name, account_type_of(v.code), true, v.en
   ('59900', 'ค่าใช้จ่ายอื่นและเบ็ดเตล็ด', 'Other and miscellaneous expenses'),
   ('59990', 'รายจ่ายอื่นๆ', 'Other expenses')
   ) as v(code, name, en)
+ where v.code not in (select account_code from system_accounts)   -- บัญชีที่ระบบลงรายการอัตโนมัติต้องเป็นบัญชีย่อย
 on conflict (code) do nothing;
 
 update accounts a set parent_id = account_find_parent(a.code);

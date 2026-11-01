@@ -19,7 +19,7 @@ const inv = async (type = 'INV') =>
 beforeAll(async () => {
   db = new PGlite();
   for (const f of readdirSync(dir).sort()) await db.exec(readFileSync(new URL(f, dir), 'utf8'));
-  for (const [c, n, t] of ACCOUNTS) await db.query('insert into accounts(code,name,type) values ($1,$2,$3)', [c, n, t]);
+  for (const [c, n, t] of ACCOUNTS) await db.query('insert into accounts(code,name,type) values ($1,$2,$3) on conflict (code) do update set name = excluded.name, type = excluded.type, is_control = false', [c, n, t]);
   await db.query(`insert into company_profile(name,address,tax_id) values ('บริษัททดสอบ','1 ถนนทดสอบ','0105500000001')`);
   c30 = (await one<{ id: string }>(`insert into contacts(business_name, credit_days, address, tax_id) values ('ลูกค้าเครดิต 30',30,'9 ซอยลูกค้า','0105500000002') returning id`)).id;
 });

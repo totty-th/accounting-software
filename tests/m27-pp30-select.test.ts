@@ -11,7 +11,7 @@ const j = (x: unknown) => JSON.stringify(x);
 
 beforeAll(async () => {
   db = new PGlite(); for (const f of readdirSync(dir).sort()) await db.exec(readFileSync(new URL(f, dir), 'utf8'));
-  await db.exec(`insert into accounts(code,name,type) values ('51111','ซื้อสินค้า','expense'),('17111','ภาษีซื้อ ภ.พ.30','asset'),('17113','ภาษีซื้อยังไม่ถึงกำหนด','asset'),('17114','ภาษีรอขอคืน','asset'),('27111','ภาษีขาย','liability'),('27140','เจ้าหนี้สรรพากร','liability'),('21399','เจ้าหนี้','liability'),('11112','ธนาคาร','asset'),('11311','ลูกหนี้','asset')`);
+  await db.exec(`insert into accounts(code,name,type) values ('51111','ซื้อสินค้า','expense'),('17111','ภาษีซื้อ ภ.พ.30','asset'),('17113','ภาษีซื้อยังไม่ถึงกำหนด','asset'),('17114','ภาษีรอขอคืน','asset'),('27111','ภาษีขาย','liability'),('27140','เจ้าหนี้สรรพากร','liability'),('21399','เจ้าหนี้','liability'),('11112','ธนาคาร','asset'),('11311','ลูกหนี้','asset') on conflict (code) do update set name = excluded.name, type = excluded.type, is_control = false`);
   await db.exec(`insert into contacts(contact_name, business_name) values ('ผู้ขาย','Vendor Co')`);
   const c = (await one<any>(`select id from contacts limit 1`)).id;
   const mk = async (no: string, vat: number) => {

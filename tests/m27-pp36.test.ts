@@ -11,7 +11,7 @@ const bal = async (code: string) => (await one<any>(`select coalesce(sum(l.debit
 
 beforeAll(async () => {
   db = new PGlite(); for (const f of readdirSync(dir).sort()) await db.exec(readFileSync(new URL(f, dir), 'utf8'));
-  await db.exec(`insert into accounts(code,name,type) values ('51111','ซื้อสินค้า','expense'),('17113','ภาษีซื้อยังไม่ถึงกำหนด','asset'),('27140','เจ้าหนี้สรรพากร','liability'),('21399','เจ้าหนี้','liability'),('11112','ธนาคาร','asset')`);
+  await db.exec(`insert into accounts(code,name,type) values ('51111','ซื้อสินค้า','expense'),('17113','ภาษีซื้อยังไม่ถึงกำหนด','asset'),('27140','เจ้าหนี้สรรพากร','liability'),('21399','เจ้าหนี้','liability'),('11112','ธนาคาร','asset') on conflict (code) do update set name = excluded.name, type = excluded.type, is_control = false`);
   await db.exec(`insert into contacts(contact_name, business_name) values ('ต่างประเทศ','Foreign Co')`);
   const c = (await one<any>(`select id from contacts limit 1`)).id;
   const uv = (await one<any>(`select post_voucher('UV','2026-10-23','ซื้อต่างประเทศ','MANUAL','x','[{"account":"51111","debit":1000},{"account":"17113","debit":70},{"account":"21399","credit":1070}]'::jsonb) v`)).v;

@@ -22,7 +22,8 @@ const USERS: [string, string, string][] = [
 ];
 
 export async function seed(db: Db) {
-  for (const [c, n, t] of COA) await db.q('insert into accounts(code,name,type) values ($1,$2,$3)', [c, n, t]);
+  for (const [c, n, t] of COA) await db.q('insert into accounts(code,name,type) values ($1,$2,$3) on conflict (code) do update set name = excluded.name, type = excluded.type, is_control = false', [c, n, t]);
+  await db.q('update accounts set parent_id = account_find_parent(code) where parent_id in (select id from accounts where not is_control)');   // บัญชีที่ seed ทับให้เป็นบัญชีย่อย → ลูกย้ายไปกลุ่มคุมที่ใกล้ที่สุด
   const uid: Record<string, string> = {};
   for (const [u, n, r] of USERS) uid[u] = (await db.q('select app_user_create($1,$2,$3) as id', [u, n, r]))[0].id;
   const d = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);

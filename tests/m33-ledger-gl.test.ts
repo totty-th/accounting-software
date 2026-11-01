@@ -9,7 +9,7 @@ const db = { q: async <T = any>(sql: string, a: unknown[] = []) => (await pg.que
 
 beforeAll(async () => {
   pg = new PGlite(); for (const f of readdirSync(dir).sort()) await pg.exec(readFileSync(new URL(f, dir), 'utf8'));
-  await pg.exec(`insert into accounts(code,name,type) values ('11100','เงินสดทดสอบ','asset'),('21100','เจ้าหนี้ทดสอบ','liability'),('41000','รายได้ทดสอบ','revenue'),('53000','ค่าใช้จ่ายทดสอบ','expense')`);
+  await pg.exec(`insert into accounts(code,name,type) values ('11100','เงินสดทดสอบ','asset'),('21100','เจ้าหนี้ทดสอบ','liability'),('41000','รายได้ทดสอบ','revenue'),('53000','ค่าใช้จ่ายทดสอบ','expense') on conflict (code) do update set name = excluded.name, type = excluded.type, is_control = false`);
   const j = (d: string, n: string, l: string) => pg.query(`select post_voucher('JV',$1::date,$2,'MANUAL',$2,$3::jsonb)`, [d, n, l]);
   await j('2025-12-20', 'ยกมา', '[{"account":"11100","debit":1000},{"account":"21100","credit":1000}]');
   await j('2026-01-05', 'ขาย', '[{"account":"11100","debit":500},{"account":"41000","credit":500}]');
@@ -46,7 +46,7 @@ describe('M33 บัญชีแยกประเภทแบบ FA', () => {
     expect(t.every(a => ['asset', 'revenue'].includes(a.type))).toBe(true);
     const by = (rows: any[], c: string) => rows.find(a => a.code === c);
     expect(by(t, '11100').bal).toBe(1300);        // 1000+500-200 (ใบผิด-ใบกลับรายการหักล้าง)
-    expect(by(t, '41000').bal).toBe(500);
+    expect(by(t, '41000').bal).toBe(-500);   // เดบิต−เครดิต แบบ FA
     const x = await glList(db, { ...base, q: 'ทดสอบ', types: [], from: '2026-02-01', to: '2026-02-28' });
     expect(by(x, '11100').bal).toBe(1300);
     expect(by(x, '41000').bal).toBe(0);            // รายได้เฉพาะช่วง ก.พ. = 0
