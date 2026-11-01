@@ -332,7 +332,8 @@ export async function saveSignatures(f: FormData): Promise<void> {
     return `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`; };
   const clr = (k: string) => f.get(k) === '1';
   await run(async () => {
-    const sig = await img('signature'), stp = await img('stamp'); const db = await getDb();
+    const sig = await img('signature'), stp = await img('stamp'), lg = await img('logo'); const db = await getDb();
+    if (lg) await db.q('update company_profile set logo_img=$1', [lg]); if (clr('clear_logo')) await db.q('update company_profile set logo_img=null');
     if (sig) await db.q('update company_profile set signature_img=$1', [sig]); if (clr('clear_signature')) await db.q('update company_profile set signature_img=null');
     if (stp) await db.q('update company_profile set stamp_img=$1', [stp]); if (clr('clear_stamp')) await db.q('update company_profile set stamp_img=null');
   }, ['/settings/company'], 'settings.company');
@@ -618,3 +619,6 @@ export async function importContacts(p: { file: string; rows: unknown[][]; map: 
   }, ['/contacts', '/contacts/import'], 'master.write');
 }
 export async function deleteContactImportBatch(id: string) { return run(call('select delete_contact_import_batch($1)', id), ['/contacts', '/contacts/import'], 'master.write'); }
+
+export const saveDocDesign = async (scope: string, p: Record<string, unknown>) => run(call('select save_doc_design($1,$2::jsonb)', scope, JSON.stringify(p)), ['/settings/design'], 'settings.company');
+export const resetDocDesign = async () => run(call('select reset_doc_design()'), ['/settings/design'], 'settings.company');

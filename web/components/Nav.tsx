@@ -78,6 +78,7 @@ const GROUPS: Group[] = [
     { head: 'หัก ณ ที่จ่าย', href: '/tax/wht-submission', label: 'ยื่นหัก ณ ที่จ่ายออนไลน์', perms: R }] },
   { key: 'set', label: 'ตั้งค่า', c: 'var(--grey)', items: [
     { href: '/settings/company', label: 'ข้อมูลบริษัท', perms: ['settings.company'] },
+    { href: '/settings/design', label: 'รูปแบบดีไซน์เอกสาร', perms: ['settings.company'] },
     { href: '/settings/lock', label: 'ล็อกงวดบัญชี', perms: R },
     { href: '/settings/opening-balance', label: 'ยอดเริ่มต้น', perms: R },
     { href: '/stock/settings', label: 'ตั้งค่าสต็อก', perms: ['stock.read'] },

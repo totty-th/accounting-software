@@ -26,7 +26,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
   const f = (n: string) => pdf.embedFont(fs.readFileSync(path.join(dir, 'fonts', n)), { subset: true });
   const F = { th: await f('sarabun-thai-400-normal.woff'), la: await f('sarabun-latin-400-normal.woff'),
               thB: await f('sarabun-thai-700-normal.woff'), laB: await f('sarabun-latin-700-normal.woff') };
-  const t = dlv ? { title: 'ใบส่งของ', rgb: [0.18, 0.49, 0.43] as [number, number, number] } : DOC_TITLE[v.doc.doc_type], col = rgb(...t.rgb), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
+  const t = dlv ? { title: 'ใบส่งของ', rgb: [0.18, 0.49, 0.43] as [number, number, number] } : DOC_TITLE[v.doc.doc_type], dz = v.design, col = dz?.bw && !dlv ? rgb(0.15, 0.15, 0.15) : rgb(...t.rgb), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
 
   const runs = (s: string) => { const out: [string, boolean][] = []; for (const ch of s) {
     const th = isThai(ch) || ch === '฿'; const last = out[out.length - 1];
@@ -52,20 +52,25 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     return out;
   };
 
+  const emb = async (s?: string | null) => { if (!s) return null; const m = /^data:image\/(png|jpeg);base64,(.+)$/.exec(s); if (!m) return null;
+    try { const b = Buffer.from(m[2], 'base64'); return m[1] === 'png' ? await pdf.embedPng(b) : await pdf.embedJpg(b); } catch { return null; } };
+  const logoImg = dz?.logo !== false ? await emb(v.images?.logo) : null, stampImg = dz?.stamp !== false ? await emb(v.images?.stamp) : null;
   const L = 42, R = 553, W = 595, H = 842;
   const sheet = (label: string) => {
     let page = pdf.addPage([W, H]); let y = H - 48;
     page.drawRectangle({ x: 0, y: H - 14, width: W, height: 14, color: col });
     // หัว: บริษัท (ซ้าย) / ชื่อเอกสาร (ขวา)
+    const lk = logoImg ? Math.min(1, 150 / logoImg.width, 40 / logoImg.height) : 0;
+    if (logoImg && !dlv) { page.drawImage(logoImg, { x: L, y: y - logoImg.height * lk + 10, width: logoImg.width * lk, height: logoImg.height * lk }); y -= logoImg.height * lk + 4; }
     draw(page, v.company?.name ?? '', L, y, 13, { bold: true });
     wrap(v.company?.address ?? '', 9.5, 280).forEach((ln, i) => draw(page, ln, L, y - 15 - i * 12, 9.5, { color: grey }));
     const addrN = wrap(v.company?.address ?? '', 9.5, 280).length;
     if (v.company?.tax_id) draw(page, `เลขประจำตัวผู้เสียภาษี ${v.company.tax_id}`, L, y - 15 - addrN * 12, 9.5, { color: grey });
-    draw(page, t.title, R, y, 16, { bold: true, right: true, color: col });
-    draw(page, label, R, y - 18, 10.5, { right: true, color: grey });
+    const ttl = wrap((!dlv && dz?.title) || t.title, 16, 175); ttl.forEach((ln, i) => draw(page, ln, R, y - i * 19, 16, { bold: true, right: true, color: col }));
+    if (dlv || dz?.copy_mark !== false) draw(page, label, R, y - 18 - (ttl.length - 1) * 19, 10.5, { right: true, color: grey });
     y -= 78;
     // ลูกค้า + เลขที่/วันที่
-    draw(page, 'ลูกค้า', L, y, 9, { color: grey });
+    draw(page, (!dlv && dz?.customer_label) || 'ลูกค้า', L, y, 9, { color: grey });
     draw(page, v.contact.name, L, y - 13, 11, { bold: true });
     let cy = y - 27;
     for (const ln of wrap(v.contact.address ?? '', 9.5, 270)) { draw(page, ln, L, cy, 9.5); cy -= 12; }
@@ -73,8 +78,8 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     const meta: [string, string][] = [['เลขที่', v.doc.doc_no], ['วันที่', v.doc.doc_type === 'INV' && full && v.doc.term_mode === 'credit_nodate' ? '................................' : thDate(v.doc.doc_date)]];
     const nodate = v.doc.doc_type === 'INV' && full && v.doc.term_mode === 'credit_nodate';
     const credit = full ? (v.doc.term_mode === 'cash' || nodate ? 0 : Number(v.doc.credit_days ?? 0)) : v.contact.credit_days;
-    if (credit > 0 && !dlv) meta.push(['เครดิต', `${credit} วัน`]);
-    if (v.doc.due_date && !qt && !nodate && !dlv) meta.push(['ครบกำหนด', thDate(v.doc.due_date)]);
+    if (credit > 0 && !dlv && dz?.show_credit !== false) meta.push(['เครดิต', `${credit} วัน`]);
+    if (v.doc.due_date && !qt && !nodate && !dlv && dz?.show_due !== false) meta.push(['ครบกำหนด', thDate(v.doc.due_date)]);
     if (full && v.doc.ref_no) meta.push(['เลขที่อ้างอิง', v.doc.ref_no]);
     if (full && v.doc.project) meta.push(['โปรเจกต์', v.doc.project]);
     if (v.doc.salesperson) meta.push(['พนักงานขาย', v.doc.salesperson]);
@@ -152,6 +157,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     if (dlv || v.doc.show_signature !== false) [[L, signL, v.contact.name], [312, signR, v.company?.name ?? '']].forEach(([x, cap, who]) => {
       const xx = x as number;
       draw(page, `ในนาม ${who}`, xx, sy + 52, 9.5, { color: grey });
+      if (!dlv && stampImg && xx > 300) { const k = Math.min(1, 90 / stampImg.width, 56 / stampImg.height); page.drawImage(stampImg, { x: xx + 40, y: sy + 16, width: stampImg.width * k, height: stampImg.height * k, opacity: 0.9 }); }
       page.drawLine({ start: { x: xx, y: sy + 14 }, end: { x: xx + 138, y: sy + 14 }, thickness: 0.6, color: grey });
       page.drawLine({ start: { x: xx + 148, y: sy + 14 }, end: { x: xx + 238, y: sy + 14 }, thickness: 0.6, color: grey });
       draw(page, cap as string, xx + 69 - width(cap as string, 9.5) / 2, sy, 9.5, { color: grey });

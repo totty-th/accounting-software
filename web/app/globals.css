@@ -336,3 +336,10 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
 .rbp>summary::before{content:'▸';position:absolute;margin-left:-12px;color:var(--muted)}
 .rbp[open]>summary::before{content:'▾'}.rbp[open]{background:color-mix(in srgb,var(--brand) 5%,var(--surface))}
 .rbp table{min-width:0}
+
+/* รูปแบบดีไซน์เอกสาร (ตั้งค่าที่ /settings/design) */
+.sheet.bw{filter:grayscale(1)}
+.sheet.hbg .sh-lines thead th{background:color-mix(in srgb,var(--dc) 14%,#fff)}
+.sheet.cont{max-width:241mm}
+.sh-logo{display:block;max-height:64px;max-width:200px;margin-bottom:6px;object-fit:contain}
+.sh-stamp{display:block;margin:0 auto -30px;max-height:60px;position:relative}

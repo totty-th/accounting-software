@@ -17,6 +17,8 @@ export default async function Company() {
       <form action={A.saveSignatures} className="panel" style={{ display: 'grid', gap: 10, padding: 16, maxWidth: 640, marginTop: 12 }}>
         <h3>ลายเซ็นอิเล็กทรอนิกส์และตรายาง</h3>
         <p className="sub">ใช้บนเอกสารซื้อที่ติ๊ก "ลายเซ็นอิเล็กทรอนิกส์และตรายาง" (ใบสั่งซื้อ) · PNG พื้นโปร่งใส/JPG ไม่เกิน 600 KB</p>
+        <label>โลโก้บริษัท (แสดงบนเอกสารขาย) {c?.logo_img && <img alt="โลโก้ปัจจุบัน" src={c.logo_img} style={{ maxHeight: 48, verticalAlign: 'middle' }} />} <input type="file" name="logo" accept="image/png,image/jpeg" /></label>
+        {c?.logo_img && <label><input type="checkbox" name="clear_logo" value="1" /> ลบโลโก้เดิม</label>}
         <label>ลายเซ็น {c?.signature_img && <img alt="ลายเซ็นปัจจุบัน" src={c.signature_img} style={{ maxHeight: 48, verticalAlign: 'middle' }} />} <input type="file" name="signature" accept="image/png,image/jpeg" /></label>
         {c?.signature_img && <label><input type="checkbox" name="clear_signature" value="1" /> ลบลายเซ็นเดิม</label>}
         <label>ตรายาง {c?.stamp_img && <img alt="ตรายางปัจจุบัน" src={c.stamp_img} style={{ maxHeight: 64, verticalAlign: 'middle' }} />} <input type="file" name="stamp" accept="image/png,image/jpeg" /></label>

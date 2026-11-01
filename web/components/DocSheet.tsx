@@ -2,33 +2,36 @@ import { DOC_TITLE, type DocView } from '@/lib/doc-view';
 import { bahtText } from '@/lib/wht-pdf';
 import { docSummary, isFull, lineTaxLabel, lineWhtLabel, SIGNERS } from '@/lib/doc-calc';
 import { money, qty, dateTh } from '@/lib/format';
+import { DEFAULT_DESIGN, FONT_CSS, SIZE_PX } from '@/lib/doc-design';
 
 // เอกสารขนาด A4 ที่ลูกค้าเห็น (ใช้ร่วมกันในหน้ารายละเอียด หน้าพิมพ์ และลิงก์แชร์)
 export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
   const t = DOC_TITLE[v.doc.doc_type], ty = v.doc.doc_type;
-  const sum = docSummary(v);
+  const d = v.design ?? DEFAULT_DESIGN; const sum = docSummary(v);
   const [signL, signR] = SIGNERS[ty];
   const showTax = ty !== 'BL';
   const qt = ty === 'QT', full = isFull(v);
   const nodate = ty === 'INV' && full && v.doc.term_mode === 'credit_nodate';   // FA: เครดิต(ไม่แสดงวันที่) = ไม่แสดงเครดิต/ครบกำหนด และวันที่เป็นเส้นประ
   const credit = full ? (v.doc.term_mode === 'cash' || nodate ? 0 : Number(v.doc.credit_days ?? 0)) : v.contact.credit_days;
   return (
-    <article className={`sheet${v.doc.status === 'cancelled' ? ' cancelled' : ''}`} style={{ ['--dc' as any]: t.color }}>
+    <article className={`sheet${v.doc.status === 'cancelled' ? ' cancelled' : ''}${d.bw ? ' bw' : ''}${d.header_bg ? ' hbg' : ''}${d.paper === 'continuous' ? ' cont' : ''}`}
+      style={{ ['--dc' as any]: d.bw ? '#222' : t.color, fontFamily: FONT_CSS[d.font], fontSize: SIZE_PX[d.size] }}>
       {v.doc.status === 'cancelled' && <div className="sh-mark">ยกเลิก</div>}
       <header className="sh-head">
         <div className="sh-co">
+          {d.logo && v.images?.logo && <img className="sh-logo" alt="โลโก้" src={v.images.logo} />}
           <b>{v.company?.name ?? ''}</b>
           <div>{v.company?.address}</div>
           {v.company?.tax_id && <div>เลขประจำตัวผู้เสียภาษี {v.company.tax_id}</div>}
         </div>
         <div className="sh-title">
-          <h2>{t.title}</h2>
-          <span className="sh-copy">{copy ? 'สำเนา' : 'ต้นฉบับ'}</span>
+          <h2>{d.title || t.title}</h2>
+          {d.copy_mark && <span className="sh-copy">{copy ? 'สำเนา' : 'ต้นฉบับ'}</span>}
         </div>
       </header>
       <section className="sh-meta">
         <div className="sh-cust">
-          <small>ลูกค้า</small>
+          <small>{d.customer_label || 'ลูกค้า'}</small>
           <b>{v.contact.name}</b>
           <div>{v.contact.address}</div>
           {v.contact.tax_id && <div>เลขประจำตัวผู้เสียภาษี {v.contact.tax_id}</div>}
@@ -36,8 +39,8 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
         <dl>
           <dt>เลขที่</dt><dd>{v.doc.doc_no}</dd>
           <dt>วันที่</dt><dd>{nodate ? '................................' : dateTh(v.doc.doc_date)}</dd>
-          {credit > 0 && <><dt>เครดิต</dt><dd>{credit} วัน</dd></>}
-          {v.doc.due_date && !qt && !nodate && <><dt>ครบกำหนด</dt><dd>{dateTh(v.doc.due_date)}</dd></>}
+          {credit > 0 && d.show_credit && <><dt>เครดิต</dt><dd>{credit} วัน</dd></>}
+          {v.doc.due_date && !qt && !nodate && d.show_due && <><dt>ครบกำหนด</dt><dd>{dateTh(v.doc.due_date)}</dd></>}
           {v.ref && (ty === 'CN' || ty === 'DN') && <><dt>วันที่อ้างอิง</dt><dd>{dateTh(v.ref.doc_date)}</dd></>}
           {v.doc.salesperson && <><dt>พนักงานขาย</dt><dd>{v.doc.salesperson}</dd></>}
           {v.ref && <><dt>อ้างอิง</dt><dd>{v.ref.doc_no}</dd></>}
@@ -68,7 +71,7 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
       {(v.doc.reason || v.doc.note) && <p className="sh-note" style={{ whiteSpace: 'pre-line' }}><small>หมายเหตุ</small>{v.doc.reason || v.doc.note}</p>}
       {v.doc.show_signature !== false && <footer className="sh-sign">
         <div><span className="on">ในนาม {v.contact.name}</span><i />{signL} / วันที่</div>
-        <div><span className="on">ในนาม {v.company?.name ?? ''}</span><i />{signR} / วันที่</div>
+        <div><span className="on">ในนาม {v.company?.name ?? ''}</span>{d.stamp && v.images?.stamp && <img className="sh-stamp" alt="ตรายาง" src={v.images.stamp} />}<i />{signR} / วันที่</div>
       </footer>}
     </article>
   );
