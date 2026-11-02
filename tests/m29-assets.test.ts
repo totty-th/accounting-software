@@ -135,6 +135,23 @@ describe('M29 เลิกใช้สินทรัพย์', () => {
   });
 });
 
+describe('M29 เทียบ FA: บริจาค/พักใช้งาน/ไม่คิดค่าเสื่อม', () => {
+  it('ที่ดิน (ไม่คิดค่าเสื่อม) บริจาค → Dr 49880 / Cr สินทรัพย์ ที่ราคาทุน', async () => {
+    const id = await mk({ depreciate: false, cost: 500000 });
+    const v = (await one<any>(`select dispose_asset($1,'2026-11-02','donated',0) v`, [id])).v;
+    const l = await lines(v);
+    expect(l.length).toBe(2);
+    expect(l.map((x: any[]) => x.slice(1))).toEqual([[500000, 0], [0, 500000]]);
+    expect(l[0][0]).toBe('49880');
+  });
+  it('พักการใช้งานยังคิดค่าเสื่อมต่อ (FA ทดสอบแล้ว)', async () => {
+    const id = await mk(); const q = `select asset_dep_period(a,'2026-11-01','2026-11-30') v from fixed_assets a where id=$1`;
+    const before = +(await one<any>(q, [id])).v;
+    await db.query(`select set_asset_status($1,'suspended')`, [id]);
+    expect(+(await one<any>(q, [id])).v).toBe(before);
+  });
+});
+
 describe('M29 สร้างจากค่าใช้จ่าย', () => {
   const exp = async (extra: Record<string, unknown> = {}) => (await one<{ id: string }>(`select save_expense($1::jsonb, $2::jsonb) id`, [
     JSON.stringify({ date: '2026-11-01', contact: vendor }),
