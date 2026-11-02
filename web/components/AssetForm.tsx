@@ -1,7 +1,8 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { createAsset, updateAsset, setAssetStatus, disposeAsset, reopenAsset, deleteAsset } from '@/lib/actions';
+import { AssetFiles } from '@/components/AssetFiles';
+import { createAsset, uploadAssetFile, updateAsset, setAssetStatus, disposeAsset, reopenAsset, deleteAsset } from '@/lib/actions';
 import { ActionButton } from '@/components/ActionButton';
 
 export interface Cat { id: string; name: string; depreciate: boolean; life_years: number | null }
@@ -20,6 +21,7 @@ export function AssetForm({ cats, today, init, locked = false, readOnly = false 
   const [err, setErr] = useState<string | null>(null);
   const [v, setV] = useState<AssetVal>(init ?? { code: '', name: '', description: '', ref_no: '', category_id: '', qty: '1', unit: '', purchase_date: today, start_date: today, cost: '',
     depreciate: true, salvage: '1.00', life_years: '', hasOpen: false, accum_open: '', calc_start: today, vendor: '', serial_no: '', warranty_end: '', location: '', user_name: '', note: '' });
+  const [queue, setQueue] = useState<File[]>([]);
   const set = (p: Partial<AssetVal>) => setV(o => ({ ...o, ...p }));
   const pickCat = (id: string) => { const c = cats.find(x => x.id === id); set({ category_id: id, ...(c ? { depreciate: c.depreciate, life_years: c.life_years ? String(c.life_years) : v.life_years } : {}) }); };
   const calc = useMemo(() => {
@@ -35,6 +37,7 @@ export function AssetForm({ cats, today, init, locked = false, readOnly = false 
     const r = init?.id ? await updateAsset(init.id, data) : await createAsset(data);
     if (r.error) return setErr(r.error);
     const id = init?.id ?? (r as any).id;
+    if (!init?.id) for (const file of queue) { const f = new FormData(); f.set('id', id); f.set('file', file); const u = await uploadAssetFile(f); if (u.error) return setErr(`สร้างสินทรัพย์แล้ว แต่แนบ ${file.name} ไม่สำเร็จ: ${u.error}`); }
     router.push(close ? '/assets' : `/assets/${id}`); router.refresh();
   });
   return (
@@ -83,6 +86,7 @@ export function AssetForm({ cats, today, init, locked = false, readOnly = false 
         </div>
         {L('โน้ต', <textarea aria-label="โน้ต" rows={2} value={v.note} disabled={dis} onChange={e => set({ note: e.target.value })} />)}
       </section>
+      {!init?.id && !readOnly && <section className="panel" style={{ padding: 16 }}><h3 style={{ marginTop: 0 }}>แนบเอกสาร/รูปภาพ</h3><AssetFiles files={[]} canWrite queue={queue} setQueue={setQueue} /></section>}
       {err && <p className="sub" role="alert" style={{ color: 'var(--red)' }}>{err}</p>}
       {!readOnly && <div className="acts" style={{ justifyContent: 'flex-start', gap: 8 }}>
         <button type="button" className="btn" disabled={pending || !v.name.trim() || !v.category_id || v.cost === ''} onClick={() => save(false)}>{pending ? '...' : 'บันทึกเอกสาร'}</button>

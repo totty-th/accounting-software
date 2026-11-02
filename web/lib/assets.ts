@@ -20,7 +20,8 @@ export interface AssetFilter { q?: string; status?: string; cat?: string; from?:
 export async function listAssets(f: AssetFilter) {
   const db = await getDb();
   const rows = await db.q<any>(`select a.*, c.name cat_name, c.sort_no, asset_accum_at(a, $1::date) accum,
-      a.cost - asset_accum_at(a, $1::date) book, e.exp_no
+      a.cost - asset_accum_at(a, $1::date) book, e.exp_no,
+      (select f.id from fixed_asset_files f where f.asset_id = a.id and f.mime ~ '^image/(png|jpe?g|gif|webp)$' order by f.created_at limit 1) thumb
     from fixed_assets a join asset_categories c on c.id = a.category_id left join expenses e on e.id = a.expense_id
     where a.status <> 'void'
       and ($2::text is null or a.code ilike '%'||$2||'%' or a.name ilike '%'||$2||'%' or a.vendor ilike '%'||$2||'%' or a.serial_no ilike '%'||$2||'%')

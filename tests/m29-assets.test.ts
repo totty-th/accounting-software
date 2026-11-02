@@ -220,3 +220,14 @@ describe('M29 ไฟล์แนบของสินทรัพย์', () => 
     expect((await one<any>(`select count(*)::int n from fixed_asset_files`)).n).toBe(0);
   });
 });
+
+describe('M29 รูปย่อในรายการ', () => {
+  it('รูปแรกที่แนบเป็นรูปย่อ · ไฟล์ที่ไม่ใช่รูปไม่นับ', async () => {
+    const id = await mk();
+    await db.query(`select add_asset_file($1,'a.pdf','application/pdf',$2)`, [id, Buffer.from('x')]);
+    const q = `select (select f.id from fixed_asset_files f where f.asset_id = a.id and f.mime ~ '^image/(png|jpe?g|gif|webp)$' order by f.created_at limit 1) t from fixed_assets a where id=$1`;
+    expect((await one<any>(q, [id])).t).toBeNull();
+    const img = (await one<any>(`select add_asset_file($1,'b.png','image/png',$2) id`, [id, Buffer.from('x')])).id;
+    expect((await one<any>(q, [id])).t).toBe(img);
+  });
+});

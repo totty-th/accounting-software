@@ -39,15 +39,15 @@ export default async function Assets({ searchParams: sp }: { searchParams: { q?:
       {rows.length === 0 ? <div className="empty">ยังไม่มีสินทรัพย์ที่ตรงเงื่อนไข</div> : groups.map(({ c, rs }) => (
         <section key={c.id} className="panel" style={{ marginBottom: 12, overflowX: 'auto' }}>
           <h3 style={{ padding: '10px 14px 0' }}>{c.name} <small className="sub">{rs.length} รายการ</small></h3>
-          <table><thead><tr><th>รหัส</th><th>ชื่อสินทรัพย์</th><th>วันที่เริ่มใช้งาน</th><th className="num">ราคาซื้อ</th><th className="num">มูลค่าทางบัญชี</th><th>สถานะ</th><th /></tr></thead>
+          <table><thead><tr><th style={{ width: 52 }} /><th>รหัส</th><th>ชื่อสินทรัพย์</th><th>วันที่เริ่มใช้งาน</th><th className="num">ราคาซื้อ</th><th className="num">มูลค่าทางบัญชี</th><th>สถานะ</th><th /></tr></thead>
             <tbody>{rs.map(r => (
-              <tr key={r.id}><td className="no"><Link href={`/assets/${r.id}`}>{r.code}</Link></td>
+              <tr key={r.id}><td>{r.thumb ? <img src={`/assets/file/${r.thumb}`} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} /> : <span aria-hidden style={{ display: 'inline-grid', placeItems: 'center', width: 40, height: 40, borderRadius: 4, background: 'var(--line, #eee)', opacity: .6 }}>▣</span>}</td><td className="no"><Link href={`/assets/${r.id}`}>{r.code}</Link></td>
                 <td>{r.name}{r.exp_no && <small className="sub"> · จาก <Link href={`/expenses/${r.expense_id}`}>{r.exp_no}</Link></small>}</td>
                 <td>{dateTh(r.start)}</td><td className="num">{money(r.cost)}</td><td className="num">{money(r.book)}</td>
                 <td><span className={`pill ${ASSET_STATUS[r.status]?.[1] ?? 'grey'}`}>{ASSET_STATUS[r.status]?.[0]}</span>{r.disp && <small className="sub"> {dateTh(r.disp)}</small>}</td>
                 <td className="acts">{W && ['in_use', 'suspended'].includes(r.status) && <AssetStatusBtn id={r.id} status={r.status} />}
                   <Link className="btn sm ghost" href={`/assets/${r.id}`}>เปิด</Link></td></tr>))}
-              <tr style={{ fontWeight: 700 }}><td /><td>ยอดรวม {c.name}</td><td /><td className="num">{money(sum(rs, 'cost'))}</td><td className="num">{money(sum(rs, 'book'))}</td><td /><td /></tr></tbody></table>
+              <tr style={{ fontWeight: 700 }}><td /><td /><td>ยอดรวม {c.name}</td><td /><td className="num">{money(sum(rs, 'cost'))}</td><td className="num">{money(sum(rs, 'book'))}</td><td /><td /></tr></tbody></table>
         </section>))}
       {rows.length > 0 && <p className="sub">รวมทั้งสิ้น {rows.length} รายการ · ราคาซื้อ {money(rows.reduce((s, r) => s + num(r.cost), 0))}</p>}
     </>
