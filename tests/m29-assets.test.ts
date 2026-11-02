@@ -152,6 +152,15 @@ describe('M29 เทียบ FA: บริจาค/พักใช้งาน
   });
 });
 
+describe('M29 อายุตั้งต้นของหมวด (ตาม FA)', () => {
+  it('ไอที 3 ปี · ซอฟต์แวร์ 10 ปี · อื่นๆ 5 ปี', async () => {
+    const r = await rows(`select name, life_years from asset_categories`);
+    const m = Object.fromEntries(r.map((x: any) => [x.name, +x.life_years]));
+    expect(m['คอมพิวเตอร์/อุปกรณ์ไอที']).toBe(3); expect(m['ซอฟต์แวร์คอมพิวเตอร์']).toBe(10);
+    expect(m['ยานพาหนะ']).toBe(5); expect(m['เฟอร์นิเจอร์/อุปกรณ์สำนักงาน']).toBe(5);
+  });
+});
+
 describe('M29 สร้างจากค่าใช้จ่าย', () => {
   const exp = async (extra: Record<string, unknown> = {}) => (await one<{ id: string }>(`select save_expense($1::jsonb, $2::jsonb) id`, [
     JSON.stringify({ date: '2026-11-01', contact: vendor }),
