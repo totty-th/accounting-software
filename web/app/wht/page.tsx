@@ -51,44 +51,16 @@ export default async function Wht({ searchParams }: { searchParams: SP }) {
         <table><thead><tr><th style={{ width: 28 }} /><th>วันที่</th><th>เลขที่เอกสาร</th><th>ผู้ถูกหัก ณ ที่จ่าย</th><th>แบบฟอร์ม / อัตรา</th><th className="num">ฐานภาษี / ภาษีที่หัก</th><th>สถานะ</th><th /></tr></thead>
           <tbody>{rows.map(r => (
             <tr key={r.id} style={r.status === 'cancelled' ? { opacity: 0.5 } : undefined}>
-              <td><input type="checkbox" name="ids" value={r.id} style={{ width: 'auto' }} aria-label={`เลือก ${r.cert_no}`} /></td><td>{dateTh(r.pay_date)}</td><td className="no">{r.cert_no}{r.exp_no && <div className="sub">{r.exp_no}</div>}</td><td>{partyName(r)}</td>
+              <td><input type="checkbox" name="ids" value={r.id} style={{ width: 'auto' }} aria-label={`เลือก ${r.cert_no}`} /></td><td>{dateTh(r.pay_date)}</td><td className="no"><a href={`/wht/${r.id}`}>{r.cert_no}</a>{r.exp_no && <div className="sub">{r.exp_no}</div>}</td><td>{partyName(r)}</td>
               <td>{FORM_TH[r.form_code] ?? r.form_code}<div className="sub">{rateOf(r.id)}</div></td>
               <td className="num">{money(r.base_amount)}<div className="sub">{money(r.wht_amount)}</div></td>
               <td><WhtStatus id={r.id} status={r.status} linked={!!r.expense_id} canWrite={W} />{r.status === 'active' && r.missing?.length ? <div><span title={r.missing.join(' · ')} style={{ color: 'var(--orange)' }}>⚠ ข้อมูลไม่ครบ ({r.missing.length})</span></div> : null}</td>
               <td className="noprint"><details style={{ position: 'relative' }}><summary className="btn sm ghost" style={{ listStyle: 'none', cursor: 'pointer' }}>⋯</summary>
                 <div className="panel" style={{ position: 'absolute', right: 0, zIndex: 5, minWidth: 190, padding: 6, display: 'grid', gap: 4 }}>
                   {r.status === 'active' && !r.missing?.length && <a className="btn sm ghost" href={`/wht/${r.id}/pdf`} target="_blank">พิมพ์ / ดาวน์โหลด PDF 50 ทวิ</a>}
-                  {r.status === 'active' && <a className="btn sm ghost" href={`#d-${r.id}`}>แก้ไขรายละเอียดในแบบ</a>}
+                  {r.status === 'active' && <a className="btn sm ghost" href={`/wht/${r.id}`}>เปิดรายละเอียด / แก้ไขในแบบ</a>}
                   {W && <a className="btn sm ghost" href={`/wht?dup=${r.id}`}>สร้างซ้ำ</a>}
                 </div></details></td></tr>))}</tbody></table></form>}
-      {[0].map(() => {
-        const rs = rows.filter(r => r.status === 'active');
-        return (
-          <div key="d">
-            {rs.map(r => (
-              <details key={r.id} id={`d-${r.id}`} className="panel" style={{ margin: '8px 0', padding: 12 }}>
-                <summary>{r.cert_no} · รายละเอียดในแบบ{r.missing?.length ? ` · ขาด: ${r.missing.join(', ')}` : ''}</summary>
-                <form action={A.saveContactTax}><fieldset disabled={!W} style={{ display: 'grid', gap: 6, margin: '10px 0', border: 0, padding: 0, minWidth: 0 }}>
-                  <b>ผู้ถูกหัก: {partyName(r)}</b><input type="hidden" name="id" value={r.contact_id} />
-                  <label>เลขประจำตัวผู้เสียภาษี 13 หลัก <input name="tax_id" defaultValue={r.tax_id ?? ''} pattern="[0-9]{13}" /></label>
-                  <label>ที่อยู่ <input name="address" defaultValue={r.address ?? ''} /></label>
-                  <label>ประเภทบุคคล <select name="person_kind" defaultValue={r.person_kind ?? ''}><option value="">-</option>
-                    <option value="juristic">นิติบุคคล</option><option value="individual">บุคคลธรรมดา</option></select></label>
-                  {W && <button className="btn">บันทึกข้อมูลผู้ถูกหัก</button>}
-                </fieldset></form>
-                <form action={A.saveCertDetails}><fieldset disabled={!W} style={{ display: 'grid', gap: 6, border: 0, padding: 0, minWidth: 0 }}>
-                  <input type="hidden" name="id" value={r.id} />
-                  <label>เล่มที่ <input name="book_no" defaultValue={r.book_no ?? ''} /></label>
-                  <label>เลขที่ในเล่ม <input name="run_no" defaultValue={r.run_no ?? ''} /></label>
-                  <label>ลำดับที่ในแบบยื่น <input name="seq_in_form" type="number" min="1" defaultValue={r.seq_in_form ?? ''} /></label>
-                  <label>ประเภทเงินได้ <select name="income_category" defaultValue={r.income_category}>{CATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-                  <label>ผู้จ่ายเงิน <select name="payer_condition" defaultValue={r.payer_condition}>{CONDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-                  <label>เงินสมทบประกันสังคม <input name="fund_sso" type="number" step="0.01" min="0" defaultValue={+r.fund_sso || ''} /></label>
-                  {W && <button className="btn">บันทึกรายละเอียดในแบบ</button>}
-                </fieldset></form>
-              </details>))}
-          </div>);
-      })}
     </>
   );
 }

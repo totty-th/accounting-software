@@ -16,7 +16,7 @@ const SQL: Record<RelKind, string> = {
   receipt: `select ri.receipt_id id, d.doc_no no, d.doc_type kind, '/sales/' || d.doc_no href from receipt_items ri join sales_docs d on d.id = ri.doc_id
     union all select ri.receipt_id, c.doc_no, c.doc_type, '/sales/' || c.doc_no from receipt_items ri join sales_docs c on c.ref_doc_id = ri.doc_id and c.doc_type in ('CN','DN') and c.status <> 'cancelled'`,
   exp: `select e.id, po.po_no no, 'PO' kind, '/purchases/orders/' || po.id href from expenses e join purchase_orders po on po.id = e.po_id
-    union all select w.expense_id id, w.cert_no no, 'WT' kind, '/wht' href from wht_certs w where w.expense_id is not null and w.status = 'active'
+    union all select w.expense_id id, w.cert_no no, 'WT' kind, '/wht/' || w.id href from wht_certs w where w.expense_id is not null and w.status = 'active'
     union all select x.doc_id, s.pay_no, 'PAY', '/payments' from payment_slip_items x join payment_slips s on s.id = x.slip_id where s.status = 'active' and x.doc_type = 'EXP'`,
   ri: `select g.id, po.po_no no, 'PO' kind, '/purchases/orders/' || po.id href from goods_receipts g join purchase_orders po on po.id = g.po_id
     union all select x.doc_id, s.pay_no, 'PAY', '/payments' from payment_slip_items x join payment_slips s on s.id = x.slip_id where s.status = 'active' and x.doc_type = 'RI'`,
