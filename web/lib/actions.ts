@@ -559,6 +559,15 @@ export const setAssetStatus = async (id: string, status: 'in_use' | 'suspended')
 export const disposeAsset = async (id: string, p: { date: string; type: string; price: number; note: string }) =>
   run(call('select dispose_asset($1, $2::date, $3, $4::numeric, $5)', id, p.date, p.type, p.price || 0, p.note), [...AS, `/assets/${id}`], 'expenses.write');
 export const reopenAsset = async (id: string) => run(call('select reopen_asset($1)', id), [...AS, `/assets/${id}`], 'expenses.write');
+export async function uploadAssetFile(f: FormData): Promise<Result> {
+  const id = String(f.get('id') ?? ''); const file = f.get('file') as File | null;
+  if (!file || !file.size) return { error: 'กรุณาเลือกไฟล์' };
+  if (file.size > 5 * 1024 * 1024) return { error: 'ไฟล์ใหญ่เกิน 5 MB' };
+  const b64 = Buffer.from(await file.arrayBuffer()).toString('base64');
+  return run(call("select add_asset_file($1,$2,$3,decode($4,'base64'))", id, file.name, file.type, b64), [`/assets/${id}`], 'expenses.write');
+}
+export const removeAssetFile = async (assetId: string, fileId: string) =>
+  run(call('select remove_asset_file($1)', fileId), [`/assets/${assetId}`], 'expenses.write');
 export const deleteAsset = async (id: string) => run(call('select delete_asset($1)', id), AS, 'expenses.write');
 export async function postAssetDepreciation(year: number): Promise<Result & { n?: number }> {
   let n: number | undefined;

@@ -5,6 +5,7 @@ import { requirePage } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { money, dateTh, dateIso } from '@/lib/format';
 import { ASSET_STATUS, DISPOSE_TYPE, assetCats, usedText } from '@/lib/assets';
+import { AssetFiles } from '@/components/AssetFiles';
 import { AssetForm, AssetStatusBtn, DisposePanel, ReopenBtn, DeleteAssetBtn, type AssetVal } from '@/components/AssetForm';
 
 export default async function AssetPage({ params }: { params: { id: string } }) {
@@ -25,6 +26,7 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
     vendor: a.vendor ?? '', serial_no: a.serial_no ?? '', warranty_end: a.warranty_end ? dateIso(a.warranty_end) : '', location: a.location ?? '', user_name: a.user_name ?? '', note: a.note ?? '' };
   const jv = await db.q<any>(`select distinct v.voucher_no, v.voucher_date, v.source_type from journal_vouchers v
     where v.source_type = 'ASSET_DISP' and v.source_id = $1 order by v.voucher_date`, [a.id]);
+  const files = await db.q<any>('select id, filename, mime, size from fixed_asset_files where asset_id=$1 order by created_at', [a.id]);
   return (<>
     <div className="top"><div><h1>{gone ? 'สินทรัพย์ที่เลิกใช้งาน' : 'แก้ไขสินทรัพย์'} {a.code} <span className={`pill ${ASSET_STATUS[a.status][1]}`}>{ASSET_STATUS[a.status][0]}</span></h1>
       <p className="sub">{a.cat_name}{a.exp_no && <> · จากเอกสารค่าใช้จ่าย <Link href={`/expenses/${a.expense_id}`}>{a.exp_no}</Link></>}</p></div>
@@ -40,6 +42,7 @@ export default async function AssetPage({ params }: { params: { id: string } }) 
       <b>{DISPOSE_TYPE[a.dispose_type]}เมื่อ {dateTh(a.disposed_date)}</b>{a.sale_price != null && <> · มูลค่าที่ขาย {money(a.sale_price)} · กำไร(ขาดทุน) {money(Number(a.sale_price) - (Number(a.cost) - Number(a.accum)))}</>}
       {a.disp_no && <> · ใบสำคัญ {a.disp_no}</>}{a.dispose_note && <p className="sub">{a.dispose_note}</p>}</section>}
     <AssetForm cats={cats} today={t} init={init} locked={!!a.expense_id} readOnly={gone || !W} />
+    <section className="panel" style={{ padding: 16, marginTop: 12 }}><h3 style={{ marginTop: 0 }}>แนบเอกสาร/รูปภาพ</h3><AssetFiles id={a.id} files={files} canWrite={W} /></section>
     {W && !gone && <div style={{ marginTop: 12 }}><DisposePanel id={a.id} today={t} cost={Number(a.cost)} annual={Number(a.annual)} accumOpen={Number(a.accum_open)} calcStart={dateIso(a.calc_start)}
       startDate={dateIso(a.start_date)} depreciate={a.depreciate} salvage={Number(a.salvage)} /></div>}
     {jv.length > 0 && <p className="sub">ใบสำคัญที่เกี่ยวข้อง: {jv.map(j => j.voucher_no).join(', ')}</p>}

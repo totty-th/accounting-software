@@ -203,3 +203,20 @@ describe('M29 หมวดหมู่', () => {
     expect(await err(db.query(`select save_asset_category(null,$1::jsonb)`, [JSON.stringify({ name: 'ผิด', life_years: 3, asset_account: '12620' })]))).toMatch(/บัญชีค่าเสื่อม/);
   });
 });
+
+describe('M29 ไฟล์แนบของสินทรัพย์', () => {
+  it('แนบได้สูงสุด 5 ไฟล์ · ไม่เกิน 5 MB · ลบได้ · ลบสินทรัพย์แล้วไฟล์หายตาม', async () => {
+    const id = await mk();
+    const add = (n: string, b: Buffer) => one<any>(`select add_asset_file($1,$2,'image/png',$3) id`, [id, n, b]);
+    const f1 = (await add('a.png', Buffer.from('x'))).id;
+    for (let i = 2; i <= 5; i++) await add(`f${i}.png`, Buffer.from('x'));
+    expect(await err(add('f6.png', Buffer.from('x')))).toMatch(/สูงสุด 5/);
+    await db.query(`select remove_asset_file($1)`, [f1]);
+    expect((await one<any>(`select count(*)::int n from fixed_asset_files where asset_id=$1`, [id])).n).toBe(4);
+    expect(await err(add('big.png', Buffer.alloc(5242881)))).toMatch(/5 MB/);
+    expect(await err(add('empty.png', Buffer.alloc(0)))).toMatch(/ว่างเปล่า/);
+    expect(await err(db.query(`select remove_asset_file($1)`, [f1]))).toMatch(/ไม่พบไฟล์/);
+    await db.query(`select delete_asset($1)`, [id]);
+    expect((await one<any>(`select count(*)::int n from fixed_asset_files`)).n).toBe(0);
+  });
+});
