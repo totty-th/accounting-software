@@ -62,15 +62,24 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     // หัว: บริษัท (ซ้าย) / ชื่อเอกสาร (ขวา)
     const lk = logoImg ? Math.min(1, 150 / logoImg.width, 40 / logoImg.height) : 0;
     if (logoImg && !dlv) { page.drawImage(logoImg, { x: L, y: y - logoImg.height * lk + 10, width: logoImg.width * lk, height: logoImg.height * lk }); y -= logoImg.height * lk + 4; }
-    draw(page, v.company?.name ?? '', L, y, 13, { bold: true });
-    wrap(v.company?.address ?? '', 9.5, 280).forEach((ln, i) => draw(page, ln, L, y - 15 - i * 12, 9.5, { color: grey }));
-    const addrN = wrap(v.company?.address ?? '', 9.5, 280).length;
-    if (v.company?.tax_id) draw(page, `เลขประจำตัวผู้เสียภาษี ${v.company.tax_id}`, L, y - 15 - addrN * 12, 9.5, { color: grey });
-    const ttl = (() => { const raw = (!dlv && dz?.title) || t.title; const out: string[] = []; let cur = '';
-      for (const tok of raw.split(/(?<=\/)/)) { if (cur && width(cur + tok, 16, true) > 175) { out.push(cur); cur = tok; } else cur += tok; }
-      if (cur) out.push(cur); return out.flatMap(l => (width(l, 16, true) > 175 ? wrap(l, 16, 165) : [l])); })(); ttl.forEach((ln, i) => draw(page, ln, R, y - i * 19, 16, { bold: true, right: true, color: col }));
-    if (dlv || dz?.copy_mark !== false) draw(page, label, R, y - 18 - (ttl.length - 1) * 19, 10.5, { right: true, color: grey });
-    y -= 78;
+    // คอลัมน์ซ้าย (บริษัท กว้าง 285) / คอลัมน์ขวา (ชื่อเอกสาร กว้าง 205) — ตัดบรรทัดตามความกว้างจริงของตัวหนา ไม่ให้ทับกัน
+    const LW = 285, RW = 205;
+    const wrapB = (s: string, size: number, maxW: number, bold: boolean, seps: RegExp) => {
+      const out: string[] = []; let cur = '';
+      const flush = () => { if (cur) { out.push(cur); cur = ''; } };
+      for (const tok of s.split(seps)) {
+        if (cur && width(cur + tok, size, bold) > maxW) flush();
+        if (width(tok, size, bold) > maxW) { for (const ch of tok) { if (cur && width(cur + ch, size, bold) > maxW) flush(); cur += ch; } } else cur += tok;
+      } flush(); return out; };
+    const nameL = wrapB(v.company?.name ?? '', 13, LW, true, /(?<=[ )])/);
+    const addrL = wrap(v.company?.address ?? '', 9.5, LW);
+    const taxL = v.company?.tax_id ? [`เลขประจำตัวผู้เสียภาษี ${v.company.tax_id}`] : [];
+    let cy0 = y; nameL.forEach(ln => { draw(page, ln, L, cy0, 13, { bold: true }); cy0 -= 16; });
+    cy0 += 2; [...addrL, ...taxL].forEach(ln => { cy0 -= 12; draw(page, ln, L, cy0, 9.5, { color: grey }); });
+    const ttl = wrapB((!dlv && dz?.title) || t.title, 15, RW, true, /(?<=[\/)])|(?<= )/);
+    let ry = y; ttl.forEach(ln => { draw(page, ln, R, ry, 15, { bold: true, right: true, color: col }); ry -= 19; });
+    if (dlv || dz?.copy_mark !== false) { draw(page, label, R, ry + 1, 10.5, { right: true, color: grey }); ry -= 14; }
+    y = Math.min(cy0, ry) - 26;
     // ลูกค้า + เลขที่/วันที่
     draw(page, (!dlv && dz?.customer_label) || 'ลูกค้า', L, y, 9, { color: grey });
     draw(page, v.contact.name, L, y - 13, 11, { bold: true });
