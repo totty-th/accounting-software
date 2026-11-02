@@ -83,9 +83,9 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     // ลูกค้า + เลขที่/วันที่
     draw(page, (!dlv && dz?.customer_label) || 'ลูกค้า', L, y, 9, { color: grey });
     draw(page, v.contact.name, L, y - 13, 11, { bold: true });
-    let cy = y - 27;
-    for (const ln of wrap(v.contact.address ?? '', 9.5, 270)) { draw(page, ln, L, cy, 9.5); cy -= 12; }
-    if (v.contact.tax_id) { draw(page, `เลขประจำตัวผู้เสียภาษี ${v.contact.tax_id}`, L, cy, 9.5); cy -= 12; }
+    let cy = y - 30;
+    for (const ln of wrap(v.contact.address ?? '', 9.5, 270)) { draw(page, ln, L, cy, 9.5); cy -= 15; }
+    if (v.contact.tax_id) { draw(page, `เลขประจำตัวผู้เสียภาษี ${v.contact.tax_id}`, L, cy, 9.5); cy -= 15; }
     const meta: [string, string][] = [['เลขที่', v.doc.doc_no], ['วันที่', v.doc.doc_type === 'INV' && full && v.doc.term_mode === 'credit_nodate' ? '................................' : thDate(v.doc.doc_date)]];
     const nodate = v.doc.doc_type === 'INV' && full && v.doc.term_mode === 'credit_nodate';
     const credit = full ? (v.doc.term_mode === 'cash' || nodate ? 0 : Number(v.doc.credit_days ?? 0)) : v.contact.credit_days;
@@ -96,8 +96,8 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     if (v.doc.salesperson) meta.push(['พนักงานขาย', v.doc.salesperson]);
     if (v.ref && !dlv && (v.doc.doc_type === 'CN' || v.doc.doc_type === 'DN')) meta.push(['วันที่อ้างอิง', thDate(v.ref.doc_date)]);
     if (v.ref && !dlv) meta.push(['อ้างอิง', v.ref.doc_no]);
-    meta.forEach(([k, val], i) => { draw(page, k, 360, y - i * 14, 10, { color: grey }); draw(page, val, R, y - i * 14, 10, { right: true }); });
-    y = Math.min(cy, y - meta.length * 14) - 14;
+    meta.forEach(([k, val], i) => { draw(page, k, 360, y - i * 18, 10, { color: grey }); draw(page, val, R, y - i * 18, 10, { right: true }); });
+    y = Math.min(cy, y - meta.length * 18) - 20;
     if (dlv) {   // บล็อกข้อมูลจัดส่ง
       const sr = shipRows(v);
       if (sr.length) {
@@ -111,16 +111,16 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     return { page, y };
   };
   const tableHead = (page: PDFPage, y: number) => {
-    page.drawRectangle({ x: L, y: y - 5, width: R - L, height: 20, color: col });
+    page.drawRectangle({ x: L, y: y - 7, width: R - L, height: 24, color: col });
     const w = rgb(1, 1, 1);
     draw(page, '#', L + 6, y, 10, { bold: true, color: w }); draw(page, 'รายละเอียด', L + 28, y, 10, { bold: true, color: w });
-    if (dlv) { draw(page, 'จำนวน', R - 6, y, 10, { bold: true, color: w, right: true }); return y - 22; }
+    if (dlv) { draw(page, 'จำนวน', R - 6, y, 10, { bold: true, color: w, right: true }); return y - 28; }
     draw(page, 'จำนวน', 300, y, 10, { bold: true, color: w, right: true });
     draw(page, 'ราคาต่อหน่วย', full ? 366 : 372, y, 10, { bold: true, color: w, right: true });
     if (full) draw(page, 'ส่วนลด', 410, y, 10, { bold: true, color: w, right: true });
     if (showTax) { draw(page, 'ภาษี', full ? 445 : 414, y, 10, { bold: true, color: w, right: true }); draw(page, 'หัก ณ ที่จ่าย', full ? 498 : 482, y, 10, { bold: true, color: w, right: true }); }
     draw(page, 'มูลค่า', R - 6, y, 10, { bold: true, color: w, right: true });
-    return y - 22;
+    return y - 28;
   };
 
   const sum = docSummary(v);
@@ -131,30 +131,30 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     y = tableHead(page, y);
     for (const l of v.lines) {
       const desc = wrap(l.description + (l.detail ? `\n${l.detail}` : ''), 10, dlv ? 400 : 230);
-      const h = Math.max(1, desc.length) * 13 + 6;
-      if (y - h < 200) { ({ page, y } = sheet(label)); y = tableHead(page, y); }
+      const h = Math.max(1, desc.length) * 16 + 12;
+      if (y - h < 210) { ({ page, y } = sheet(label)); y = tableHead(page, y); }
       draw(page, String(l.line_no), L + 6, y, 10);
-      desc.forEach((ln, i) => draw(page, ln, L + 28, y - i * 13, 10));
+      desc.forEach((ln, i) => draw(page, ln, L + 28, y - i * 16, 10));
       if (dlv) draw(page, qtyFmt(l.qty) + (l.unit ? ` ${l.unit}` : ''), R - 6, y, 10, { right: true });
       else { draw(page, qtyFmt(l.qty) + (l.unit ? ` ${l.unit}` : ''), 300, y, 10, { right: true }); draw(page, fmt(l.unit_price), full ? 366 : 372, y, 10, { right: true });
       if (full && Number(l.discount) > 0) draw(page, fmt(l.discount), 410, y, 10, { right: true });
       if (showTax) { draw(page, lineTaxLabel(v, l), full ? 445 : 414, y, 10, { right: true }); draw(page, lineWhtLabel(v, l), full ? 498 : 482, y, 10, { right: true }); }
       draw(page, fmt(l.amount), R - 6, y, 10, { right: true }); }
-      page.drawLine({ start: { x: L, y: y - 8 }, end: { x: R, y: y - 8 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
+      page.drawLine({ start: { x: L, y: y - h + 20 }, end: { x: R, y: y - h + 20 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
       y -= h;
     }
     // สรุปยอด
     if (dlv) { if (y < 170) ({ page, y } = sheet(label)); draw(page, `จำนวน ${v.lines.length} รายการ`, L, y - 4, 10, { color: grey }); }
     else {
-    const need = (sum.rows.length + sum.wht.length) * 15 + 150;
+    const need = (sum.rows.length + sum.wht.length) * 19 + 170;
     if (y < need) ({ page, y } = sheet(label));
     y -= 6;
-    draw(page, `(${bahtText(Number(sum.total))})`, L, y - (sum.rows.length * 15) / 2, 10);
+    draw(page, `(${bahtText(Number(sum.total))})`, L, y - (sum.rows.length * 19) / 2, 10);
     const put = (rows: typeof sum.rows) => rows.forEach(r => {
       if (r.gap) y -= 5;
       draw(page, r.label, 440, y, r.strong ? 11 : 10, { bold: r.strong, right: true, color: r.strong ? col : ink });
       draw(page, `${fmt(r.value)} บาท`, R - 6, y, r.strong ? 11 : 10, { bold: r.strong, right: true });
-      y -= 15;
+      y -= 19;
     });
     put(sum.rows);
     if (sum.wht.length) { y -= 4; page.drawLine({ start: { x: 330, y: y + 10 }, end: { x: R, y: y + 10 }, thickness: 0.4, color: rgb(0.8, 0.8, 0.84) }); put(sum.wht); }
