@@ -18,7 +18,8 @@ const KIND_ICON: Record<string, string> = { service: '🛎', goods_nostock: '�
 const KIND_LABEL: Record<string, string> = { service: 'บริการ', goods_nostock: 'สินค้าไม่นับสต็อก', goods_stock: 'สินค้านับสต็อก' };
 
 /** ใบเสนอราคา/ใบแจ้งหนี้: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — QT สร้างและแก้ไข (เฉพาะรออนุมัติ) · INV สร้างอย่างเดียว */
-export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses, people, today, salesperson, canPickSalesperson, init, canCreateCustomer, canCreateProduct, negMode = 'warn' }: {
+export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses, people, today, salesperson, canPickSalesperson, init, canCreateCustomer, canCreateProduct, negMode = 'warn', ds }: {
+  ds?: { price_mode: string; vat_level: string; discount_level: string; wht_level: string; show_warehouse: boolean; remarks: Record<string, string> };
   negMode?: 'allow' | 'warn' | 'block';
   docType?: 'QT' | 'INV'; id: string | null; customers: Cust[]; products: QProd[]; warehouses: Wh[]; people: string[]; today: string; salesperson: string; canPickSalesperson?: boolean;
   init?: { header: Record<string, any>; lines: Line[] }; canCreateCustomer: boolean; canCreateProduct: boolean;
@@ -31,11 +32,14 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
   const [np, setNp] = useState<{ row: number; kind: string; name: string; code: string; unit: string; price: string; description: string } | null>(null);
   const h0 = init?.header ?? {};
   const [h, setH] = useState({ date: today, contact: '', term_mode: 'credit', credit_days: '0', due_date: today, salesperson, project: '', ref_no: '', description: '',
-    price_mode: 'exclusive', warehouse_id: '', show_signature: true, note: '', internal_note: '', ...h0 });
+    price_mode: ds?.price_mode ?? 'exclusive', warehouse_id: '', show_signature: true, note: id ? '' : ds?.remarks?.[docType] ?? '', internal_note: '', ...h0 });
   const [lines, setLines] = useState<Line[]>(init?.lines?.length ? init.lines : [blank(), blank(), blank()]);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [nc, setNc] = useState<{ name: string; tax_id: string; address: string } | null>(null);
+  // ตั้งค่าเอกสาร: ระดับท้ายเอกสาร = ใช้ค่าเดียวกับทุกบรรทัด (แก้เอกสารเดิมใช้ระดับรายการเสมอ กันค่าต่างบรรทัดถูกซ่อน)
+  const lvl = (k: 'vat_level' | 'discount_level' | 'wht_level') => (!id && ds?.[k] === 'footer' ? 'footer' : 'line');
+  const setAll = (p: Partial<Line>) => setLines(ls => ls.map(l => ({ ...l, ...p })));
   const set = (p: Partial<typeof h>) => setH(o => ({ ...o, ...p }));
   const setL = (i: number, p: Partial<Line>) => setLines(ls => ls.map((l, j) => (j === i ? { ...l, ...p } : l)));
   const cust = customers.find(v => v.id === h.contact);
@@ -139,15 +143,15 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
           {lbl('โปรเจค', <input value={h.project} onChange={e => set({ project: e.target.value })} />)}
           {lbl('เลขที่อ้างอิง', <input value={h.ref_no} onChange={e => set({ ref_no: e.target.value })} />)}
           {lbl('ราคาสินค้า', <select value={h.price_mode} onChange={e => set({ price_mode: e.target.value })}><option value="exclusive">ราคาไม่รวมภาษี</option><option value="inclusive">ราคารวมภาษี</option></select>)}
-          {lbl('คลังสินค้า', <select value={h.warehouse_id} onChange={e => set({ warehouse_id: e.target.value })}><option value="">คลังสินค้าหลัก</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>)}
+          {(id || ds?.show_warehouse !== false) && lbl('คลังสินค้า', <select value={h.warehouse_id} onChange={e => set({ warehouse_id: e.target.value })}><option value="">คลังสินค้าหลัก</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>)}
         </div>
         <div style={{ marginTop: 8 }}>{lbl('รายละเอียด', <input value={h.description} onChange={e => set({ description: e.target.value })} />)}</div>
       </section>
 
       <section className="panel" style={{ padding: 12, overflowX: 'auto' }}>
         <table style={{ minWidth: 1000, width: '100%', tableLayout: 'fixed' }}><colgroup><col style={{ width: 34 }} /><col /><col style={{ width: 90 }} /><col style={{ width: 90 }} /><col style={{ width: 120 }} /><col style={{ width: 110 }} /><col style={{ width: 100 }} /><col style={{ width: 120 }} /><col style={{ width: 120 }} /><col style={{ width: 64 }} /></colgroup><thead><tr><th>#</th><th>ชื่อสินค้า / รายละเอียด</th><th>จำนวน</th><th>หน่วย</th><th>ราคาต่อหน่วย</th>
-          <th>ส่วนลด <select aria-label="ชนิดส่วนลด" style={{ width: 64, padding: '2px 4px' }} value={lines[0]?.dtype} onChange={e => setLines(ls => ls.map(l => ({ ...l, dtype: e.target.value as any })))}>
-            <option value="percent">%</option><option value="amount">฿</option></select></th><th>ภาษี</th><th>หัก ณ ที่จ่าย</th><th className="num">ราคารวม</th><th /></tr></thead>
+          <th>ส่วนลด {lvl('discount_level') === 'line' && <select aria-label="ชนิดส่วนลด" style={{ width: 64, padding: '2px 4px' }} value={lines[0]?.dtype} onChange={e => setLines(ls => ls.map(l => ({ ...l, dtype: e.target.value as any })))}>
+            <option value="percent">%</option><option value="amount">฿</option></select>}</th><th>ภาษี</th><th>หัก ณ ที่จ่าย</th><th className="num">ราคารวม</th><th /></tr></thead>
           <tbody>{lines.map((l, i) => (
             <tr key={i} style={{ verticalAlign: 'top' }}><td>{i + 1}</td>
               <td>
@@ -160,12 +164,12 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
               <td>{l.product_id && l.unit ? <select aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => pickUnit(i, e.target.value)}>{(() => { const pr = prods.find(x => x.id === l.product_id); const gs = pr?.kind === 'goods_stock';
                   return <>{[pr?.unit ?? l.unit, ...(pr?.units ?? []).map(u => u.unit)].filter((u, k, a) => u && a.indexOf(u) === k).map(u => <option key={u} value={u}>{u}{u === pr?.unit && gs ? ` (คงเหลือ ${pr?.onhand})` : ''}</option>)}</>; })()}</select> : <input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} />}</td>
               <td><input aria-label={`ราคา ${i + 1}`} inputMode="decimal" value={l.unit_price} onChange={e => setL(i, { unit_price: e.target.value })} /></td>
-              <td><input aria-label={`ส่วนลด ${i + 1}`} inputMode="decimal" value={l.dval} onChange={e => setL(i, { dval: e.target.value })} /></td>
-              <td><select aria-label={`ภาษี ${i + 1}`} value={l.vat} onChange={e => setL(i, { vat: e.target.value })}><option value="0">0%</option><option value="7">7%</option><option value="exempt">ยกเว้น</option></select></td>
-              <td><select aria-label={`หัก ณ ที่จ่าย ${i + 1}`} value={l.wht} onChange={e => setL(i, { wht: e.target.value })}>{WHT.map(w => <option key={w} value={w}>{w === '0' ? 'ไม่หัก' : `${w}%`}</option>)}</select></td>
+              <td>{lvl('discount_level') === 'footer' ? <span className="sub">ท้ายเอกสาร</span> : <input aria-label={`ส่วนลด ${i + 1}`} inputMode="decimal" value={l.dval} onChange={e => setL(i, { dval: e.target.value })} />}</td>
+              <td>{lvl('vat_level') === 'footer' ? <span className="sub">ท้ายเอกสาร</span> : <select aria-label={`ภาษี ${i + 1}`} value={l.vat} onChange={e => setL(i, { vat: e.target.value })}><option value="0">0%</option><option value="7">7%</option><option value="exempt">ยกเว้น</option></select>}</td>
+              <td>{lvl('wht_level') === 'footer' ? <span className="sub">ท้ายเอกสาร</span> : <select aria-label={`หัก ณ ที่จ่าย ${i + 1}`} value={l.wht} onChange={e => setL(i, { wht: e.target.value })}>{WHT.map(w => <option key={w} value={w}>{w === '0' ? 'ไม่หัก' : `${w}%`}</option>)}</select>}</td>
               <td className="num">{fmt(calc.per[i].total)}</td>
               <td>{lines.length > 1 && <button type="button" className="btn sm ghost" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}>ลบ</button>}</td></tr>))}</tbody></table>
-        <button type="button" className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => setLines(ls => [...ls, blank()])}>+ เพิ่มแถวรายการ</button>
+        <button type="button" className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => setLines(ls => [...ls, { ...blank(), ...(lvl('vat_level') === 'footer' ? { vat: ls[0]?.vat ?? '7' } : {}), ...(lvl('wht_level') === 'footer' ? { wht: ls[0]?.wht ?? '0' } : {}), ...(lvl('discount_level') === 'footer' ? { dval: ls[0]?.dval ?? '', dtype: 'percent' as const } : {}) }])}>+ เพิ่มแถวรายการ</button>
       </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 12 }}>
@@ -175,6 +179,11 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
           {lbl('โน้ตภายในบริษัท', <textarea rows={2} value={h.internal_note} onChange={e => set({ internal_note: e.target.value })} />)}
         </section>
         <section className="panel" style={{ padding: 16 }}>
+          {(lvl('vat_level') === 'footer' || lvl('discount_level') === 'footer' || lvl('wht_level') === 'footer') && <div style={{ display: 'grid', gap: 6, marginBottom: 10 }}>
+            {lvl('discount_level') === 'footer' && lbl('ส่วนลดท้ายเอกสาร (%)', <input aria-label="ส่วนลดท้ายเอกสาร" inputMode="decimal" value={lines[0]?.dval ?? ''} onChange={e => setAll({ dval: e.target.value, dtype: 'percent' })} />)}
+            {lvl('vat_level') === 'footer' && lbl('ภาษีมูลค่าเพิ่ม', <select aria-label="ภาษีท้ายเอกสาร" value={lines[0]?.vat ?? '7'} onChange={e => setAll({ vat: e.target.value })}><option value="0">0%</option><option value="7">7%</option><option value="exempt">ยกเว้น</option></select>)}
+            {lvl('wht_level') === 'footer' && lbl('หัก ณ ที่จ่าย', <select aria-label="หัก ณ ที่จ่ายท้ายเอกสาร" value={lines[0]?.wht ?? '0'} onChange={e => setAll({ wht: e.target.value })}>{WHT.map(w => <option key={w} value={w}>{w === '0' ? 'ไม่หัก' : `${w}%`}</option>)}</select>)}
+          </div>}
           <table><tbody>
             <tr><td>รวมเป็นเงิน</td><td className="num">{fmt(calc.net + calc.disc)}</td></tr>
             <tr><td>ส่วนลดรวม</td><td className="num">{fmt(calc.disc)}</td></tr>

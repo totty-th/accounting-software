@@ -637,3 +637,40 @@ export async function deleteContactImportBatch(id: string) { return run(call('se
 
 export const saveDocDesign = async (scope: string, p: Record<string, unknown>) => run(call('select save_doc_design($1,$2::jsonb)', scope, JSON.stringify(p)), ['/settings/design'], 'settings.company');
 export const resetDocDesign = async () => run(call('select reset_doc_design()'), ['/settings/design'], 'settings.company');
+
+// ---- ตั้งค่าเอกสาร (0068) ----
+const SC = 'settings.company';
+export async function saveDocNumberFormat(f: FormData): Promise<Result> {
+  return run(call('select save_doc_number_format($1,$2,$3,$4,$5)', str(f, 'prefix'), str(f, 'custom') ?? '', str(f, 'date_fmt'), Number(str(f, 'seq')) || 4, str(f, 'reset')), ['/settings/numbering'], SC);
+}
+export async function resetDocNumberFormat(f: FormData): Promise<Result> {
+  return run(call('select reset_doc_number_format($1)', str(f, 'prefix')), ['/settings/numbering'], SC);
+}
+export async function saveDocSettings(f: FormData): Promise<Result> {
+  const remarks: Record<string, string> = {};
+  for (const t of ['QT', 'INV', 'CA', 'BL', 'CN', 'DN', 'PO', 'RI', 'EXP']) { const v = str(f, 'remark_' + t); if (v) remarks[t] = v; }
+  const on = (k: string) => f.get(k) === '1';
+  return run(call('select save_doc_settings($1::jsonb)', JSON.stringify({
+    price_mode: str(f, 'price_mode'), vat_level: str(f, 'vat_level'), discount_level: str(f, 'discount_level'), wht_level: str(f, 'wht_level'),
+    show_warehouse: on('show_warehouse'), qr_tax_request: on('qr_tax_request'), qr_self_register: on('qr_self_register'), multi_currency: on('multi_currency'), remarks })),
+    ['/settings/documents', '/settings/currency', '/sales/new'], SC);
+}
+export async function savePaymentInfo(f: FormData): Promise<Result> {
+  const file = f.get('qr') as File | null; let qr = '';
+  if (file && file.size > 0) {
+    if (file.size > 600 * 1024 || !/^image\/(png|jpeg)$/.test(file.type)) return { error: 'รูป QR ต้องเป็น PNG/JPG ไม่เกิน 600 KB' };
+    qr = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`;
+  }
+  const o: Record<string, unknown> = { qr_img: qr, is_active: f.get('is_active') !== '0' };
+  for (const k of ['kind', 'bank', 'account_no', 'account_name', 'branch', 'cheque_payee', 'remark']) o[k] = str(f, k) ?? '';
+  return run(call('select save_payment_info($1,$2::jsonb)', str(f, 'id') ?? null, JSON.stringify(o)), ['/settings/payment-info'], SC);
+}
+export async function removePaymentInfo(f: FormData): Promise<Result> {
+  return run(call('select remove_payment_info($1)', str(f, 'id')), ['/settings/payment-info'], SC);
+}
+export async function saveCurrency(f: FormData): Promise<Result> {
+  return run(call('select save_currency($1,$2,$3,$4,$5)', str(f, 'code') ?? '', str(f, 'name') ?? '', str(f, 'symbol') ?? '', Number(str(f, 'rate')) || 0, f.get('is_active') !== '0'), ['/settings/currency'], SC);
+}
+export async function removeCurrency(f: FormData): Promise<Result> {
+  return run(call('select remove_currency($1)', str(f, 'code')), ['/settings/currency'], SC);
+}

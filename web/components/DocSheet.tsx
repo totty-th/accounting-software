@@ -69,6 +69,10 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
       </section>
       {v.doc.description && <p className="sh-note"><small>รายละเอียด</small>{v.doc.description}</p>}
       {(v.doc.reason || v.doc.note) && <p className="sh-note" style={{ whiteSpace: 'pre-line' }}><small>หมายเหตุ</small>{v.doc.reason || v.doc.note}</p>}
+      {['QT', 'INV', 'BL'].includes(ty) && !!v.payInfo?.length && <section className="sh-note" style={{ whiteSpace: 'pre-line' }}><small>ช่องทางการชำระเงิน</small>
+        {v.payInfo.map((p, i) => <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
+          <span>{p.kind === 'cash' ? 'เงินสด' : p.kind === 'transfer' ? `โอนเงิน ${p.bank ?? ''} ${p.branch ? `สาขา${p.branch} ` : ''}เลขที่บัญชี ${p.account_no ?? ''} ชื่อบัญชี ${p.account_name ?? ''}` : `เช็คสั่งจ่ายในนาม ${p.cheque_payee ?? ''}`}{p.remark ? ` (${p.remark})` : ''}</span>
+          {p.qr_img && <img alt="QR" src={p.qr_img} style={{ height: 56 }} />}</div>)}</section>}
       {v.doc.show_signature !== false && <footer className="sh-sign">
         <div><span className="on">ในนาม {v.contact.name}</span><i />{signL} / วันที่</div>
         <div><span className="on">ในนาม {v.company?.name ?? ''}</span>{d.stamp && v.images?.stamp && <img className="sh-stamp" alt="ตรายาง" src={v.images.stamp} />}<i />{signR} / วันที่</div>

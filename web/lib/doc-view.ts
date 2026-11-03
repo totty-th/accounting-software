@@ -9,6 +9,7 @@ export interface DocView {
     delivery_mode?: 'pickup' | 'ship' | null; ship_name?: string | null; ship_address?: string | null; ship_phone?: string | null; carrier?: string | null; delivery_note?: string | null };
   contact: { id: string; name: string; address: string | null; tax_id: string | null; credit_days: number };
   company: { name: string; address: string | null; tax_id: string | null } | null;
+  payInfo?: { kind: string; bank: string | null; account_no: string | null; account_name: string | null; branch: string | null; cheque_payee: string | null; remark: string | null; qr_img: string | null }[];
   design?: import('./doc-design').DocDesign; images?: { logo: string | null; stamp: string | null };
   lines: { line_no: number; description: string; item_kind: string; qty: string | number; unit_price: string | number; amount: string | number;
     unit?: string | null; detail?: string | null; discount?: string | number; discount_type?: string; discount_value?: string | number; vat_rate?: string | number | null; vat_exempt?: boolean; wht_rate?: string | number; wht?: string | number }[];
@@ -37,6 +38,7 @@ export async function loadView(key: string): Promise<DocView | null> {
     v.design = resolveDesign(await db.q<any>('select scope, settings from doc_design'), v.doc.doc_type);
     const im = (await db.q<any>('select logo_img, stamp_img from company_profile limit 1'))[0];
     v.images = { logo: im?.logo_img ?? null, stamp: im?.stamp_img ?? null };
+    v.payInfo = await db.q<any>('select kind, bank, account_no, account_name, branch, cheque_payee, remark, qr_img from payment_infos where is_active order by sort_no, created_at');
     return v;
   } catch { return null; }
 }

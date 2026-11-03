@@ -16,5 +16,8 @@ export async function qtFormData() {
   const warehouses = (await db.q(`select id, code, name from warehouses order by is_main desc, code`)).map(w => ({ id: w.id as string, label: `${w.code} ${w.name}` }));
   const people = (await db.q(`select display_name from app_users where is_active order by display_name`)).map(u => u.display_name as string);
   const negMode = ((await db.q(`select negative_sales from stock_settings`))[0]?.negative_sales ?? 'warn') as 'allow' | 'warn' | 'block';
-  return { customers, products, warehouses, people, negMode };
+  const dsr = (await db.q<any>('select * from doc_settings'))[0];
+  const ds = { price_mode: dsr.price_mode as string, vat_level: dsr.vat_level as string, discount_level: dsr.discount_level as string, wht_level: dsr.wht_level as string,
+    show_warehouse: dsr.show_warehouse as boolean, remarks: (dsr.remarks ?? {}) as Record<string, string> };
+  return { ds, customers, products, warehouses, people, negMode };
 }

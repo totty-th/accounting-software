@@ -161,7 +161,15 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     y -= 6;
     const noteTxt = v.doc.reason || v.doc.note;
     if (full && v.doc.description) { draw(page, 'รายละเอียด', L, y, 9.5, { color: col }); const dl = wrap(v.doc.description, 10, 500); dl.forEach((ln, i) => draw(page, ln, L, y - 13 - i * 12, 10)); y -= 13 + dl.length * 12 + 4; }
-    if (noteTxt) { draw(page, 'หมายเหตุ', L, y, 9.5, { color: col }); wrap(noteTxt, 10, 500).forEach((ln, i) => draw(page, ln, L, y - 13 - i * 12, 10)); }
+    if (noteTxt) { const nl = wrap(noteTxt, 10, 500); draw(page, 'หมายเหตุ', L, y, 9.5, { color: col }); nl.forEach((ln, i) => draw(page, ln, L, y - 13 - i * 12, 10)); y -= 13 + nl.length * 12 + 4; }
+    // ช่องทางการชำระเงิน (ตั้งที่ ตั้งค่า → ข้อมูลการรับชำระ) เฉพาะเอกสารที่รอรับเงิน และเหลือที่ว่างเหนือช่องลายเซ็น
+    if (['QT', 'INV', 'BL'].includes(v.doc.doc_type) && v.payInfo?.length && y > 160) {
+      draw(page, 'ช่องทางการชำระเงิน', L, y, 9.5, { color: col }); y -= 13;
+      for (const p of v.payInfo) {
+        const t = (p.kind === 'cash' ? 'เงินสด' : p.kind === 'transfer' ? `โอนเงิน ${p.bank ?? ''} ${p.branch ? `สาขา${p.branch} ` : ''}เลขที่บัญชี ${p.account_no ?? ''} ชื่อบัญชี ${p.account_name ?? ''}` : `เช็คสั่งจ่ายในนาม ${p.cheque_payee ?? ''}`) + (p.remark ? ` (${p.remark})` : '');
+        for (const ln of wrap(t, 10, 500)) { if (y < 150) break; draw(page, ln, L, y, 10); y -= 12; }
+      }
+    }
     }
     // ลายเซ็น (ในนาม + ช่องเซ็น + วันที่)
     const sy = 84;
