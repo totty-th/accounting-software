@@ -112,13 +112,17 @@ describe('M18.3 ใบเตรียมจ่าย หลายผู้จำ
     expect(rows.reduce((a: number, x: any) => a + +x.amount, 0)).toBe(3210);
     expect(rows.filter((x: any) => x.doc_id === e1).reduce((a: number, x: any) => a + +x.amount, 0)).toBe(1070);
   });
-  it('ยกเลิกใบเตรียมจ่าย: ได้ถ้ายังไม่จ่าย · ปล่อยเอกสารกลับไปเลือกใหม่ได้ · จ่ายแล้วยกเลิกไม่ได้', async () => {
+  it('ยกเลิกใบเตรียมจ่าย: ได้ถ้ายังไม่จ่าย · เอกสารไม่ถูกปล่อยคืนหลังยกเลิก (ตามต้นแบบ 0061) · ยกเลิกใบที่จ่ายแล้วรีเซ็ตเอกสารให้', async () => {
     const e = await ex(v1, 1000), e2 = await ex(v2, 500);
     const s = await slip([{ type: 'EXP', id: e }]);
     await call('select cancel_payment_slip($1)', [s]);
-    await slip([{ type: 'EXP', id: e }]);   // เลือกใหม่ได้
+    // ต้นแบบ FA ไม่ปล่อยเอกสารคืนหลังยกเลิกใบ (migration 0061) → เลือกเอกสารเดิมเข้าใบใหม่ไม่ได้
+    expect(await err(slip([{ type: 'EXP', id: e }]))).toContain('อยู่ในใบเตรียมจ่ายอื่นแล้ว');
     const s2 = await slip([{ type: 'EXP', id: e2 }]);
     await call('select pay_payment_slip_vendor($1,$2,$3::date)', [s2, v2, D]);
-    expect(await err(call('select cancel_payment_slip($1)', [s2]))).toContain('จ่ายแล้ว');
+    // 0061: ยกเลิกใบที่จ่ายแล้ว = รีเซ็ตเอกสารที่จ่ายให้ก่อนแล้วยกเลิกใบ (ไม่ error)
+    await call('select cancel_payment_slip($1)', [s2]);
+    expect((await call('select status from payment_slips where id=$1', [s2])).rows[0].status).toBe('cancelled');
+    expect((await call('select (slip_doc_info($1,$2)).paid p', ['EXP', e2])).rows[0].p).toBe(false);
   });
 });
