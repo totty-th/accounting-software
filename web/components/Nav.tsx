@@ -77,12 +77,14 @@ const GROUPS: Group[] = [
     { href: '/reports/output-tax', label: 'รายงานภาษีขาย ภ.พ.30', perms: R },
     { head: 'หัก ณ ที่จ่าย', href: '/tax/wht-submission', label: 'ยื่นหัก ณ ที่จ่ายออนไลน์', perms: R }] },
   { key: 'set', label: 'ตั้งค่า', c: 'var(--grey)', items: [
-    { href: '/settings/company', label: 'ข้อมูลบริษัท', perms: ['settings.company'] },
+    { href: '/settings', label: 'ภาพรวมการตั้งค่า', perms: R },
+    { href: '/settings/company', label: 'ข้อมูลธุรกิจ', perms: ['settings.company'] },
     { href: '/settings/design', label: 'รูปแบบดีไซน์เอกสาร', perms: ['settings.company'] },
     { href: '/settings/lock', label: 'ล็อกงวดบัญชี', perms: R },
     { href: '/settings/opening-balance', label: 'ยอดเริ่มต้น', perms: R },
     { href: '/stock/settings', label: 'ตั้งค่าสต็อก', perms: ['stock.read'] },
-    { href: '/admin/users', label: 'ผู้ใช้และสิทธิ์', perms: ['users.manage'] }] },
+    { href: '/admin/users', label: 'ผู้ใช้และสิทธิ์', perms: ['users.manage'] },
+    { href: '/settings/shortcuts', label: 'แป้นพิมพ์ลัด', perms: R }] },
 ];
 
 const pathOf = (h: string) => h.split('?')[0];

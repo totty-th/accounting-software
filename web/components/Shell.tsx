@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Nav } from '@/components/Nav';
+import { Shortcuts } from '@/components/Shortcuts';
 import { RowClick } from '@/components/RowClick';
 import { RoleProvider } from '@/components/Can';
 import { logoutAction } from '@/lib/auth-actions';
@@ -27,7 +28,7 @@ export function Shell({ children, user }: { children: React.ReactNode; user: { n
             <button className="btn sm ghost" type="submit">ออกจากระบบ</button>
           </form>
         </aside>
-        <main className="main"><RowClick />{children}</main>
+        <main className="main"><RowClick /><Shortcuts />{children}</main>
       </div>
     </RoleProvider>
   );

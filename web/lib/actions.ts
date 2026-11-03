@@ -217,9 +217,15 @@ export async function saveCertDetails(f: FormData): Promise<void> {
   await run(call('select set_cert_details($1,$2::jsonb)', str(f, 'id'), JSON.stringify(d)), ['/wht'], 'wht.write');
 }
 export async function saveCompany(f: FormData): Promise<void> {
-  await run(call(`insert into company_profile(name,address,tax_id) values ($1,$2,$3)
-    on conflict (singleton) do update set name=excluded.name, address=excluded.address, tax_id=excluded.tax_id`,
-    str(f, 'name'), str(f, 'address'), str(f, 'tax_id')), ['/wht', '/settings/company'], 'settings.company');
+  const br = f.get('is_branch') === 'branch';
+  await run(call(`insert into company_profile(name,address,tax_id,business_type,vat_registered,is_branch,branch_no,phone,mobile,fax,website,name_en,address_en)
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    on conflict (singleton) do update set name=excluded.name, address=excluded.address, tax_id=excluded.tax_id,
+      business_type=excluded.business_type, vat_registered=excluded.vat_registered, is_branch=excluded.is_branch, branch_no=excluded.branch_no,
+      phone=excluded.phone, mobile=excluded.mobile, fax=excluded.fax, website=excluded.website, name_en=excluded.name_en, address_en=excluded.address_en`,
+    str(f, 'name'), str(f, 'address'), str(f, 'tax_id'), str(f, 'business_type') ?? 'company', f.get('vat_registered') !== 'no',
+    br, br ? str(f, 'branch_no') ?? null : null, str(f, 'phone') ?? null, str(f, 'mobile') ?? null, str(f, 'fax') ?? null,
+    str(f, 'website') ?? null, str(f, 'name_en') ?? null, str(f, 'address_en') ?? null), ['/wht', '/settings/company'], 'settings.company');
 }
 export async function saveContactTax(f: FormData): Promise<void> {
   await run(call('update contacts set tax_id=$2, address=$3, person_kind=$4 where id=$1',
