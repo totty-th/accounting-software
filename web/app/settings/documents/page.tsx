@@ -17,9 +17,14 @@ export default async function Documents() {
       <SForm action={saveDocSettings} canWrite={can(user.role, 'settings.company')} style={{ maxWidth: 720 }}>
         <h3>ฟังก์ชันเอกสาร</h3>
         <label>ราคาสินค้า <select name="price_mode" defaultValue={s.price_mode}><option value="exclusive">ราคาไม่รวมภาษี</option><option value="inclusive">ราคารวมภาษี</option></select></label>
+        <h4>เอกสารขาย</h4>
         {lv('vat_level', 'ภาษีมูลค่าเพิ่ม', '')}
         {lv('discount_level', 'ส่วนลด', '(ท้ายเอกสาร = เปอร์เซ็นต์เดียวกันทุกบรรทัด)')}
         {lv('wht_level', 'หัก ณ ที่จ่าย', '')}
+        <h4>เอกสารซื้อ/ค่าใช้จ่าย</h4>
+        {lv('pur_vat_level', 'ภาษีมูลค่าเพิ่ม', '')}
+        {lv('pur_discount_level', 'ส่วนลด', '(ท้ายเอกสาร = เปอร์เซ็นต์เดียวกันทุกบรรทัด)')}
+        {lv('pur_wht_level', 'หัก ณ ที่จ่าย', '')}
         <label><input type="checkbox" name="show_warehouse" value="1" defaultChecked={s.show_warehouse} /> แสดงคลังสินค้าในฟอร์มเอกสาร</label>
         <label><input type="checkbox" name="multi_currency" value="1" defaultChecked={s.multi_currency} /> เปิดใช้งานหลายสกุลเงิน (ตั้งค่าที่เมนูสกุลเงิน)</label>
         <h3>หมายเหตุเอกสาร (ข้อความตั้งต้น)</h3>

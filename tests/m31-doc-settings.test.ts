@@ -56,3 +56,16 @@ describe('สกุลเงิน', () => {
     await expect(q(`select save_currency('EUR','ยูโร','€',0,true)`)).rejects.toThrow(/ไม่ถูกต้อง/);
   });
 });
+
+describe('ระดับ VAT/ส่วนลด/WHT แยกขาย-ซื้อ (0069)', () => {
+  it('ค่าตั้งต้น line และตั้งแยกกันได้', async () => {
+    let r = (await q(`select vat_level, pur_vat_level, pur_wht_level from doc_settings`))[0];
+    expect(r).toMatchObject({ vat_level: 'line', pur_vat_level: 'line', pur_wht_level: 'line' });
+    await q(`select save_doc_settings('{"pur_vat_level":"footer","pur_wht_level":"footer"}'::jsonb)`);
+    r = (await q(`select vat_level, discount_level, pur_vat_level, pur_discount_level, pur_wht_level from doc_settings`))[0];
+    expect(r).toMatchObject({ vat_level: 'line', discount_level: 'line', pur_vat_level: 'footer', pur_discount_level: 'line', pur_wht_level: 'footer' });
+  });
+  it('ค่าไม่ถูกต้องถูกปฏิเสธ', async () => {
+    await expect(q(`select save_doc_settings('{"pur_vat_level":"x"}'::jsonb)`)).rejects.toThrow();
+  });
+});

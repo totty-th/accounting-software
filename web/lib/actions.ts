@@ -652,6 +652,7 @@ export async function saveDocSettings(f: FormData): Promise<Result> {
   const on = (k: string) => f.get(k) === '1';
   return run(call('select save_doc_settings($1::jsonb)', JSON.stringify({
     price_mode: str(f, 'price_mode'), vat_level: str(f, 'vat_level'), discount_level: str(f, 'discount_level'), wht_level: str(f, 'wht_level'),
+    pur_vat_level: str(f, 'pur_vat_level'), pur_discount_level: str(f, 'pur_discount_level'), pur_wht_level: str(f, 'pur_wht_level'),
     show_warehouse: on('show_warehouse'), qr_tax_request: on('qr_tax_request'), qr_self_register: on('qr_self_register'), multi_currency: on('multi_currency'), remarks })),
     ['/settings/documents', '/settings/currency', '/sales/new'], SC);
 }
