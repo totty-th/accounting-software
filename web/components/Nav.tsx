@@ -84,6 +84,7 @@ const GROUPS: Group[] = [
     { href: '/settings/numbering', label: 'เลขที่เอกสาร', perms: ['settings.company'] },
     { href: '/settings/payment-info', label: 'ข้อมูลการรับชำระ', perms: ['settings.company'] },
     { href: '/settings/currency', label: 'สกุลเงิน', perms: ['settings.company'] },
+    { href: '/settings/fiscal-period', label: 'งวดบัญชี', perms: ['settings.company'] },
     { href: '/settings/lock', label: 'ล็อกงวดบัญชี', perms: R },
     { href: '/settings/opening-balance', label: 'ยอดเริ่มต้น', perms: R },
     { href: '/stock/settings', label: 'ตั้งค่าสต็อก', perms: ['stock.read'] },

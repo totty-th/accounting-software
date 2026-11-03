@@ -28,3 +28,15 @@ describe('แป้นพิมพ์ลัด', () => {
     const ks = SHORTCUTS.map(s => `${s.shift}${s.key}`); expect(new Set(ks).size).toBe(ks.length);
   });
 });
+
+const q = async (s: string, p: any[] = []) => (await db.query<any>(s, p)).rows;
+describe('งวดบัญชี (0070)', () => {
+  it('ตั้งเดือนสิ้นงวด/วันก่อตั้งได้ และตรวจค่า', async () => {
+    await q(`insert into company_profile(name,address,tax_id) values ('บ','ที่อยู่','1234567890123') on conflict (singleton) do nothing`);
+    await q(`select save_fiscal_period(9, date '2020-01-15')`);
+    const r = (await q(`select fiscal_end_month m, founded_on::text f from company_profile`))[0];
+    expect(r).toMatchObject({ m: 9, f: '2020-01-15' });
+    await expect(q(`select save_fiscal_period(13, null)`)).rejects.toThrow(/เดือน/);
+    await expect(q(`select save_fiscal_period(12, date '2999-01-01')`)).rejects.toThrow(/อนาคต/);
+  });
+});

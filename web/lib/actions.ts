@@ -227,6 +227,9 @@ export async function saveCompany(f: FormData): Promise<void> {
     br, br ? str(f, 'branch_no') ?? null : null, str(f, 'phone') ?? null, str(f, 'mobile') ?? null, str(f, 'fax') ?? null,
     str(f, 'website') ?? null, str(f, 'name_en') ?? null, str(f, 'address_en') ?? null), ['/wht', '/settings/company'], 'settings.company');
 }
+export async function saveFiscalPeriod(f: FormData): Promise<Result> {
+  return run(call('select save_fiscal_period($1::int, $2::date)', Number(str(f, 'end_month')) || 12, str(f, 'founded_on') || null), ['/settings/fiscal-period'], 'settings.company');
+}
 export async function saveContactTax(f: FormData): Promise<void> {
   await run(call('update contacts set tax_id=$2, address=$3, person_kind=$4 where id=$1',
     str(f, 'id'), str(f, 'tax_id') ?? null, str(f, 'address') ?? null, str(f, 'person_kind') ?? null), ['/wht', '/contacts'], 'wht.write');
