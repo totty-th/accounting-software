@@ -21,8 +21,6 @@ export default async function Documents() {
         {lv('discount_level', 'ส่วนลด', '(ท้ายเอกสาร = เปอร์เซ็นต์เดียวกันทุกบรรทัด)')}
         {lv('wht_level', 'หัก ณ ที่จ่าย', '')}
         <label><input type="checkbox" name="show_warehouse" value="1" defaultChecked={s.show_warehouse} /> แสดงคลังสินค้าในฟอร์มเอกสาร</label>
-        <label><input type="checkbox" name="qr_tax_request" value="1" defaultChecked={s.qr_tax_request} /> QR Code ให้ลูกค้าขอใบกำกับภาษี <span className="sub">(เก็บค่าไว้ — ยังไม่แสดงบนเอกสาร)</span></label>
-        <label><input type="checkbox" name="qr_self_register" value="1" defaultChecked={s.qr_self_register} /> QR Code ให้ลูกค้าลงทะเบียนข้อมูลเอง <span className="sub">(เก็บค่าไว้ — ยังไม่แสดงบนเอกสาร)</span></label>
         <label><input type="checkbox" name="multi_currency" value="1" defaultChecked={s.multi_currency} /> เปิดใช้งานหลายสกุลเงิน (ตั้งค่าที่เมนูสกุลเงิน)</label>
         <h3>หมายเหตุเอกสาร (ข้อความตั้งต้น)</h3>
         {REM.map(([k, l]) => <label key={k}>{l} <textarea name={'remark_' + k} rows={2} maxLength={1000} defaultValue={s.remarks?.[k] ?? ''} /></label>)}

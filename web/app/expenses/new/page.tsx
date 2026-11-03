@@ -4,6 +4,7 @@ import { today } from '@/lib/db';
 import { getDb } from '@/lib/db';
 import { poFormData } from '@/lib/po-data';
 import { dateIso } from '@/lib/format';
+import { defaultRemark } from '@/lib/doc-remarks';
 import { ExpForm } from '@/components/ExpForm';
 
 export default async function NewExpense({ searchParams }: { searchParams: { po?: string } }) {
@@ -28,6 +29,6 @@ export default async function NewExpense({ searchParams }: { searchParams: { po?
   }
   return (<>
     <div className="top"><div><h1>สร้างค่าใช้จ่าย{fromPo ? ` จากใบสั่งซื้อ ${fromPo.no}` : ''}</h1><p className="sub">บันทึกแล้วตั้งเจ้าหนี้ทันที · จ่ายเงินที่หน้าเอกสาร</p></div></div>
-    <ExpForm vendors={vendors} accounts={accounts} assetCats={assetCats} today={today()} purchaser={user.displayName || user.username} canCreateVendor={can(user.role, 'contact.create')} fromPo={fromPo} />
+    <ExpForm remark={await defaultRemark('EXP')} vendors={vendors} accounts={accounts} assetCats={assetCats} today={today()} purchaser={user.displayName || user.username} canCreateVendor={can(user.role, 'contact.create')} fromPo={fromPo} />
   </>);
 }

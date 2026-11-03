@@ -10,7 +10,8 @@ type Result = { error?: string; ok?: true };
 const money = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const r2 = (x: number) => Math.round(x * 100) / 100;
 
-export function SalesDocForm({ type, title, customers, products, today, action }: {
+export function SalesDocForm({ type, title, customers, products, today, action, remark = '' }: {
+  remark?: string;
   type: string; title: string; customers: Opt[]; products: Prod[]; today: string;
   action: (p: any) => Promise<Result>;
 }) {
@@ -20,6 +21,7 @@ export function SalesDocForm({ type, title, customers, products, today, action }
   const [contact, setContact] = useState(type === 'CA' ? '' : customers[0]?.id ?? '');
   const [date, setDate] = useState(today);
   const [mode, setMode] = useState('exclusive');
+  const [note, setNote] = useState(remark);
   const [lines, setLines] = useState<Line[]>([{ product: '', desc: '', qty: '1', price: '' }]);
 
   const set = (i: number, patch: Partial<Line>) => setLines(ls => ls.map((l, k) => (k === i ? { ...l, ...patch } : l)));
@@ -36,7 +38,7 @@ export function SalesDocForm({ type, title, customers, products, today, action }
   const submit = () => start(async () => {
     setErr(null);
     const payload = {
-      type, date, contact: contact || null, mode,
+      type, date, contact: contact || null, mode, reason: note.trim() || undefined,
       lines: lines.filter(l => l.desc && +l.qty > 0).map(l => ({
         description: l.desc, product_id: l.product || undefined, kind: 'service', qty: +l.qty, unit_price: +l.price || 0 })),
     };
@@ -86,6 +88,7 @@ export function SalesDocForm({ type, title, customers, products, today, action }
         <div><span>VAT 7%</span><span>{money(t.vat)}</span></div>
         <div className="t"><span>ยอดรวมสุทธิ</span><span>{money(t.total)}</span></div>
       </div>
+      <label className="f" style={{ marginTop: 12 }}>หมายเหตุ (แสดงบนเอกสาร)<textarea rows={2} value={note} onChange={e => setNote(e.target.value)} /></label>
       {err && <div className="notice" role="alert" style={{ borderLeftColor: 'var(--red)', marginTop: 14 }}>{err}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
         <button className="btn" disabled={pending} onClick={submit}>{pending ? 'กำลังบันทึก...' : 'บันทึก'}</button>

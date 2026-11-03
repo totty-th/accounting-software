@@ -3,6 +3,7 @@ import { SalesDocForm } from '@/components/DocForm';
 import { QtForm } from '@/components/QtForm';
 import { qtFormData } from '@/lib/qt-data';
 import { DOC_TYPE } from '@/lib/status';
+import { defaultRemark } from '@/lib/doc-remarks';
 import { createSalesDoc } from '@/lib/actions';
 import { partyName } from '@/lib/format';
 import { requirePage } from '@/lib/auth';
@@ -31,7 +32,7 @@ export default async function NewDoc({ searchParams }: { searchParams: { type?: 
   return (
     <>
       <div className="top"><h1>{DOC_TYPE[type]}ใหม่</h1></div>
-      <SalesDocForm type={type} title={DOC_TYPE[type]} customers={customers} products={products} today={today()} action={createSalesDoc} />
+      <SalesDocForm remark={await defaultRemark(type)} type={type} title={DOC_TYPE[type]} customers={customers} products={products} today={today()} action={createSalesDoc} />
     </>
   );
 }

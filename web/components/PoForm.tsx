@@ -14,7 +14,8 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2,
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
 /** ใบสั่งซื้อ: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — สร้างและแก้ไข */
-export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses, today, purchaser, init, canCreateVendor, canCreateProduct }: {
+export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses, today, purchaser, init, canCreateVendor, canCreateProduct, remark = '' }: {
+  remark?: string;
   kind?: 'PO' | 'RI'; id: string | null; vendors: Vendor[]; products: Prod[]; warehouses: Wh[]; today: string; purchaser: string;
   init?: { header: Record<string, any>; lines: Line[] }; canCreateVendor: boolean; canCreateProduct: boolean;
 }) {
@@ -23,7 +24,7 @@ export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses,
   const [vendors, setVendors] = useState(v0); const [products, setProducts] = useState(p0);
   const h0 = init?.header ?? {};
   const [h, setH] = useState({ date: today, contact: '', credit_days: '0', due_date: today, purchaser, project: '', ref_no: '', description: '',
-    price_mode: 'exclusive', warehouse_id: '', show_signature: true, note: '', internal_note: '', ...h0 });
+    price_mode: 'exclusive', warehouse_id: '', show_signature: true, note: id ? '' : remark, internal_note: '', ...h0 });
   const [lines, setLines] = useState<Line[]>(init?.lines?.length ? init.lines : [blank(), blank(), blank()]);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
