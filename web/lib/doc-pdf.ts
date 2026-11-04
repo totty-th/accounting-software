@@ -55,7 +55,8 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
   const emb = async (s?: string | null) => { if (!s) return null; const m = /^data:image\/(png|jpeg);base64,(.+)$/.exec(s); if (!m) return null;
     try { const b = Buffer.from(m[2], 'base64'); return m[1] === 'png' ? await pdf.embedPng(b) : await pdf.embedJpg(b); } catch { return null; } };
   const logoImg = dz?.logo !== false ? await emb(v.images?.logo) : null, stampImg = dz?.stamp !== false ? await emb(v.images?.stamp) : null;
-  const L = 42, R = 553, W = 595, H = 842;
+  // กระดาษต่อเนื่องของ FA = 612x792 pt (8.5x11 นิ้ว, อ่านจาก MediaBox ของ PDF ตัวอย่าง FA 4-11-2026) · A4 = 595x842
+  const cont = dz?.paper === 'continuous'; const L = 42, R = 553, W = cont ? 612 : 595, H = cont ? 792 : 842;
   const sheet = (label: string) => {
     let page = pdf.addPage([W, H]); let y = H - 48;
     page.drawRectangle({ x: 0, y: H - 14, width: W, height: 14, color: col });

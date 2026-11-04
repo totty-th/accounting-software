@@ -17,6 +17,7 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
   return (
     <article className={`sheet${v.doc.status === 'cancelled' ? ' cancelled' : ''}${d.bw ? ' bw' : ''}${d.header_bg ? ' hbg' : ''}${d.paper === 'continuous' ? ' cont' : ''}`}
       style={{ ['--dc' as any]: d.bw ? '#222' : t.color, fontFamily: FONT_CSS[d.font], fontSize: SIZE_PX[d.size] }}>
+      {d.paper === 'continuous' && <style>{'@media print{@page{size:215.9mm 279.4mm;margin:10mm}}'}</style>}
       {v.doc.status === 'cancelled' && <div className="sh-mark">ยกเลิก</div>}
       <header className="sh-head">
         <div className="sh-co">
