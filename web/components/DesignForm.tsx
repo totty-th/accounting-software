@@ -1,5 +1,5 @@
 'use client';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveDocDesign, resetDocDesign } from '@/lib/actions';
 import { DEFAULT_DESIGN, DESIGN_TYPES, FONT_TH, FORMAT_TH, TITLE_PRESETS, type DocDesign } from '@/lib/doc-design';
@@ -7,6 +7,19 @@ import { DocSheet } from '@/components/DocSheet';
 import type { DocView } from '@/lib/doc-view';
 
 type Rows = Record<string, Partial<DocDesign>>;
+/** แสดงเอกสารบนกระดาษขนาดจริง (A4 210×297 มม. / ต่อเนื่อง 215.9×279.4 มม.) ย่อให้พอดีความกว้างกรอบ */
+function Paper({ cont, children }: { cont: boolean; children: React.ReactNode }) {
+  const box = useRef<HTMLDivElement>(null); const [w, setW] = useState(0);
+  useEffect(() => { const el = box.current; if (!el) return; const ro = new ResizeObserver(() => setW(el.clientWidth)); ro.observe(el); setW(el.clientWidth); return () => ro.disconnect(); }, []);
+  const pw = cont ? 816 : 794, ph = cont ? 1056 : 1123;   // px ที่ 96 dpi
+  const k = w > 0 ? Math.min(1, w / pw) : 1;
+  return (
+    <div ref={box} style={{ width: '100%', background: '#e6e8ee', padding: 10, borderRadius: 6, boxSizing: 'border-box' }}>
+      <div style={{ width: pw * k, height: ph * k, margin: '0 auto', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.25)', overflow: 'hidden', position: 'relative' }}>
+        <div className="paper-pv" style={{ width: pw, height: ph, transform: `scale(${k})`, transformOrigin: 'top left', padding: cont ? '10mm' : '12mm', boxSizing: 'border-box', overflow: 'hidden', ['--pg' as any]: 1 }}>{children}</div>
+      </div>
+    </div>);
+}
 /** ตั้งค่ารูปแบบดีไซน์เอกสาร: เรียบง่าย = ใช้กับทุกเอกสาร · ขั้นสูง = ตั้งแยกชนิดเอกสาร (ทับค่าเรียบง่าย) */
 export function DesignForm({ init, canWrite, samples = {} }: { init: Rows; canWrite: boolean; samples?: Record<string, DocView> }) {
   const r = useRouter(); const [pending, start] = useTransition();
@@ -60,8 +73,7 @@ export function DesignForm({ init, canWrite, samples = {} }: { init: Rows; canWr
         <span><button type="button" className={`chip${!copy ? ' on' : ''}`} onClick={() => setCopy(false)}>ต้นฉบับ</button> <button type="button" className={`chip${copy ? ' on' : ''}`} onClick={() => setCopy(true)}>สำเนา</button></span></div>
       {sample ? <>
         <p className="sub">ใช้ข้อมูลจากเอกสารจริงล่าสุดของชนิดนี้ ({sample.doc.doc_no}) · {base.paper === 'continuous' ? `กระดาษต่อเนื่อง 8.5×11 นิ้ว (${FORMAT_TH[base.paper_format]}) · ขาว-ดำ` + (base.paper_format === 'printshop' ? ' · แบบโรงพิมพ์พิมพ์เฉพาะข้อมูลลงแบบฟอร์ม ดูผลที่ PDF หลังบันทึก' : '') : 'A4: ตอนพิมพ์ตั้งหน้ากระดาษ A4 ขอบ 12 มม.'}</p>
-        <div style={{ overflow: 'auto', background: '#eef0f5', padding: 10, borderRadius: 6 }}>
-          <div style={{ zoom: 0.72 }}><DocSheet v={{ ...sample, design: base }} copy={copy} /></div></div></>
+        <Paper cont={base.paper === 'continuous'}><DocSheet v={{ ...sample, design: base }} copy={copy} /></Paper></>
         : <p className="sub">ยังไม่มีเอกสารชนิดนี้ให้เป็นตัวอย่าง — สร้างเอกสารสักใบก่อนเพื่อดูตัวอย่าง</p>}
     </div>
     </div>
