@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { PDFDocument } from '../web/node_modules/pdf-lib';
 import { buildDocPdf } from '../web/lib/doc-pdf';
+import { buildPrintshopPdf } from '../web/lib/doc-printshop';
+import fs from 'node:fs';
 import { DEFAULT_DESIGN } from '../web/lib/doc-design';
 
 // กระดาษต่อเนื่องของ FA = 612x792 pt (อ่านจาก PDF ตัวอย่างของ FA) · A4 = 595.28x841.89
@@ -18,5 +20,18 @@ describe('ขนาดหน้ากระดาษ PDF เอกสารข�
       const { width, height } = d.getPage(0).getSize();
       expect([Math.round(width), Math.round(height)]).toEqual([w, h]);
     }
+  });
+
+  it('แบบโรงพิมพ์: ข้อมูลล้วน 612x792 · แม่แบบเปล่ามี 1 หน้า · เอกสารมัดจำถอยไปรูปแบบมาตรฐาน', async () => {
+    const v = view('continuous'); v.design.paper_format = 'printshop';
+    v.lines = Array.from({ length: 20 }, (_, i) => ({ line_no: i + 1, description: 'สินค้า ' + (i + 1), item_kind: 'product', qty: 1, unit_price: 100, amount: 100 }));
+    const d = await PDFDocument.load(await buildDocPdf(v));
+    expect(d.getPageCount()).toBe(2);   // 20 บรรทัด / 16 บรรทัดต่อหน้า
+    expect(Math.round(d.getPage(0).getSize().width)).toBe(612);
+    const blank = await PDFDocument.load(await buildPrintshopPdf({ docType: 'INV', company: { name: 'บริษัททดสอบ', address: null, tax_id: null }, blank: true }));
+    expect(blank.getPageCount()).toBe(1);
+    const dep = view('continuous'); dep.design.paper_format = 'printshop'; dep.doc.is_deposit = true;
+    expect((await PDFDocument.load(await buildDocPdf(dep))).getPageCount()).toBe(1);
+    fs.writeFileSync('/tmp/ps-data.pdf', await buildDocPdf(v)); fs.writeFileSync('/tmp/ps-blank.pdf', await buildPrintshopPdf({ docType: 'INV', company: { name: 'บริษัท ผลิตภัณฑ์ตะแกรงเหล็กแผ่นไทย จำกัด', address: '100/12 ถนนนนทรี แขวงบางโพงพาง เขตยานนาวา กรุงเทพฯ 10120', tax_id: '0105522005334' }, blank: true }));
   });
 });

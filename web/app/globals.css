@@ -340,6 +340,8 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
 /* รูปแบบดีไซน์เอกสาร (ตั้งค่าที่ /settings/design) */
 .sheet.bw{filter:grayscale(1)}
 .sheet.hbg .sh-lines thead th{background:color-mix(in srgb,var(--dc) 14%,#fff)}
-.sheet.cont{max-width:215.9mm}   /* 8.5 นิ้ว = กว้างเท่ากระดาษต่อเนื่องของ FA */
+.sheet.cont{max-width:215.9mm;border-top-width:0}
+.sheet.cont .sh-lines th,.sheet.cont .sh-lines td{border:1px solid #333}
+.sheet.cont .sh-lines thead th{background:none;color:#111}   /* 8.5 นิ้ว = กว้างเท่ากระดาษต่อเนื่องของ FA */
 .sh-logo{display:block;max-height:64px;max-width:200px;margin-bottom:6px;object-fit:contain}
 .sh-stamp{display:block;margin:0 auto -30px;max-height:60px;position:relative}

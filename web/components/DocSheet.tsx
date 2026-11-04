@@ -16,7 +16,7 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
   const credit = full ? (v.doc.term_mode === 'cash' || nodate ? 0 : Number(v.doc.credit_days ?? 0)) : v.contact.credit_days;
   return (
     <article className={`sheet${v.doc.status === 'cancelled' ? ' cancelled' : ''}${d.bw ? ' bw' : ''}${d.header_bg ? ' hbg' : ''}${d.paper === 'continuous' ? ' cont' : ''}`}
-      style={{ ['--dc' as any]: d.bw ? '#222' : t.color, fontFamily: FONT_CSS[d.font], fontSize: SIZE_PX[d.size] }}>
+      style={{ ['--dc' as any]: d.bw || d.paper === 'continuous' ? '#222' : t.color, fontFamily: FONT_CSS[d.font], fontSize: SIZE_PX[d.size] }}>
       {d.paper === 'continuous' && <style>{'@media print{@page{size:215.9mm 279.4mm;margin:10mm}}'}</style>}
       {v.doc.status === 'cancelled' && <div className="sh-mark">ยกเลิก</div>}
       <header className="sh-head">

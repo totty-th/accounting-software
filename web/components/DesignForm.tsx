@@ -2,7 +2,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveDocDesign, resetDocDesign } from '@/lib/actions';
-import { DEFAULT_DESIGN, DESIGN_TYPES, FONT_TH, TITLE_PRESETS, type DocDesign } from '@/lib/doc-design';
+import { DEFAULT_DESIGN, DESIGN_TYPES, FONT_TH, FORMAT_TH, TITLE_PRESETS, type DocDesign } from '@/lib/doc-design';
 import { DocSheet } from '@/components/DocSheet';
 import type { DocView } from '@/lib/doc-view';
 
@@ -36,6 +36,13 @@ export function DesignForm({ init, canWrite, samples = {} }: { init: Rows; canWr
         <div className="acts" style={{ justifyContent: 'flex-start', gap: 16 }}><b>ขนาด</b>
           <label><input type="radio" checked={base.paper === 'a4'} disabled={!canWrite} onChange={() => set('paper', 'a4')} /> A4</label>
           <label><input type="radio" checked={base.paper === 'continuous'} disabled={!canWrite} onChange={() => set('paper', 'continuous')} /> กระดาษต่อเนื่อง</label></div>
+        {base.paper === 'continuous' && <>
+          <label>รูปแบบ<select value={base.paper_format} disabled={!canWrite} onChange={e => set('paper_format', e.target.value as DocDesign['paper_format'])}>{Object.entries(FORMAT_TH).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
+          {base.paper_format === 'printshop' && <div className="sub" style={{ display: 'grid', gap: 6 }}>
+            <span>เอกสารจะพิมพ์เฉพาะข้อมูลลงกระดาษแบบฟอร์มสำเร็จรูปที่สั่งพิมพ์จากโรงพิมพ์ (ไม่พิมพ์เส้น/ป้ายชื่อช่อง/ข้อมูลบริษัท)</span>
+            <span>ดาวน์โหลดแม่แบบส่งโรงพิมพ์: {DESIGN_TYPES.filter(([k]) => k !== 'BL').map(([k, n]) => <a key={k} href={`/settings/design/template/${k}`} target="_blank" rel="noreferrer" style={{ marginRight: 10 }}>{n}</a>)}</span>
+            <span>ไม่รองรับ: ใบแจ้งหนี้มัดจำ/เอกสารที่หักมัดจำ และใบวางบิล (พิมพ์ด้วยรูปแบบมาตรฐานแทน) · ต้องบันทึกก่อนจึงจะเห็นผลที่ปุ่มพิมพ์/PDF</span></div>}
+          {base.paper_format === 'carbon' && <span className="sub">กระดาษคาร์บอน: รูปแบบขาว-ดำเหมือนมาตรฐาน (FA แสดงตัวอย่างเหมือนกัน)</span>}</>}
         {sw('bw', 'เอกสารขาว-ดำ')}
         <label>ตัวอักษร<select value={base.font} disabled={!canWrite} onChange={e => set('font', e.target.value as DocDesign['font'])}>{Object.entries(FONT_TH).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
         <label>ขนาดตัวอักษร<select value={base.size} disabled={!canWrite} onChange={e => set('size', e.target.value as DocDesign['size'])}><option value="s">เล็ก</option><option value="m">กลาง (ค่าเริ่มต้น)</option><option value="l">ใหญ่</option></select></label>
@@ -52,7 +59,7 @@ export function DesignForm({ init, canWrite, samples = {} }: { init: Rows; canWr
       <div className="acts" style={{ justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><b>ตัวอย่างเอกสาร (ดูผลทันทีก่อนบันทึก)</b>
         <span><button type="button" className={`chip${!copy ? ' on' : ''}`} onClick={() => setCopy(false)}>ต้นฉบับ</button> <button type="button" className={`chip${copy ? ' on' : ''}`} onClick={() => setCopy(true)}>สำเนา</button></span></div>
       {sample ? <>
-        <p className="sub">ใช้ข้อมูลจากเอกสารจริงล่าสุดของชนิดนี้ ({sample.doc.doc_no}) · {base.paper === 'continuous' ? 'กระดาษต่อเนื่อง: ตอนนี้ปรับเฉพาะความกว้างหน้ากระดาษ (ขนาด/ขอบเครื่องพิมพ์จริงยังไม่ได้ทดสอบ)' : 'A4: ตอนพิมพ์ตั้งหน้ากระดาษ A4 ขอบ 12 มม.'}</p>
+        <p className="sub">ใช้ข้อมูลจากเอกสารจริงล่าสุดของชนิดนี้ ({sample.doc.doc_no}) · {base.paper === 'continuous' ? `กระดาษต่อเนื่อง 8.5×11 นิ้ว (${FORMAT_TH[base.paper_format]}) · ขาว-ดำ` + (base.paper_format === 'printshop' ? ' · แบบโรงพิมพ์พิมพ์เฉพาะข้อมูลลงแบบฟอร์ม ดูผลที่ PDF หลังบันทึก' : '') : 'A4: ตอนพิมพ์ตั้งหน้ากระดาษ A4 ขอบ 12 มม.'}</p>
         <div style={{ overflow: 'auto', background: '#eef0f5', padding: 10, borderRadius: 6 }}>
           <div style={{ zoom: 0.72 }}><DocSheet v={{ ...sample, design: base }} copy={copy} /></div></div></>
         : <p className="sub">ยังไม่มีเอกสารชนิดนี้ให้เป็นตัวอย่าง — สร้างเอกสารสักใบก่อนเพื่อดูตัวอย่าง</p>}

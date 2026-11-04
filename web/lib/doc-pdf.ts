@@ -4,6 +4,7 @@ import { PDFDocument, PDFFont, PDFPage, rgb, degrees } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { DOC_TITLE, type DocView } from './doc-view';
 import { bahtText } from './wht-pdf';
+import { buildPrintshopPdf, supportsPrintshop } from './doc-printshop';
 import { docSummary, isFull, lineTaxLabel, lineWhtLabel, shipRows, SIGNERS } from './doc-calc';
 
 const ASSETS = () => { const a = path.join(process.cwd(), 'assets'); return fs.existsSync(a) ? a : path.join(process.cwd(), 'web/assets'); };
@@ -19,6 +20,8 @@ export type PdfKind = 'doc' | 'delivery';
 // kind='delivery' = ใบส่งของ: ไม่มีราคา (#/รายละเอียด/จำนวน) + บล็อกข้อมูลจัดส่ง (ตาม FlowAccount + ส่วนเพิ่มของเรา)
 export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: PdfKind = 'doc'): Promise<Uint8Array> {
   const dlv = kind === 'delivery';
+  if (!dlv && v.design?.paper === 'continuous' && v.design.paper_format === 'printshop' && supportsPrintshop(v))   // แบบโรงพิมพ์: พิมพ์เฉพาะข้อมูลลงแบบฟอร์มสำเร็จรูป
+    return buildPrintshopPdf({ v, docType: v.doc.doc_type, company: v.company, blank: false });
   const qt = v.doc.doc_type === 'QT', full = isFull(v), showTax = v.doc.doc_type !== 'BL';
   const dir = ASSETS();
   const pdf = await PDFDocument.create();
@@ -26,7 +29,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
   const f = (n: string) => pdf.embedFont(fs.readFileSync(path.join(dir, 'fonts', n)), { subset: true });
   const F = { th: await f('sarabun-thai-400-normal.woff'), la: await f('sarabun-latin-400-normal.woff'),
               thB: await f('sarabun-thai-700-normal.woff'), laB: await f('sarabun-latin-700-normal.woff') };
-  const t = dlv ? { title: 'ใบส่งของ', rgb: [0.18, 0.49, 0.43] as [number, number, number] } : DOC_TITLE[v.doc.doc_type], dz = v.design, col = dz?.bw && !dlv ? rgb(0.15, 0.15, 0.15) : rgb(...t.rgb), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
+  const t = dlv ? { title: 'ใบส่งของ', rgb: [0.18, 0.49, 0.43] as [number, number, number] } : DOC_TITLE[v.doc.doc_type], dz = v.design, col = (dz?.bw || dz?.paper === 'continuous') && !dlv ? rgb(0.1, 0.1, 0.12) : rgb(...t.rgb), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
 
   const runs = (s: string) => { const out: [string, boolean][] = []; for (const ch of s) {
     const th = isThai(ch) || ch === '฿'; const last = out[out.length - 1];
@@ -59,7 +62,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
   const cont = dz?.paper === 'continuous'; const L = 42, R = 553, W = cont ? 612 : 595, H = cont ? 792 : 842;
   const sheet = (label: string) => {
     let page = pdf.addPage([W, H]); let y = H - 48;
-    page.drawRectangle({ x: 0, y: H - 14, width: W, height: 14, color: col });
+    if (!cont) page.drawRectangle({ x: 0, y: H - 14, width: W, height: 14, color: col });
     // หัว: บริษัท (ซ้าย) / ชื่อเอกสาร (ขวา)
     const lk = logoImg ? Math.min(1, 150 / logoImg.width, 40 / logoImg.height) : 0;
     if (logoImg && !dlv) { page.drawImage(logoImg, { x: L, y: y - logoImg.height * lk + 10, width: logoImg.width * lk, height: logoImg.height * lk }); y -= logoImg.height * lk + 4; }
@@ -112,8 +115,9 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     return { page, y };
   };
   const tableHead = (page: PDFPage, y: number) => {
-    page.drawRectangle({ x: L, y: y - 7, width: R - L, height: 24, color: col });
-    const w = rgb(1, 1, 1);
+    const bx = dz?.paper === 'continuous';   // กระดาษต่อเนื่อง (มาตรฐาน/คาร์บอน): ขาว-ดำ หัวตารางเป็นกรอบ ไม่ลงสี (ตาม FA)
+    page.drawRectangle(bx ? { x: L, y: y - 7, width: R - L, height: 24, borderColor: col, borderWidth: 0.8 } : { x: L, y: y - 7, width: R - L, height: 24, color: col });
+    const w = bx ? col : rgb(1, 1, 1);
     draw(page, '#', L + 6, y, 10, { bold: true, color: w }); draw(page, 'รายละเอียด', L + 28, y, 10, { bold: true, color: w });
     if (dlv) { draw(page, 'จำนวน', R - 6, y, 10, { bold: true, color: w, right: true }); return y - 28; }
     draw(page, 'จำนวน', 300, y, 10, { bold: true, color: w, right: true });

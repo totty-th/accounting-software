@@ -11,6 +11,7 @@ const err = async (p: Promise<unknown>) => { try { await p; return ''; } catch (
 describe('M40 รูปแบบดีไซน์เอกสาร (REA FA 02-11-2026)', () => {
   it('บันทึก/ทับ/รีเซ็ต และตรวจค่า', async () => {
     expect(await err(db.query(`select save_doc_design('all','{"paper":"b5"}')`))).toContain('ขนาดกระดาษ');
+    expect(await err(db.query(`select save_doc_design('all','{"paper":"continuous","paper_format":"x"}')`))).toContain('รูปแบบกระดาษต่อเนื่อง');
     expect(await err(db.query(`select save_doc_design('all','{"font":"comic"}')`))).toContain('ฟอนต์');
     expect(await err(db.query(`select save_doc_design('ZZ','{}')`))).toBeTruthy();
     await db.query(`select save_doc_design('all','{"bw":true,"size":"l","show_credit":false}')`);
