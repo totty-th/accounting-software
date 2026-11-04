@@ -650,14 +650,18 @@ export async function resetDocNumberFormat(f: FormData): Promise<Result> {
   return run(call('select reset_doc_number_format($1)', str(f, 'prefix')), ['/settings/numbering'], SC);
 }
 export async function saveDocSettings(f: FormData): Promise<Result> {
-  const remarks: Record<string, string> = {};
-  for (const t of ['QT', 'INV', 'CA', 'BL', 'CN', 'DN', 'PO', 'RI', 'EXP']) { const v = str(f, 'remark_' + t); if (v) remarks[t] = v; }
   const on = (k: string) => f.get(k) === '1';
   return run(call('select save_doc_settings($1::jsonb)', JSON.stringify({
     price_mode: str(f, 'price_mode'), vat_level: str(f, 'vat_level'), discount_level: str(f, 'discount_level'), wht_level: str(f, 'wht_level'),
     pur_vat_level: str(f, 'pur_vat_level'), pur_discount_level: str(f, 'pur_discount_level'), pur_wht_level: str(f, 'pur_wht_level'),
-    show_warehouse: on('show_warehouse'), default_main_warehouse: on('default_main_warehouse'), qr_tax_request: on('qr_tax_request'), qr_self_register: on('qr_self_register'), multi_currency: on('multi_currency'), remarks })),
+    show_warehouse: on('show_warehouse'), default_main_warehouse: on('default_main_warehouse'), qr_tax_request: on('qr_tax_request'), qr_self_register: on('qr_self_register'), multi_currency: on('multi_currency') })),
     ['/settings/documents', '/settings/currency', '/sales/new'], SC);
+}
+/** หมายเหตุเอกสาร: rows = [{doc, text}] · doc = 'ALL' หรือรหัสชนิดเอกสาร (ALL กับแยกชนิดเลือกอย่างใดอย่างหนึ่ง) */
+export async function saveDocRemarks(rows: { doc: string; text: string }[]): Promise<Result> {
+  const m: Record<string, string> = {};
+  for (const r of rows) { const t = (r.text ?? '').trim(); if (!r.doc) continue; if (m[r.doc] !== undefined) return { error: 'เลือกชนิดเอกสารซ้ำกัน' }; if (t) m[r.doc] = t; }
+  return run(call('select save_doc_remarks($1::jsonb)', JSON.stringify(m)), ['/settings/remarks', '/sales/new', '/purchases/new', '/purchases/orders/new', '/expenses/new'], SC);
 }
 export async function savePaymentInfo(f: FormData): Promise<Result> {
   const file = f.get('qr') as File | null; let qr = '';

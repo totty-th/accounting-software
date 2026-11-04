@@ -36,6 +36,19 @@ describe('ฟังก์ชัน/หมายเหตุเอกสาร', 
     await expect(q(`select save_doc_settings('{"remarks":{"XX":"a"}}')`)).rejects.toThrow(/ชนิดเอกสาร/);
   });
 });
+describe('หมายเหตุเอกสารแบบ FA (save_doc_remarks)', () => {
+  it('ALL อย่างเดียว หรือแยกชนิด · ตรวจชนิด/ความยาว · ตัวตั้งต้นใช้ ALL เมื่อไม่มีของชนิดนั้น', async () => {
+    await q(`select save_doc_remarks('{"ALL":"ขอบคุณที่ใช้บริการ"}')`);
+    const get = async (t: string) => (await q(`select coalesce(remarks->>$1, remarks->>'ALL') v from doc_settings`, [t]))[0].v;
+    expect(await get('INV')).toBe('ขอบคุณที่ใช้บริการ'); expect(await get('PO')).toBe('ขอบคุณที่ใช้บริการ');
+    await q(`select save_doc_remarks('{"QT":"ราคามีผล 30 วัน","PAY":"แนบสลิป"}')`);
+    expect(await get('QT')).toBe('ราคามีผล 30 วัน'); expect(await get('INV')).toBeNull();
+    await expect(q(`select save_doc_remarks('{"ALL":"a","QT":"b"}')`)).rejects.toThrow(/อย่างใดอย่างหนึ่ง/);
+    await expect(q(`select save_doc_remarks('{"XX":"a"}')`)).rejects.toThrow(/ชนิดเอกสาร/);
+    await expect(q(`select save_doc_remarks($1::jsonb)`, [JSON.stringify({ QT: 'ก'.repeat(1001) })])).rejects.toThrow(/1000/);
+    await q(`select save_doc_remarks('{}')`);
+  });
+});
 describe('ข้อมูลรับชำระ', () => {
   it('โอนต้องมีธนาคาร/เลขบัญชี/ชื่อบัญชี, เช็คต้องมีผู้รับ', async () => {
     await expect(q(`select save_payment_info(null,'{"kind":"transfer","bank":"กสิกร"}')`)).rejects.toThrow();

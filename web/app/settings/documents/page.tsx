@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { requirePage } from '@/lib/auth';
 import { can } from '@/lib/permissions';
 import { getDb } from '@/lib/db';
@@ -5,7 +6,6 @@ import { SForm } from '@/components/SForm';
 import { saveDocSettings } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
-const REM: [string, string][] = [['QT', 'ใบเสนอราคา'], ['INV', 'ใบแจ้งหนี้/ใบกำกับภาษี'], ['CA', 'ขายเงินสด'], ['BL', 'ใบวางบิล'], ['CN', 'ใบลดหนี้'], ['DN', 'ใบเพิ่มหนี้'], ['PO', 'ใบสั่งซื้อ'], ['RI', 'ใบรับสินค้า'], ['EXP', 'ค่าใช้จ่าย']];
 export default async function Documents() {
   const user = await requirePage('settings.company');
   const s = (await (await getDb()).q<any>('select * from doc_settings'))[0];
@@ -28,8 +28,7 @@ export default async function Documents() {
         <label><input type="checkbox" name="show_warehouse" value="1" defaultChecked={s.show_warehouse} /> แสดงคลังสินค้าในฟอร์มเอกสาร (ปิด = ตัด/เพิ่มสต็อกที่คลังหลักเสมอ)</label>
         <label><input type="checkbox" name="default_main_warehouse" value="1" defaultChecked={s.default_main_warehouse} /> ตั้ง 'คลังหลัก' เป็นค่าเริ่มต้นในหน้าเอกสาร (ปิด = ต้องเลือกคลังเองทุกครั้ง)</label>
         <label><input type="checkbox" name="multi_currency" value="1" defaultChecked={s.multi_currency} /> เปิดใช้งานหลายสกุลเงิน (ตั้งค่าที่เมนูสกุลเงิน)</label>
-        <h3>หมายเหตุเอกสาร (ข้อความตั้งต้น)</h3>
-        {REM.map(([k, l]) => <label key={k}>{l} <textarea name={'remark_' + k} rows={2} maxLength={1000} defaultValue={s.remarks?.[k] ?? ''} /></label>)}
+        <p className="sub">หมายเหตุตั้งต้นของเอกสารตั้งที่ <Link href="/settings/remarks">หมายเหตุเอกสาร</Link></p>
       </SForm>
     </>
   );

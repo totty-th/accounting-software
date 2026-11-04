@@ -1,7 +1,7 @@
 import { getDb } from './db';
-/** หมายเหตุตั้งต้นของชนิดเอกสาร (ตั้งที่ ตั้งค่า → ตั้งค่าเอกสาร) ใช้เติมในเอกสารใหม่ */
+/** หมายเหตุตั้งต้นของชนิดเอกสาร (ตั้งที่ ตั้งค่า → หมายเหตุเอกสาร; 'ทั้งหมด' ใช้เมื่อไม่ได้ตั้งแยกชนิด) ใช้เติมในเอกสารใหม่ */
 export async function defaultRemark(type: string): Promise<string> {
-  const r = (await (await getDb()).q<{ v: string | null }>(`select remarks->>$1 as v from doc_settings`, [type]))[0];
+  const r = (await (await getDb()).q<{ v: string | null }>(`select coalesce(remarks->>$1, remarks->>'ALL') as v from doc_settings`, [type]))[0];
   return r?.v ?? '';
 }
 

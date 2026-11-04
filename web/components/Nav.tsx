@@ -81,6 +81,7 @@ const GROUPS: Group[] = [
     { href: '/settings/company', label: 'ข้อมูลธุรกิจ', perms: ['settings.company'] },
     { href: '/settings/design', label: 'รูปแบบดีไซน์เอกสาร', perms: ['settings.company'] },
     { href: '/settings/documents', label: 'ตั้งค่าเอกสาร', perms: ['settings.company'] },
+    { href: '/settings/remarks', label: 'หมายเหตุเอกสาร', perms: ['settings.company'] },
     { href: '/settings/numbering', label: 'เลขที่เอกสาร', perms: ['settings.company'] },
     { href: '/settings/payment-info', label: 'ข้อมูลการรับชำระ', perms: ['settings.company'] },
     { href: '/settings/currency', label: 'สกุลเงิน', perms: ['settings.company'] },

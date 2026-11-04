@@ -32,7 +32,7 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
   const [np, setNp] = useState<{ row: number; kind: string; name: string; code: string; unit: string; price: string; description: string } | null>(null);
   const h0 = init?.header ?? {};
   const [h, setH] = useState({ date: today, contact: '', term_mode: 'credit', credit_days: '0', due_date: today, salesperson, project: '', ref_no: '', description: '',
-    price_mode: ds?.price_mode ?? 'exclusive', warehouse_id: '', show_signature: true, note: id ? '' : ds?.remarks?.[docType] ?? '', internal_note: '', ...h0 });
+    price_mode: ds?.price_mode ?? 'exclusive', warehouse_id: '', show_signature: true, note: id ? '' : ds?.remarks?.[docType] ?? ds?.remarks?.ALL ?? '', internal_note: '', ...h0 });
   const [lines, setLines] = useState<Line[]>(init?.lines?.length ? init.lines : [blank(), blank(), blank()]);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
