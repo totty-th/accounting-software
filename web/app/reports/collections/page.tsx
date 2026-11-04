@@ -8,6 +8,7 @@ import { reportPeriod } from '@/lib/report-filter';
 import { ReportFilter } from '@/components/ReportFilter';
 import { parseStatuses } from '@/lib/status-filter';
 import { requirePage } from '@/lib/auth';
+import { COLLECTION_SQL } from '@/lib/collection-report';
 import { ReportTools } from '@/components/ReportTools';
 
 export const dynamic = 'force-dynamic';
@@ -23,13 +24,7 @@ export default async function CollectionReport({ searchParams }: { searchParams:
   const t = today();
   const range = periodRange(period, t, searchParams.from, searchParams.to);
   const db = await getDb();
-  const rows = await db.q(`select d.id, d.doc_no, d.doc_type, d.doc_date, d.status, d.total, c.business_name, c.contact_name,
-      (select string_agg(distinct rp.method, ',') from receipt_items ri join receipts r on r.id=ri.receipt_id and r.status<>'cancelled'
-         join receipt_payments rp on rp.receipt_id=r.id where ri.doc_id=d.id) methods
-    from sales_docs d join contacts c on c.id=d.contact_id
-    where d.doc_type in ('INV','CA','DN') and ($1::date is null or d.doc_date>=$1::date) and ($2::date is null or d.doc_date<=$2::date)
-      and (cardinality($3::text[])=0 or d.status = any($3::text[]))
-    order by d.doc_date desc, d.doc_no desc`, [range?.[0] ?? null, range?.[1] ?? null, `{${st.join(',')}}`]);
+  const rows = await db.q(COLLECTION_SQL, [range?.[0] ?? null, range?.[1] ?? null, `{${st.join(',')}}`]);
   const live = rows.filter(r => r.status !== 'cancelled');
   const total = live.reduce((s, r) => s + Number(r.total), 0);
   return (
