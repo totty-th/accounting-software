@@ -3,23 +3,29 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveDocDesign, resetDocDesign } from '@/lib/actions';
 import { DEFAULT_DESIGN, DESIGN_TYPES, FONT_TH, TITLE_PRESETS, type DocDesign } from '@/lib/doc-design';
+import { DocSheet } from '@/components/DocSheet';
+import type { DocView } from '@/lib/doc-view';
 
 type Rows = Record<string, Partial<DocDesign>>;
 /** ตั้งค่ารูปแบบดีไซน์เอกสาร: เรียบง่าย = ใช้กับทุกเอกสาร · ขั้นสูง = ตั้งแยกชนิดเอกสาร (ทับค่าเรียบง่าย) */
-export function DesignForm({ init, canWrite }: { init: Rows; canWrite: boolean }) {
+export function DesignForm({ init, canWrite, samples = {} }: { init: Rows; canWrite: boolean; samples?: Record<string, DocView> }) {
   const r = useRouter(); const [pending, start] = useTransition();
   const [adv, setAdv] = useState(Object.keys(init).some(k => k !== 'all'));
   const [type, setType] = useState('INV');
   const [rows, setRows] = useState<Rows>(init);
   const [msg, setMsg] = useState<string | null>(null);
+  const [copy, setCopy] = useState(false);
   const scope = adv ? type : 'all';
+  const pt = adv ? type : (samples.INV ? 'INV' : Object.keys(samples)[0]);   // ชนิดเอกสารที่ใช้เป็นตัวอย่าง
   const base = { ...DEFAULT_DESIGN, ...(adv ? init.all ?? {} : {}), ...(rows[scope] ?? {}) } as DocDesign;
   const set = <K extends keyof DocDesign>(k: K, v: DocDesign[K]) => setRows(o => ({ ...o, [scope]: { ...(o[scope] ?? {}), [k]: v } }));
   const sw = (k: 'bw' | 'copy_mark' | 'header_bg' | 'logo' | 'stamp' | 'show_credit' | 'show_due', label: string) =>
     <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={base[k]} disabled={!canWrite} onChange={e => set(k, e.target.checked)} /> {label}</label>;
   const save = () => start(async () => { const x = await saveDocDesign(scope, { ...DEFAULT_DESIGN, ...(rows[scope] ?? {}) }); setMsg(x.error ?? 'บันทึกรูปแบบเอกสารแล้ว (มีผลกับเอกสารทั้งหมดที่พิมพ์/แชร์ รวมที่สร้างไว้ก่อนหน้า)'); if (!x.error) r.refresh(); });
   const reset = () => start(async () => { if (!window.confirm('รีเซ็ตรูปแบบดีไซน์เอกสารทั้งหมดกลับค่าเริ่มต้น?')) return; const x = await resetDocDesign(); if (x.error) setMsg(x.error); else { setRows({}); setAdv(false); setMsg('รีเซ็ตแล้ว'); r.refresh(); } });
+  const sample = pt ? samples[pt] : undefined;
   return (
+    <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,420px),1fr))', alignItems: 'start' }}>
     <div className="panel" style={{ display: 'grid', gap: 10, maxWidth: 640 }}>
       <div className="acts" style={{ justifyContent: 'flex-start', gap: 8 }}><b>โหมดการใช้งาน</b>
         <button type="button" className={`chip${!adv ? ' on' : ''}`} onClick={() => setAdv(false)}>เรียบง่าย</button>
@@ -41,6 +47,16 @@ export function DesignForm({ init, canWrite }: { init: Rows; canWrite: boolean }
         {sw('show_credit', 'แสดงเครดิต')}{sw('show_due', 'แสดงวันครบกำหนด')}</fieldset>
       {canWrite && <div className="acts" style={{ justifyContent: 'flex-start', gap: 8 }}><button type="button" className="btn" disabled={pending} onClick={save}>บันทึกข้อมูล</button>
         <button type="button" className="btn ghost" disabled={pending} onClick={reset}>รีเซ็ตรูปแบบดีไซน์เอกสาร</button>{msg && <span className="sub" role="status">{msg}</span>}</div>}
+    </div>
+    <div className="panel" style={{ minWidth: 0 }}>
+      <div className="acts" style={{ justifyContent: 'space-between', gap: 8, marginBottom: 8 }}><b>ตัวอย่างเอกสาร (ดูผลทันทีก่อนบันทึก)</b>
+        <span><button type="button" className={`chip${!copy ? ' on' : ''}`} onClick={() => setCopy(false)}>ต้นฉบับ</button> <button type="button" className={`chip${copy ? ' on' : ''}`} onClick={() => setCopy(true)}>สำเนา</button></span></div>
+      {sample ? <>
+        <p className="sub">ใช้ข้อมูลจากเอกสารจริงล่าสุดของชนิดนี้ ({sample.doc.doc_no}) · {base.paper === 'continuous' ? 'กระดาษต่อเนื่อง: ตอนนี้ปรับเฉพาะความกว้างหน้ากระดาษ (ขนาด/ขอบเครื่องพิมพ์จริงยังไม่ได้ทดสอบ)' : 'A4: ตอนพิมพ์ตั้งหน้ากระดาษ A4 ขอบ 12 มม.'}</p>
+        <div style={{ overflow: 'auto', background: '#eef0f5', padding: 10, borderRadius: 6 }}>
+          <div style={{ zoom: 0.72 }}><DocSheet v={{ ...sample, design: base }} copy={copy} /></div></div></>
+        : <p className="sub">ยังไม่มีเอกสารชนิดนี้ให้เป็นตัวอย่าง — สร้างเอกสารสักใบก่อนเพื่อดูตัวอย่าง</p>}
+    </div>
     </div>
   );
 }

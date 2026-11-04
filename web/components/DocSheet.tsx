@@ -1,5 +1,6 @@
-import { DOC_TITLE, type DocView } from '@/lib/doc-view';
-import { bahtText } from '@/lib/wht-pdf';
+import type { DocView } from '@/lib/doc-view';
+import { DOC_TITLE } from '@/lib/doc-title';
+import { bahtText } from '@/lib/baht-text';
 import { docSummary, isFull, lineTaxLabel, lineWhtLabel, SIGNERS } from '@/lib/doc-calc';
 import { money, qty, dateTh } from '@/lib/format';
 import { DEFAULT_DESIGN, FONT_CSS, SIZE_PX } from '@/lib/doc-design';
