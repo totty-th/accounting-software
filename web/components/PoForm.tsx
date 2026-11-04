@@ -14,8 +14,9 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2,
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
 /** ใบสั่งซื้อ: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — สร้างและแก้ไข */
-export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses, today, purchaser, init, canCreateVendor, canCreateProduct, remark = '', lv }: {
+export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses, today, purchaser, init, canCreateVendor, canCreateProduct, remark = '', lv, wh }: {
   remark?: string;
+  wh?: { show: boolean; defMain: boolean };
   lv?: { vat: string; discount: string; wht: string };
   kind?: 'PO' | 'RI'; id: string | null; vendors: Vendor[]; products: Prod[]; warehouses: Wh[]; today: string; purchaser: string;
   init?: { header: Record<string, any>; lines: Line[] }; canCreateVendor: boolean; canCreateProduct: boolean;
@@ -55,7 +56,8 @@ export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses,
     return { per, net, vat, disc, ex, wht, total: r2(net + vat) };
   }, [lines, h.price_mode]);
 
-  const ok = h.contact && lines.some(l => l.product_id) && lines.filter(l => l.product_id).every(l => Number(l.qty) > 0 && l.unit_price !== '');
+  const needWh = !id && !!wh?.show && wh.defMain === false;
+  const ok = (!needWh || !!h.warehouse_id) && h.contact && lines.some(l => l.product_id) && lines.filter(l => l.product_id).every(l => Number(l.qty) > 0 && l.unit_price !== '');
   const submit = () => start(async () => {
     setErr(null);
     const save = kind === 'RI' ? (_: string | null, a: any, b: any[]) => saveGoodsReceiptFull(a, b) : savePurchaseOrder;
@@ -108,7 +110,7 @@ export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses,
           {lbl('โปรเจค', <input value={h.project} onChange={e => set({ project: e.target.value })} />)}
           {lbl('เลขที่อ้างอิง', <input value={h.ref_no} onChange={e => set({ ref_no: e.target.value })} />)}
           {lbl('ราคาสินค้า', <select value={h.price_mode} onChange={e => set({ price_mode: e.target.value })}><option value="exclusive">ราคาไม่รวมภาษี</option><option value="inclusive">ราคารวมภาษี</option></select>)}
-          {lbl('คลังสินค้า', <select value={h.warehouse_id} onChange={e => set({ warehouse_id: e.target.value })}><option value="">คลังสินค้าหลัก</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>)}
+          {(id || wh?.show !== false) && lbl('คลังสินค้า', <select value={h.warehouse_id} onChange={e => set({ warehouse_id: e.target.value })}>{needWh ? <option value="" disabled>เลือกคลังสินค้า</option> : <option value="">คลังสินค้าหลัก</option>}{warehouses.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>)}
         </div>
         <div style={{ marginTop: 8 }}>{lbl('รายละเอียด', <input value={h.description} onChange={e => set({ description: e.target.value })} />)}</div>
       </section>

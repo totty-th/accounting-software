@@ -69,3 +69,12 @@ describe('ระดับ VAT/ส่วนลด/WHT แยกขาย-ซื�
     await expect(q(`select save_doc_settings('{"pur_vat_level":"x"}'::jsonb)`)).rejects.toThrow();
   });
 });
+
+describe('คลังหลักตั้งต้น (0071)', () => {
+  it('ค่าตั้งต้นเปิด และปิดได้โดยไม่กระทบค่าอื่น', async () => {
+    expect((await q(`select default_main_warehouse d from doc_settings`))[0].d).toBe(true);
+    await q(`select save_doc_settings('{"default_main_warehouse":false}'::jsonb)`);
+    const r = (await q(`select default_main_warehouse d, show_warehouse s, pur_vat_level p from doc_settings`))[0];
+    expect(r).toMatchObject({ d: false, s: true, p: 'footer' });
+  });
+});

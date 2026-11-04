@@ -18,6 +18,6 @@ export async function qtFormData() {
   const negMode = ((await db.q(`select negative_sales from stock_settings`))[0]?.negative_sales ?? 'warn') as 'allow' | 'warn' | 'block';
   const dsr = (await db.q<any>('select * from doc_settings'))[0];
   const ds = { price_mode: dsr.price_mode as string, vat_level: dsr.vat_level as string, discount_level: dsr.discount_level as string, wht_level: dsr.wht_level as string,
-    show_warehouse: dsr.show_warehouse as boolean, remarks: (dsr.remarks ?? {}) as Record<string, string> };
+    show_warehouse: dsr.show_warehouse as boolean, default_main_warehouse: dsr.default_main_warehouse as boolean, remarks: (dsr.remarks ?? {}) as Record<string, string> };
   return { ds, customers, products, warehouses, people, negMode };
 }

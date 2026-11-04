@@ -19,7 +19,7 @@ const KIND_LABEL: Record<string, string> = { service: 'บริการ', good
 
 /** ใบเสนอราคา/ใบแจ้งหนี้: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — QT สร้างและแก้ไข (เฉพาะรออนุมัติ) · INV สร้างอย่างเดียว */
 export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses, people, today, salesperson, canPickSalesperson, init, canCreateCustomer, canCreateProduct, negMode = 'warn', ds }: {
-  ds?: { price_mode: string; vat_level: string; discount_level: string; wht_level: string; show_warehouse: boolean; remarks: Record<string, string> };
+  ds?: { price_mode: string; vat_level: string; discount_level: string; wht_level: string; show_warehouse: boolean; default_main_warehouse?: boolean; remarks: Record<string, string> };
   negMode?: 'allow' | 'warn' | 'block';
   docType?: 'QT' | 'INV'; id: string | null; customers: Cust[]; products: QProd[]; warehouses: Wh[]; people: string[]; today: string; salesperson: string; canPickSalesperson?: boolean;
   init?: { header: Record<string, any>; lines: Line[] }; canCreateCustomer: boolean; canCreateProduct: boolean;
@@ -76,7 +76,8 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
     return { per, net, vat, disc, ex, noTax, wht, total: r2(net + vat) };
   }, [lines, h.price_mode]);
 
-  const ok = h.contact && lines.some(hasContent) && lines.filter(hasContent).every(l => Number(l.qty) > 0 && l.unit_price !== '');
+  const needWh = !id && ds?.show_warehouse !== false && ds?.default_main_warehouse === false;
+  const ok = (!needWh || !!h.warehouse_id) && h.contact && lines.some(hasContent) && lines.filter(hasContent).every(l => Number(l.qty) > 0 && l.unit_price !== '');
   const submit = () => start(async () => {
     setErr(null);
     // ขายเป็นหน่วยเพิ่ม → แปลงเป็นหน่วยหลักก่อนบันทึก (ตัดสต็อกถูกหน่วย) และจดหน่วยที่ขายไว้ในรายละเอียด
@@ -143,7 +144,7 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
           {lbl('โปรเจค', <input value={h.project} onChange={e => set({ project: e.target.value })} />)}
           {lbl('เลขที่อ้างอิง', <input value={h.ref_no} onChange={e => set({ ref_no: e.target.value })} />)}
           {lbl('ราคาสินค้า', <select value={h.price_mode} onChange={e => set({ price_mode: e.target.value })}><option value="exclusive">ราคาไม่รวมภาษี</option><option value="inclusive">ราคารวมภาษี</option></select>)}
-          {(id || ds?.show_warehouse !== false) && lbl('คลังสินค้า', <select value={h.warehouse_id} onChange={e => set({ warehouse_id: e.target.value })}><option value="">คลังสินค้าหลัก</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>)}
+          {(id || ds?.show_warehouse !== false) && lbl('คลังสินค้า', <select value={h.warehouse_id} onChange={e => set({ warehouse_id: e.target.value })}>{needWh ? <option value="" disabled>เลือกคลังสินค้า</option> : <option value="">คลังสินค้าหลัก</option>}{warehouses.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>)}
         </div>
         <div style={{ marginTop: 8 }}>{lbl('รายละเอียด', <input value={h.description} onChange={e => set({ description: e.target.value })} />)}</div>
       </section>

@@ -25,7 +25,8 @@ export default async function Documents() {
         {lv('pur_vat_level', 'ภาษีมูลค่าเพิ่ม', '')}
         {lv('pur_discount_level', 'ส่วนลด', '(ท้ายเอกสาร = เปอร์เซ็นต์เดียวกันทุกบรรทัด)')}
         {lv('pur_wht_level', 'หัก ณ ที่จ่าย', '')}
-        <label><input type="checkbox" name="show_warehouse" value="1" defaultChecked={s.show_warehouse} /> แสดงคลังสินค้าในฟอร์มเอกสาร</label>
+        <label><input type="checkbox" name="show_warehouse" value="1" defaultChecked={s.show_warehouse} /> แสดงคลังสินค้าในฟอร์มเอกสาร (ปิด = ตัด/เพิ่มสต็อกที่คลังหลักเสมอ)</label>
+        <label><input type="checkbox" name="default_main_warehouse" value="1" defaultChecked={s.default_main_warehouse} /> ตั้ง 'คลังหลัก' เป็นค่าเริ่มต้นในหน้าเอกสาร (ปิด = ต้องเลือกคลังเองทุกครั้ง)</label>
         <label><input type="checkbox" name="multi_currency" value="1" defaultChecked={s.multi_currency} /> เปิดใช้งานหลายสกุลเงิน (ตั้งค่าที่เมนูสกุลเงิน)</label>
         <h3>หมายเหตุเอกสาร (ข้อความตั้งต้น)</h3>
         {REM.map(([k, l]) => <label key={k}>{l} <textarea name={'remark_' + k} rows={2} maxLength={1000} defaultValue={s.remarks?.[k] ?? ''} /></label>)}

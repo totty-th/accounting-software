@@ -2,7 +2,7 @@ import { can } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
 import { today } from '@/lib/db';
 import { poFormData } from '@/lib/po-data';
-import { defaultRemark, purchaseLevels } from '@/lib/doc-remarks';
+import { defaultRemark, purchaseLevels, warehouseSettings } from '@/lib/doc-remarks';
 import { PoForm } from '@/components/PoForm';
 
 export default async function NewRi() {
@@ -10,7 +10,7 @@ export default async function NewRi() {
   const d = await poFormData();
   return (<>
     <div className="top"><div><h1>สร้างใบรับสินค้า</h1><p className="sub">บันทึกแล้วสินค้าเข้าสต็อกและตั้งเจ้าหนี้ทันที</p></div></div>
-    <PoForm kind="RI" remark={await defaultRemark('RI')} lv={await purchaseLevels()} id={null} {...d} today={today()} purchaser={user.displayName || user.username}
+    <PoForm kind="RI" remark={await defaultRemark('RI')} lv={await purchaseLevels()} wh={await warehouseSettings()} id={null} {...d} today={today()} purchaser={user.displayName || user.username}
       canCreateVendor={can(user.role, 'contact.create')} canCreateProduct={can(user.role, 'master.write')} />
   </>);
 }

@@ -11,3 +11,9 @@ export async function purchaseLevels(): Promise<PurLevels> {
   const r = (await (await getDb()).q<any>(`select pur_vat_level v, pur_discount_level d, pur_wht_level w from doc_settings`))[0];
   return { vat: r?.v ?? 'line', discount: r?.d ?? 'line', wht: r?.w ?? 'line' };
 }
+
+/** ค่าตั้งคลังสินค้าบนเอกสาร: show = แสดงช่องเลือกคลัง · defMain = ตั้งคลังหลักเป็นค่าเริ่มต้น */
+export async function warehouseSettings(): Promise<{ show: boolean; defMain: boolean }> {
+  const r = (await (await getDb()).q<any>(`select show_warehouse s, default_main_warehouse d from doc_settings`))[0];
+  return { show: r?.s ?? true, defMain: r?.d ?? true };
+}
