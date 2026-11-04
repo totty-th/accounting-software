@@ -3,15 +3,11 @@ import { apiUser } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { periodRange } from '@/lib/period';
 import { reportPeriod, pgArr, periodLabel } from '@/lib/report-filter';
+import { paymentExportRows } from '@/lib/payment-report';
 import { companyOf, faSheet, faHead, faFormat, send, xDate } from '@/lib/fa-xlsx';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-const CH = `case pp.method when 'cash' then 'cash' when 'transfer' then 'transfer:' || pp.bank_account_id when 'card' then 'card:' || pp.credit_card_id
-  when 'petty' then 'petty:' || pp.petty_fund_id when 'cheque' then 'cheque:' || pp.bank_account_id end`;
-const GROUP = `case pp.method when 'cash' then 'เงินสด' when 'transfer' then 'โอน ' || coalesce(ba.bank_name || ' ' || ba.account_no, '')
-  when 'card' then 'บัตรเครดิต ' || coalesce(cc.card_name || ' ****' || cc.last4, '') when 'petty' then 'เงินสดย่อย ' || coalesce(pf.fund_name, '')
-  when 'cheque' then 'เช็ค ' || coalesce(ba.bank_name || ' ' || ba.account_no, '') end`;
 const KIND = { cash: 'เงินสด', transfer: 'โอน', card: 'บัตรเครดิต', petty: 'เงินสดย่อย', cheque: 'เช็ค' } as Record<string, string>;
 
 // GET /reports/payments/export?period=&from=&to=&ch= → Excel รายงานการชำระเงิน: 4 ชีตแบบ FA (สรุปตามช่องทาง / ตามเอกสาร / ตามช่องทาง 2 แบบ)
@@ -21,20 +17,7 @@ export async function GET(req: Request) {
   const period = reportPeriod(g('period')), range = periodRange(period, today(), g('from'), g('to'));
   const sel = u.searchParams.getAll('ch');
   const db = await getDb();
-  const rows = await db.q<any>(`select pp.doc_type, pp.doc_id, pp.line_no, pp.method, pp.pay_date, pp.amount, pp.cheque_no, pp.cheque_date, ${GROUP} grp, ${CH} key,
-      d.no, d.dt, d.net, d.wht, d.slip, c.business_name, c.contact_name,
-      (select coalesce(sum(p2.amount), 0) from purchase_payments p2 where p2.doc_type = pp.doc_type and p2.doc_id = pp.doc_id) doc_paid
-    from purchase_payments pp
-      left join bank_accounts ba on ba.id = pp.bank_account_id left join credit_cards cc on cc.id = pp.credit_card_id left join petty_funds pf on pf.id = pp.petty_fund_id
-      join lateral (select e.exp_no no, e.exp_date dt, e.contact_id, e.total net, e.wht_total wht, e.status,
-                           (select s.pay_no from payment_slip_items x join payment_slips s on s.id = x.slip_id where s.status = 'active' and x.doc_id = e.id limit 1) slip
-                      from expenses e where pp.doc_type = 'EXP' and e.id = pp.doc_id
-                    union all select g.ri_no, g.ri_date, g.contact_id, g.total, g.wht_total, g.status,
-                           (select s.pay_no from payment_slip_items x join payment_slips s on s.id = x.slip_id where s.status = 'active' and x.doc_id = g.id limit 1)
-                      from goods_receipts g where pp.doc_type = 'RI' and g.id = pp.doc_id) d on d.status <> 'cancelled'
-      join contacts c on c.id = d.contact_id
-    where ($1::date is null or pp.pay_date >= $1::date) and ($2::date is null or pp.pay_date <= $2::date)
-      and (cardinality($3::text[]) = 0 or ${CH} = any($3::text[])) order by pp.method, 9, pp.pay_date, d.no`, [range?.[0] ?? null, range?.[1] ?? null, pgArr(sel)]);
+  const rows = await paymentExportRows(db, range, sel);
   const co = await companyOf(db), pl = periodLabel(range);
   const wb = new ExcelJS.Workbook();
   const diff = (r: any) => Math.max(Number(r.net) - Number(r.wht) - Number(r.doc_paid), 0);
