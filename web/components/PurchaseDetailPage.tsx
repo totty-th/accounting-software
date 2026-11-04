@@ -27,6 +27,8 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
   const tbl = kind === 'EXP' ? 'expenses' : kind === 'RI' ? 'goods_receipts' : 'purchase_orders';
   const h = (await db.q<any>(`select t.*, c.business_name, c.contact_name, c.tax_id from ${tbl} t join contacts c on c.id=t.contact_id where t.id=$1`, [id]))[0];
   if (kind === 'PO') h.billed = (await db.q<any>('select po_billed($1) b', [id]))[0].b;
+  const splitLines = kind === 'PO' ? (await db.q<any>(`select l.line_no, coalesce(l.description, p.name) name, l.unit, l.qty, po_line_billed_qty(l.po_id, l.line_no) done
+    from purchase_order_lines l join products p on p.id = l.product_id where l.po_id = $1 order by l.line_no`, [id])).map((r: any) => ({ line_no: r.line_no, name: r.name, unit: r.unit ?? '', qty: Number(r.qty), done: Number(r.done) })) : [];
   const todayIso = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   const st = h.status as string;
   const pillKey = kind === 'PO' && st === 'pending' ? 'pending_approval' : st;
@@ -59,7 +61,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
           {kind === 'PO' && W && (st === 'pending' || st === 'approved') && <ActionButton label="สร้างใบรับสินค้า" action={A.upgradePoToRi.bind(null, id)} />}
           {kind === 'PO' && W && (st === 'pending' || st === 'approved' || st === 'partial') && (
             <details><summary className="btn ghost">แบ่งจ่ายใบรับสินค้า</summary>
-              <SplitRiForm poId={id} total={Number(h.total)} billed={Number(h.billed)} today={todayIso} /></details>)}
+              <SplitRiForm poId={id} total={Number(h.total)} billed={Number(h.billed)} today={todayIso} lines={splitLines} status={st} /></details>)}
           {kind === 'PO' && W && (st === 'pending' || st === 'approved') && <Link className="btn ghost" href={`/expenses/new?po=${id}`}>สร้างค่าใช้จ่าย</Link>}
           {kind !== 'PO' && W && payable.includes(st) && (
             <details><summary className="btn">จ่ายเงิน</summary>

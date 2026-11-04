@@ -354,6 +354,8 @@ export const cancelPurchaseOrder = async (id: string) => run(call('select cancel
 export const upgradePoToRi = async (id: string) => run(call('select upgrade_po_to_ri($1)', id), PO, 'expenses.write');
 export const splitPoToRi = async (id: string, date: string, mode: 'percent' | 'amount', value: number, receiveStock: boolean) =>
   run(call('select split_ri_from_po($1,$2::date,$3,$4,$5)', id, date, mode, value, receiveStock), PO, 'expenses.write');
+export const splitPoToRiQty = async (id: string, date: string, qtys: { line_no: number; qty: number }[]) =>
+  run(call('select split_ri_from_po_qty($1,$2::date,$3::jsonb)', id, date, JSON.stringify(qtys)), PO, 'expenses.write');
 // ใบเตรียมจ่าย
 const SLIP = [...ALL, '/payments', '/purchases'];
 export async function createPaymentSlip(p: { date: string; due: string; docs: { type: string; id: string }[]; preparer?: string; requester?: string; approver?: string; reason?: string }) {

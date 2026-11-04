@@ -101,13 +101,14 @@ describe('M11 สต็อกต่อบรรทัดของ CN/DN ตา�
     expect([await onHand(a), await onHand(c)]).toEqual([40, 45]);
   });
 
-  it('คืนเกินจำนวนที่ขายไม่ได้ · ออก CN ซ้ำไม่ได้ (แม้ฉบับก่อนยกเลิก)', async () => {
+  it('คืนเกินจำนวนที่ขายไม่ได้ · ออก CN หลายใบได้แต่จำนวนคืนสะสมต้องไม่เกิน (0075)', async () => {
     const i = await inv([L(a, 10, 1200)]);
     expect(await err(adj('CN', i, [L(a, 11, 1, 'return')]))).toContain('เกินจำนวน');
     const cn = (await adj('CN', i, [L(a, 8, 1200, 'return')])).id;
-    expect(await err(adj('CN', i, [L(a, 2, 1200, 'return')]))).toContain('เคยถูกสร้างเป็นใบลดหนี้');
+    expect(await err(adj('CN', i, [L(a, 3, 1200, 'return')]))).toContain('เกินจำนวน');   // 8+3 > 10
+    expect(await err(adj('CN', i, [L(a, 2, 1200, 'return')]))).toBe('');                 // 8+2 = 10 ได้
     await call('select cancel_sales_doc($1)', [cn]);
-    expect(await err(adj('CN', i, [L(a, 2, 1200, 'return')]))).toContain('เคยถูกสร้างเป็นใบลดหนี้');
+    expect(await err(adj('CN', i, [L(a, 8, 1200, 'return')]))).toBe('');                 // ยกเลิกแล้วโควตากลับมา
   });
 
   it('ตัวเลือกสต็อกผิดประเภทถูกปฏิเสธ', async () => {
