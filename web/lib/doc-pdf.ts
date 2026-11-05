@@ -59,17 +59,18 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
 
   const emb = async (s?: string | null) => { if (!s) return null; const m = /^data:image\/(png|jpeg);base64,(.+)$/.exec(s); if (!m) return null;
     try { const b = Buffer.from(m[2], 'base64'); return m[1] === 'png' ? await pdf.embedPng(b) : await pdf.embedJpg(b); } catch { return null; } };
-  const logoImg = dz?.logo !== false ? await emb(v.images?.logo) : null, stampImg = dz?.stamp !== false ? await emb(v.images?.stamp) : null;
+  const logoImg = dz?.logo !== false ? await emb(v.images?.logo) : null, stampImg = dz?.stamp !== false ? await emb(v.images?.stamp) : null, sigImg = await emb(v.images?.signature);
   // กระดาษต่อเนื่องของ FA = 612x792 pt (8.5x11 นิ้ว, อ่านจาก MediaBox ของ PDF ตัวอย่าง FA 4-11-2026) · A4 = 595x842
   const cont = dz?.paper === 'continuous'; const L = 42, R = 553, W = cont ? 612 : 595, H = cont ? 792 : 842;
   const sheet = (label: string) => {
     let page = pdf.addPage([W, H]); let y = H - 48;
     if (!cont) page.drawRectangle({ x: 0, y: H - 14, width: W, height: 14, color: col });
     // หัว: บริษัท (ซ้าย) / ชื่อเอกสาร (ขวา)
-    const lk = logoImg ? Math.min(1, 150 / logoImg.width, 40 / logoImg.height) : 0;
-    if (logoImg && !dlv) { page.drawImage(logoImg, { x: L, y: y - logoImg.height * lk + 10, width: logoImg.width * lk, height: logoImg.height * lk }); y -= logoImg.height * lk + 4; }
+    // โลโก้อยู่กลางหัวเอกสาร (ใหญ่ขึ้น ไม่กินที่แถวบริษัท)
+    const lk = logoImg ? Math.min(1, 140 / logoImg.width, 62 / logoImg.height) : 0;
+    if (logoImg && !dlv) page.drawImage(logoImg, { x: 330 - (logoImg.width * lk) / 2, y: y + 14 - logoImg.height * lk, width: logoImg.width * lk, height: logoImg.height * lk });
     // คอลัมน์ซ้าย (บริษัท กว้าง 285) / คอลัมน์ขวา (ชื่อเอกสาร กว้าง 205) — ตัดบรรทัดตามความกว้างจริงของตัวหนา ไม่ให้ทับกัน
-    const LW = 285, RW = 205;
+    const LW = logoImg && !dlv ? 215 : 285, RW = logoImg && !dlv ? 150 : 205;
     const wrapB = (s: string, size: number, maxW: number, bold: boolean, seps: RegExp) => {
       const out: string[] = []; let cur = '';
       const flush = () => { if (cur) { out.push(cur); cur = ''; } };
@@ -182,12 +183,17 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     const sy = 84;
     if (dlv || v.doc.show_signature !== false) [[L, signL, v.contact.name], [312, signR, v.company?.name ?? '']].forEach(([x, cap, who]) => {
       const xx = x as number;
-      draw(page, `ในนาม ${who}`, xx, sy + 52, 9.5, { color: grey });
-      if (!dlv && stampImg && xx > 300) { const k = Math.min(1, 90 / stampImg.width, 56 / stampImg.height); page.drawImage(stampImg, { x: xx + 40, y: sy + 16, width: stampImg.width * k, height: stampImg.height * k, opacity: 0.9 }); }
+      draw(page, `ในนาม ${who}`, xx, sy + 70, 9.5, { color: grey });
+      // ลายเซ็น (ซ้ายของช่อง) และตราประทับ (ขวาของช่อง) อยู่เหนือเส้นเซ็น ไม่ทับข้อความ
+      if (!dlv && xx > 300) {
+        if (sigImg) { const k = Math.min(1, 125 / sigImg.width, 48 / sigImg.height); page.drawImage(sigImg, { x: xx + 6, y: sy + 17, width: sigImg.width * k, height: sigImg.height * k }); }
+        if (stampImg) { const k = Math.min(1, 88 / stampImg.width, 48 / stampImg.height); page.drawImage(stampImg, { x: xx + 150, y: sy + 17, width: stampImg.width * k, height: stampImg.height * k, opacity: 0.9 }); }
+      }
       page.drawLine({ start: { x: xx, y: sy + 14 }, end: { x: xx + 138, y: sy + 14 }, thickness: 0.6, color: grey });
       page.drawLine({ start: { x: xx + 148, y: sy + 14 }, end: { x: xx + 238, y: sy + 14 }, thickness: 0.6, color: grey });
       draw(page, cap as string, xx + 69 - width(cap as string, 9.5) / 2, sy, 9.5, { color: grey });
       draw(page, 'วันที่', xx + 193 - width('วันที่', 9.5) / 2, sy, 9.5, { color: grey });
+      if (!dlv && xx > 300 && v.doc.salesperson) draw(page, `(${v.doc.salesperson})`, xx + 69 - width(`(${v.doc.salesperson})`, 9.5) / 2, sy - 13, 9.5, { color: grey });
     });
     if (v.doc.status === 'cancelled') {
       const wm = 'ยกเลิก', size = 110, wmW = width(wm, size);

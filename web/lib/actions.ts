@@ -336,6 +336,16 @@ export async function quickCreateProduct(p: { code: string; name: string; unit: 
     [p.code.trim(), p.name.trim(), p.unit.trim() || 'ชิ้น', p.buy || 0]))[0]; }, ['/products', '/stock', '/purchases/orders'], 'master.write');
   return { ...r, product: out };
 }
+export async function saveMySignature(f: FormData): Promise<void> {
+  await run(async u => {
+    const db = await getDb();
+    if (f.get('clear') === '1') { await db.q('update app_users set signature_img=null where id=$1', [u.id]); return; }
+    const file = f.get('signature') as File | null;
+    if (!file || !file.size) throw new Error('กรุณาเลือกไฟล์ลายเซ็น');
+    if (file.size > 600 * 1024) throw new Error('รูปใหญ่เกิน 600 KB'); if (!/^image\/(png|jpeg)$/.test(file.type)) throw new Error('รองรับเฉพาะ PNG/JPG');
+    await db.q('update app_users set signature_img=$1 where id=$2', [`data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`, u.id]);
+  }, ['/settings/my-signature'], () => true);
+}
 export async function saveSignatures(f: FormData): Promise<void> {
   const img = async (k: string) => { const file = f.get(k) as File | null; if (!file || !file.size) return null;
     if (file.size > 600 * 1024) throw new Error('รูปใหญ่เกิน 600 KB'); if (!/^image\/(png|jpeg)$/.test(file.type)) throw new Error('รองรับเฉพาะ PNG/JPG');

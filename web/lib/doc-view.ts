@@ -36,8 +36,9 @@ export async function loadView(key: string): Promise<DocView | null> {
       'select u.display_name as n from sales_docs d left join app_users u on u.id = d.created_by where d.id = $1', [id]))[0]?.n ?? null);
     const { resolveDesign } = await import('./doc-design');
     v.design = resolveDesign(await db.q<any>('select scope, settings from doc_design'), v.doc.doc_type);
+    const sg = (await db.q<any>('select u.signature_img from sales_docs d left join app_users u on u.id = d.created_by where d.id = $1', [id]))[0];
     const im = (await db.q<any>('select logo_img, stamp_img, signature_img, name_en, address_en, phone, email, website, signer_name from company_profile limit 1'))[0];
-    v.images = { logo: im?.logo_img ?? null, stamp: im?.stamp_img ?? null, signature: im?.signature_img ?? null };
+    v.images = { logo: im?.logo_img ?? null, stamp: im?.stamp_img ?? null, signature: sg?.signature_img ?? null };   // ลายเซ็นของผู้สร้างเอกสาร (พนักงานขาย) ไม่ใช่ของบริษัท
     if (v.company && im) v.company = { ...v.company, name_en: im.name_en, address_en: im.address_en, phone: im.phone, email: im.email, website: im.website, signer_name: im.signer_name };
     const ct = (await db.q<any>('select contact_name, phone_office, person_mobile from contacts where id=$1', [v.contact.id]))[0];
     if (ct) v.contact = { ...v.contact, person: ct.contact_name, phone: [ct.phone_office, ct.person_mobile].filter(Boolean).join(' / ') || null };

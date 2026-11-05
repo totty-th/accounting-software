@@ -45,7 +45,7 @@ export async function buildBrandedPdf(v: DocView, mode: 'original' | 'copy' | 'b
   const sheet = (label: string) => {
     const page = pdf.addPage([W, H]); let y = H - 50;
     // ซ้าย: บริษัท
-    let cy = y; const LW = 250;
+    let cy = y; const LW = logo ? 215 : 280;
     for (const ln of wrap(co?.name ?? '', 13, LW, true)) { draw(page, ln, L, cy, 13, { bold: true, color: navy }); cy -= 16; }
     if (co?.name_en) { for (const ln of wrap(co.name_en, 10, LW, true)) { draw(page, ln, L, cy, 10, { bold: true, color: navy }); cy -= 13; } }
     cy -= 2;
@@ -53,10 +53,10 @@ export async function buildBrandedPdf(v: DocView, mode: 'original' | 'copy' | 'b
     const mail = [co?.email, co?.website].filter(Boolean).join(' | ');
     for (const ln of [...wrap(co?.address ?? '', 8.5, LW), ...(contact ? wrap(contact, 8.5, LW) : []), ...(mail ? wrap(mail, 8.5, LW) : [])]) { draw(page, ln, L, cy, 8.5, { color: grey }); cy -= 11.5; }
     // กลาง: โลโก้
-    if (logo) { const k = Math.min(1, 150 / logo.width, 56 / logo.height); page.drawImage(logo, { x: 300 - 40 + (150 - logo.width * k) / 2 - 20, y: H - 50 - logo.height * k + 8, width: logo.width * k, height: logo.height * k }); }
+    if (logo) { const k = Math.min(1, 140 / logo.width, 60 / logo.height); page.drawImage(logo, { x: 330 - (logo.width * k) / 2, y: H - 50 - logo.height * k + 14, width: logo.width * k, height: logo.height * k }); }
     // ขวา: ชื่อเอกสาร
     let ry = y;
-    for (const ln of wrap(title, 19, 150, true)) { draw(page, ln, R, ry - 4, 19, { bold: true, right: true, color: navy }); ry -= 22; }
+    for (const ln of wrap(title, 19, logo ? 150 : 200, true)) { draw(page, ln, R, ry - 4, 19, { bold: true, right: true, color: navy }); ry -= 22; }
     draw(page, EN_TITLE[type] ?? '', R, ry, 9, { right: true, color: grey }); ry -= 13;
     draw(page, `เลขที่: ${v.doc.doc_no}`, R, ry, 9.5, { right: true }); ry -= 13;
     if (dz.copy_mark !== false) { draw(page, label, R, ry, 9, { right: true, color: grey }); ry -= 12; }
@@ -159,7 +159,7 @@ export async function buildBrandedPdf(v: DocView, mode: 'original' | 'copy' | 'b
       if (stamp) { const k = Math.min(1, 110 / stamp.width, 50 / stamp.height); page.drawImage(stamp, { x: 297 - (stamp.width * k) / 2, y: sy - 4, width: stamp.width * k, height: stamp.height * k }); }
       draw(page, 'ตราประทับบริษัท', 297, sy - 13, 9.5, { center: true });
       const rx = 440;
-      if (sig) { const k = Math.min(1, 100 / sig.width, 40 / sig.height); page.drawImage(sig, { x: rx - (sig.width * k) / 2, y: sy + 4, width: sig.width * k, height: sig.height * k }); }
+      if (sig) { const k = Math.min(1, 110 / sig.width, 38 / sig.height); page.drawImage(sig, { x: rx - (sig.width * k) / 2, y: sy + 18, width: sig.width * k, height: sig.height * k }); }
       if (co?.signer_name) draw(page, co.signer_name, rx, sy + 4 + (sig ? 0 : 0), 10.5, { bold: true, center: true, color: navy });
       page.drawLine({ start: { x: rx - 85, y: sy }, end: { x: rx + 85, y: sy }, thickness: 0.7, color: navy });
       if (v.doc.salesperson) { draw(page, v.doc.salesperson, rx, sy - 13, 9.5, { center: true }); draw(page, 'พนักงานขาย', rx, sy - 26, 9.5, { center: true }); }

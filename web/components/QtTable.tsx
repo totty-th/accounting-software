@@ -19,8 +19,9 @@ const toneColor: Record<string, string> = { green: '#1f9d55', orange: '#d97706',
 
 type Item = { label: string; run?: () => Promise<any>; href?: string; danger?: boolean; confirm?: boolean };
 
-function itemsFor(r: QtRow, W: boolean, AP: boolean, onDeposit: (r: QtRow, k: 'INV' | 'CA' | 'BL') => void): Item[] {
+function itemsFor(r: QtRow, W: boolean, AP: boolean, canEdit: boolean, onDeposit: (r: QtRow, k: 'INV' | 'CA' | 'BL') => void): Item[] {
   const s = r.status, out: Item[] = [];
+  if (canEdit && s === 'pending_approval') out.push({ label: 'แก้ไข', href: `/sales/${r.doc_no}/edit` });
   const bill = W && ['pending_approval', 'approved', 'partial'].includes(s);
   if (AP && s === 'pending_approval') out.push({ label: 'อนุมัติ', run: () => A.approveQuote(r.id) });
   if (W && s === 'approved') out.push({ label: 'ดำเนินการแล้ว', run: () => A.closeQuotation(r.id), confirm: true });
@@ -100,7 +101,7 @@ export function QtTable({ rows, canWrite, canApprove, canOwn, exportHref }: { ro
             <tbody>{rows.map(r => {
               const [label, tone] = STATUS[r.status] ?? [r.status, 'grey'];
               const dim = r.status === 'rejected' || r.status === 'cancelled';
-              const its = itemsFor(r, canWrite, canApprove, (x, k) => { setDep(x); setDepKind(k); setDepNet(''); });
+              const its = itemsFor(r, canWrite, canApprove, canWrite || canOwn, (x, k) => { setDep(x); setDepKind(k); setDepNet(''); });
               const more: Item[] = [
                 ...((W) && r.status === 'pending_approval' ? [{ label: 'แก้ไข', href: `/sales/${r.doc_no}/edit` }] : []),
                 { label: 'พิมพ์', href: `/sales/${r.doc_no}/pdf` }, { label: 'แชร์', href: `/sales/${r.doc_no}` },
