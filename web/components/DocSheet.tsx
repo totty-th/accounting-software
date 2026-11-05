@@ -76,10 +76,11 @@ export function DocSheet({ v, copy = false }: { v: DocView; copy?: boolean }) {
           <span>{p.kind === 'cash' ? 'เงินสด' : p.kind === 'transfer' ? `โอนเงิน ${p.bank ?? ''} ${p.branch ? `สาขา${p.branch} ` : ''}เลขที่บัญชี ${p.account_no ?? ''} ชื่อบัญชี ${p.account_name ?? ''}` : `เช็คสั่งจ่ายในนาม ${p.cheque_payee ?? ''}`}{p.remark ? ` (${p.remark})` : ''}</span>
           {p.qr_img && <img alt="QR" src={p.qr_img} style={{ height: 56 }} />}</div>)}</section>}
       {v.doc.show_signature !== false && <footer className="sh-sign">
-        <div><span className="on">ในนาม {v.contact.name}</span><div className="sh-sg" /><i />{signL} / วันที่</div>
+        <div><span className="on">ในนาม {v.contact.name}</span><div className="sh-sg" /><i />{signL}<br />วันที่ ___/___/______</div>
+        <div className="sh-mid"><span className="on">&nbsp;</span><div className="sh-sg">{d.stamp && v.images?.stamp && <img className="sh-stamp" alt="ตรายาง" src={v.images.stamp} />}</div><i style={{ borderTopColor: 'transparent' }} />ตราประทับบริษัท</div>
         <div><span className="on">ในนาม {v.company?.name ?? ''}</span>
-          <div className="sh-sg">{v.images?.signature && <img className="sh-sig" alt="ลายเซ็น" src={v.images.signature} />}{d.stamp && v.images?.stamp && <img className="sh-stamp" alt="ตรายาง" src={v.images.stamp} />}</div>
-          <i />{signR}{v.doc.salesperson ? ` (${v.doc.salesperson})` : ''} / วันที่</div>
+          <div className="sh-sg">{v.images?.signature && <img className="sh-sig" alt="ลายเซ็น" src={v.images.signature} />}</div>
+          <i />{signR}{v.doc.salesperson ? <><br />({v.doc.salesperson})</> : null}<br />วันที่ ___/___/______</div>
       </footer>}
     </article>
   );

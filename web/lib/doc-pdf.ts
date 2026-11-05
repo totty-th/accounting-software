@@ -181,7 +181,21 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     }
     // ลายเซ็น (ในนาม + ช่องเซ็น + วันที่)
     const sy = 84;
-    if (dlv || v.doc.show_signature !== false) [[L, signL, v.contact.name], [312, signR, v.company?.name ?? '']].forEach(([x, cap, who]) => {
+    if (!dlv && v.doc.show_signature !== false) {   // ซ้าย = ลูกค้าเซ็น · กลางค่อนขวา = ตราประทับบริษัท · ขวา = ฝ่ายขาย (ลายเซ็นพนักงานขาย)
+      const R0 = R - 170, mid = 322;
+      const nm = (t: string, x: number) => wrap(`ในนาม ${t}`, 9.5, 180).slice(0, 2).forEach((ln, i) => draw(page, ln, x, sy + 84 - i * 11, 9.5, { color: grey }));
+      nm(v.contact.name, L); nm(v.company?.name ?? '', R0);
+      page.drawLine({ start: { x: L, y: sy + 14 }, end: { x: L + 170, y: sy + 14 }, thickness: 0.6, color: grey });
+      draw(page, signL, L + 85 - width(signL, 9.5) / 2, sy, 9.5, { color: grey });
+      draw(page, 'วันที่ ___/___/______', L + 85 - width('วันที่ ___/___/______', 9.5) / 2, sy - 13, 9.5, { color: grey });
+      if (stampImg) { const k = Math.min(1, 100 / stampImg.width, 54 / stampImg.height); page.drawImage(stampImg, { x: mid - (stampImg.width * k) / 2, y: sy + 17, width: stampImg.width * k, height: stampImg.height * k, opacity: 0.9 }); }
+      draw(page, 'ตราประทับบริษัท', mid - width('ตราประทับบริษัท', 9.5) / 2, sy, 9.5, { color: grey });
+      if (sigImg) { const k = Math.min(1, 150 / sigImg.width, 44 / sigImg.height); page.drawImage(sigImg, { x: R0 + 85 - (sigImg.width * k) / 2, y: sy + 17, width: sigImg.width * k, height: sigImg.height * k }); }
+      page.drawLine({ start: { x: R0, y: sy + 14 }, end: { x: R0 + 170, y: sy + 14 }, thickness: 0.6, color: grey });
+      draw(page, signR, R0 + 85 - width(signR, 9.5) / 2, sy, 9.5, { color: grey });
+      if (v.doc.salesperson) draw(page, `(${v.doc.salesperson})`, R0 + 85 - width(`(${v.doc.salesperson})`, 9.5) / 2, sy - 13, 9.5, { color: grey });
+    }
+    if (dlv) [[L, signL, v.contact.name], [312, signR, v.company?.name ?? '']].forEach(([x, cap, who]) => {
       const xx = x as number;
       draw(page, `ในนาม ${who}`, xx, sy + 70, 9.5, { color: grey });
       // ลายเซ็น (ซ้ายของช่อง) และตราประทับ (ขวาของช่อง) อยู่เหนือเส้นเซ็น ไม่ทับข้อความ

@@ -156,8 +156,8 @@ export async function buildBrandedPdf(v: DocView, mode: 'original' | 'copy' | 'b
       const sy = Math.max(y - 70, 70);
       page.drawLine({ start: { x: L + 20, y: sy }, end: { x: L + 190, y: sy }, thickness: 0.7, color: ink });
       draw(page, leftCap, L + 105, sy - 13, 9.5, { center: true }); draw(page, 'วันที่ ___/___/______', L + 105, sy - 26, 9.5, { center: true });
-      if (stamp) { const k = Math.min(1, 110 / stamp.width, 50 / stamp.height); page.drawImage(stamp, { x: 297 - (stamp.width * k) / 2, y: sy - 4, width: stamp.width * k, height: stamp.height * k }); }
-      draw(page, 'ตราประทับบริษัท', 297, sy - 13, 9.5, { center: true });
+      if (stamp) { const k = Math.min(1, 110 / stamp.width, 50 / stamp.height); page.drawImage(stamp, { x: 318 - (stamp.width * k) / 2, y: sy - 4, width: stamp.width * k, height: stamp.height * k }); }
+      draw(page, 'ตราประทับบริษัท', 318, sy - 13, 9.5, { center: true });
       const rx = 440;
       if (sig) { const k = Math.min(1, 110 / sig.width, 38 / sig.height); page.drawImage(sig, { x: rx - (sig.width * k) / 2, y: sy + 18, width: sig.width * k, height: sig.height * k }); }
       if (co?.signer_name) draw(page, co.signer_name, rx, sy + 4 + (sig ? 0 : 0), 10.5, { bold: true, center: true, color: navy });
