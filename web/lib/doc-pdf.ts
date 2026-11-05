@@ -4,6 +4,7 @@ import { PDFDocument, PDFFont, PDFPage, rgb, degrees } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { DOC_TITLE, type DocView } from './doc-view';
 import { bahtText } from './wht-pdf';
+import { buildBrandedPdf } from './doc-pdf-branded';
 import { buildPrintshopPdf, supportsPrintshop } from './doc-printshop';
 import { docSummary, isFull, lineTaxLabel, lineWhtLabel, shipRows, SIGNERS } from './doc-calc';
 
@@ -22,6 +23,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
   const dlv = kind === 'delivery';
   if (!dlv && v.design?.paper === 'continuous' && v.design.paper_format === 'printshop' && supportsPrintshop(v))   // แบบโรงพิมพ์: พิมพ์เฉพาะข้อมูลลงแบบฟอร์มสำเร็จรูป
     return buildPrintshopPdf({ v, docType: v.doc.doc_type, company: v.company, blank: false });
+  if (!dlv && v.design?.layout === 'branded' && v.design.paper !== 'continuous' && v.doc.doc_type !== 'RE') return buildBrandedPdf(v, mode);
   const qt = v.doc.doc_type === 'QT', full = isFull(v), showTax = v.doc.doc_type !== 'BL';
   const dir = ASSETS();
   const pdf = await PDFDocument.create();

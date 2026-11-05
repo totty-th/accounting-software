@@ -24,6 +24,8 @@ export default async function Company() {
         <label>เบอร์มือถือ <input name="mobile" defaultValue={c?.mobile ?? ''} /></label>
         <label>เบอร์โทรสาร <input name="fax" defaultValue={c?.fax ?? ''} /></label>
         <label>เว็บไซต์ <input name="website" defaultValue={c?.website ?? ''} /></label>
+        <label>อีเมล <input name="email" type="email" defaultValue={c?.email ?? ''} /></label>
+        <label>ชื่อผู้มีอำนาจลงนาม (แสดงใต้ลายเซ็นบนเอกสารขายแบบแบรนด์) <input name="signer_name" defaultValue={c?.signer_name ?? ''} /></label>
         <h3>ข้อมูลภาษาอังกฤษ</h3>
         <label>ชื่อธุรกิจ (EN) <input name="name_en" defaultValue={c?.name_en ?? ''} /></label>
         <label>ที่อยู่ (EN) <input name="address_en" defaultValue={c?.address_en ?? ''} /></label>

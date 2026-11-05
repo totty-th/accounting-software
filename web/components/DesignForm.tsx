@@ -45,6 +45,13 @@ export function DesignForm({ init, canWrite, samples = {} }: { init: Rows; canWr
         <button type="button" className={`chip${adv ? ' on' : ''}`} onClick={() => setAdv(true)}>ขั้นสูง</button></div>
       <p className="sub">{adv ? 'ตั้งแยกตามชนิดเอกสาร — ค่าที่ไม่ได้ตั้งเฉพาะชนิดจะใช้ค่าของโหมดเรียบง่าย' : 'ตั้งครั้งเดียวใช้กับทุกเอกสารขาย'}</p>
       {adv && <label>ชนิดเอกสาร<select value={type} onChange={e => setType(e.target.value)}>{DESIGN_TYPES.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>}
+      <fieldset style={{ display: 'grid', gap: 8 }}><legend>รูปแบบหน้าตาเอกสาร (PDF)</legend>
+        <label>เลย์เอาต์<select value={base.layout} disabled={!canWrite} onChange={e => set('layout', e.target.value as DocDesign['layout'])}>
+          <option value="standard">มาตรฐาน</option><option value="branded">แบรนด์ (โลโก้กลางหัวเอกสาร กล่องลูกค้า ตราประทับ/ผู้ลงนามท้ายเอกสาร)</option></select></label>
+        {base.layout === 'branded' && <>
+          <label>รหัสแบบฟอร์ม (แสดงท้ายหน้า เช่น FM-SA-01-01 Rev.01)<input value={base.form_code} maxLength={40} disabled={!canWrite} onChange={e => set('form_code', e.target.value)} /></label>
+          <span className="sub">แบบแบรนด์ใช้กับกระดาษ A4 · ตั้งโลโก้ ตรายาง ลายเซ็น อีเมล และชื่อผู้ลงนามที่ ตั้งค่า → ข้อมูลบริษัท · ชื่อผู้ติดต่อ/เบอร์ลูกค้าดึงจากรายชื่อลูกค้า</span></>}
+      </fieldset>
       <fieldset style={{ display: 'grid', gap: 8 }}><legend>รูปแบบกระดาษ</legend>
         <div className="acts" style={{ justifyContent: 'flex-start', gap: 16 }}><b>ขนาด</b>
           <label><input type="radio" checked={base.paper === 'a4'} disabled={!canWrite} onChange={() => set('paper', 'a4')} /> A4</label>

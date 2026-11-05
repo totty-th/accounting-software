@@ -7,10 +7,10 @@ export interface DocView {
     term_mode?: string; credit_days?: number; salesperson_name?: string | null; project?: string | null; ref_no?: string | null; description?: string | null;
     show_signature?: boolean; note?: string | null; discount_total?: string | number; exempt_base?: string | number; wht_total?: string | number;
     delivery_mode?: 'pickup' | 'ship' | null; ship_name?: string | null; ship_address?: string | null; ship_phone?: string | null; carrier?: string | null; delivery_note?: string | null };
-  contact: { id: string; name: string; address: string | null; tax_id: string | null; credit_days: number };
-  company: { name: string; address: string | null; tax_id: string | null } | null;
+  contact: { id: string; name: string; address: string | null; tax_id: string | null; credit_days: number; person?: string | null; phone?: string | null };
+  company: { name: string; address: string | null; tax_id: string | null; name_en?: string | null; address_en?: string | null; phone?: string | null; email?: string | null; website?: string | null; signer_name?: string | null } | null;
   payInfo?: { kind: string; bank: string | null; account_no: string | null; account_name: string | null; branch: string | null; cheque_payee: string | null; remark: string | null; qr_img: string | null }[];
-  design?: import('./doc-design').DocDesign; images?: { logo: string | null; stamp: string | null };
+  design?: import('./doc-design').DocDesign; images?: { logo: string | null; stamp: string | null; signature?: string | null };
   lines: { line_no: number; description: string; item_kind: string; qty: string | number; unit_price: string | number; amount: string | number;
     unit?: string | null; detail?: string | null; discount?: string | number; discount_type?: string; discount_value?: string | number; vat_rate?: string | number | null; vat_exempt?: boolean; wht_rate?: string | number; wht?: string | number }[];
   ref: { id: string; doc_no: string; doc_type: string; doc_date: string; subtotal: string | number; total: string | number } | null;
@@ -36,8 +36,11 @@ export async function loadView(key: string): Promise<DocView | null> {
       'select u.display_name as n from sales_docs d left join app_users u on u.id = d.created_by where d.id = $1', [id]))[0]?.n ?? null);
     const { resolveDesign } = await import('./doc-design');
     v.design = resolveDesign(await db.q<any>('select scope, settings from doc_design'), v.doc.doc_type);
-    const im = (await db.q<any>('select logo_img, stamp_img from company_profile limit 1'))[0];
-    v.images = { logo: im?.logo_img ?? null, stamp: im?.stamp_img ?? null };
+    const im = (await db.q<any>('select logo_img, stamp_img, signature_img, name_en, address_en, phone, email, website, signer_name from company_profile limit 1'))[0];
+    v.images = { logo: im?.logo_img ?? null, stamp: im?.stamp_img ?? null, signature: im?.signature_img ?? null };
+    if (v.company && im) v.company = { ...v.company, name_en: im.name_en, address_en: im.address_en, phone: im.phone, email: im.email, website: im.website, signer_name: im.signer_name };
+    const ct = (await db.q<any>('select contact_name, phone_office, person_mobile from contacts where id=$1', [v.contact.id]))[0];
+    if (ct) v.contact = { ...v.contact, person: ct.contact_name, phone: [ct.phone_office, ct.person_mobile].filter(Boolean).join(' / ') || null };
     v.payInfo = await db.q<any>('select kind, bank, account_no, account_name, branch, cheque_payee, remark, qr_img from payment_infos where is_active order by sort_no, created_at');
     return v;
   } catch { return null; }

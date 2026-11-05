@@ -38,5 +38,5 @@ export function SalesActions({ d, role, detail = false }: { d: any; role: Role; 
   if (W && d.doc_type === 'BL' && d.is_deposit && s === 'billed') out.push(b('สร้างใบแจ้งหนี้มัดจำ (ลงบัญชี)', A.convertDepositBl.bind(null, d.id), ''));
   if (W && (d.doc_type === 'CN' || d.doc_type === 'DN') && s === 'cancelled') out.push(b('รีเซ็ต', A.restoreSalesDoc.bind(null, d.id), '', 'c'));
   if ((W || (can(role, 'quote.own') && d.doc_type === 'QT')) && s !== 'cancelled' && s !== 'converted' && s !== 'rejected') out.push(cancel);
-  return detail ? <>{out}</> : <ActsMenu>{out}</ActsMenu>;
+  return detail ? <>{out}</> : <ActsMenu float>{out}</ActsMenu>;
 }
