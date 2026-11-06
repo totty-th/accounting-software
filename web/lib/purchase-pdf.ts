@@ -55,7 +55,7 @@ export async function loadPurchaseView(kind: PKind, id: string): Promise<PView |
   if (kind === 'PO') {
     const h = (await db.q('select * from purchase_orders where id=$1', [id]))[0];
     if (!h) return null;
-    const ls = await db.q(`select l.*, p.code, p.name from purchase_order_lines l join products p on p.id=l.product_id where po_id=$1 order by line_no`, [id]);
+    const ls = await db.q(`select l.*, p.code, p.name, p.base_unit from purchase_order_lines l join products p on p.id=l.product_id where po_id=$1 order by line_no`, [id]);
     const pt = (await party(h.contact_id)) as PView['party'];
     const sub = +h.subtotal, disc = +h.discount_total;
     const meta: [string, string][] = [];
@@ -67,7 +67,7 @@ export async function loadPurchaseView(kind: PKind, id: string): Promise<PView |
     return { kind, title: 'ใบสั่งซื้อ', no: h.po_no, date: h.po_date, status: h.status, company, party: pt, meta,
       cols: [{ h: '#', w: 20 }, { h: 'รายละเอียด', w: 150 }, { h: 'จำนวน', right: true, w: 45 }, { h: 'หน่วย', w: 38 }, { h: 'ราคาต่อหน่วย', right: true, w: 62 },
         { h: 'ส่วนลด', right: true, w: 48 }, { h: 'ภาษี', right: true, w: 40 }, { h: 'หัก ณ ที่จ่าย', right: true, w: 52 }, { h: 'มูลค่า', right: true, w: 56 }],
-      rows: ls.map(l => [String(l.line_no), `${l.code} ${l.name}${l.description ? '\n' + l.description : ''}`, qty(l.qty), l.unit ?? '', fmt(l.unit_price),
+      rows: ls.map(l => [String(l.line_no), `${l.code} ${l.name}${l.description ? '\n' + l.description : ''}${l.stock_qty != null ? `\nรับเข้าสต็อก ${qty(l.stock_qty)} ${l.base_unit}` : ''}`, qty(l.qty), l.unit ?? '', fmt(l.unit_price),
         +l.discount ? (l.discount_type === 'percent' ? `${qty(l.discount_value)}%` : fmt(l.discount)) : '', l.vat_exempt ? 'ยกเว้น' : `${qty(l.vat_rate)}%`,
         +l.wht_rate ? `${qty(l.wht_rate)}%` : 'ไม่หัก', fmt(l.price_mode === 'inclusive' ? +l.net + +l.vat : l.net)]),
       totals: [['รวมเป็นเงิน', fmt(sub + disc)], ['ส่วนลดรวม', fmt(disc)], ['ราคาหลังหักส่วนลด', fmt(sub)],
@@ -80,7 +80,7 @@ export async function loadPurchaseView(kind: PKind, id: string): Promise<PView |
   if (kind === 'RI') {
     const h = (await db.q('select * from goods_receipts where id=$1', [id]))[0];
     if (!h) return null;
-    const ls = await db.q(`select l.*, p.code, p.name from goods_receipt_lines l join products p on p.id=l.product_id where ri_id=$1 order by line_no`, [id]);
+    const ls = await db.q(`select l.*, p.code, p.name, p.base_unit from goods_receipt_lines l join products p on p.id=l.product_id where ri_id=$1 order by line_no`, [id]);
     const pt = (await party(h.contact_id)) as PView['party'];
     const sub = +h.subtotal, disc = +h.discount_total, wht = +h.wht_total;
     const meta: [string, string][] = [];
@@ -91,7 +91,7 @@ export async function loadPurchaseView(kind: PKind, id: string): Promise<PView |
     return { kind, title: 'ใบรับสินค้า', no: h.ri_no, date: h.ri_date, status: h.status, company, party: pt, meta,
       cols: [{ h: '#', w: 20 }, { h: 'รายละเอียด', w: 150 }, { h: 'จำนวน', right: true, w: 45 }, { h: 'หน่วย', w: 38 }, { h: 'ราคาต่อหน่วย', right: true, w: 62 },
         { h: 'ส่วนลด', right: true, w: 48 }, { h: 'ภาษี', right: true, w: 40 }, { h: 'หัก ณ ที่จ่าย', right: true, w: 52 }, { h: 'มูลค่า', right: true, w: 56 }],
-      rows: ls.map(l => [String(l.line_no), `${l.code} ${l.name}${l.description ? '\n' + l.description : ''}`, qty(l.qty), l.unit ?? '', fmt(l.unit_price),
+      rows: ls.map(l => [String(l.line_no), `${l.code} ${l.name}${l.description ? '\n' + l.description : ''}${l.stock_qty != null ? `\nรับเข้าสต็อก ${qty(l.stock_qty)} ${l.base_unit}` : ''}`, qty(l.qty), l.unit ?? '', fmt(l.unit_price),
         +l.discount ? (l.discount_type === 'percent' ? `${qty(l.discount_value)}%` : fmt(l.discount)) : '', l.vat_exempt ? 'ยกเว้น' : `${qty(l.vat_rate)}%`,
         +l.wht_rate ? `${qty(l.wht_rate)}%` : 'ไม่หัก', fmt(h.price_mode === 'inclusive' ? +l.net + +l.vat : l.net)]),
       totals: [['รวมเป็นเงิน', fmt(sub + disc)], ['ส่วนลดรวม', fmt(disc)], ['ราคาหลังหักส่วนลด', fmt(sub)],

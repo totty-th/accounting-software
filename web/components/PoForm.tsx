@@ -6,7 +6,9 @@ import { savePurchaseOrder, saveGoodsReceiptFull, quickCreateVendor, quickCreate
 export interface Vendor { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
 export interface Prod { id: string; code: string; name: string; unit: string; price: number; onhand: number }
 interface Wh { id: string; label: string }
-interface Line { product_id: string; description: string; unit: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
+interface Line { product_id: string; description: string; unit: string; stock?: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
+// ซื้อคนละหน่วยกับหน่วยสต็อกของสินค้า → ต้องกรอกจำนวนที่ได้รับจริง (แบบ B)
+const diffUnit = (unit: string, base?: string) => !!base && !!unit.trim() && unit.trim().toLowerCase() !== base.trim().toLowerCase();
 const blank = (): Line => ({ product_id: '', description: '', unit: '', qty: '1', unit_price: '', dtype: 'percent', dval: '', vat: '7', wht: '0' });
 const WHT = ['0', '0.5', '0.75', '1', '1.5', '2', '3', '5', '10', '15'];
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -44,25 +46,25 @@ export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses,
   const calc = useMemo(() => {
     let net = 0, vat = 0, disc = 0, ex = 0, wht = 0;
     const per = lines.map(l => {
-      if (!l.product_id) return { total: 0 };
+      if (!l.product_id) return { total: 0, net: 0 };
       const gross = r2((Number(l.qty) || 0) * (Number(l.unit_price) || 0));
       const d = l.dtype === 'amount' ? Number(l.dval) || 0 : r2(gross * (Number(l.dval) || 0) / 100);
       const after = gross - d; const exempt = l.vat === 'exempt'; const vr = exempt ? 0 : Number(l.vat);
       let n: number, v: number;
       if (exempt || vr === 0) { n = after; v = 0; } else if (h.price_mode === 'exclusive') { n = after; v = r2(n * vr / 100); } else { n = r2(after * 100 / (100 + vr)); v = r2(after - n); }
       net += n; vat += v; disc += d; wht += r2(n * (Number(l.wht) || 0) / 100); if (exempt) ex += n;
-      return { total: h.price_mode === 'exclusive' ? n : after };
+      return { total: h.price_mode === 'exclusive' ? n : after, net: n };
     });
     return { per, net, vat, disc, ex, wht, total: r2(net + vat) };
   }, [lines, h.price_mode]);
 
   const needWh = !id && !!wh?.show && wh.defMain === false;
-  const ok = (!needWh || !!h.warehouse_id) && h.contact && lines.some(l => l.product_id) && lines.filter(l => l.product_id).every(l => Number(l.qty) > 0 && l.unit_price !== '');
+  const ok = (!needWh || !!h.warehouse_id) && h.contact && lines.some(l => l.product_id) && lines.filter(l => l.product_id).every(l => Number(l.qty) > 0 && l.unit_price !== '' && (!diffUnit(l.unit, products.find(x => x.id === l.product_id)?.unit) || Number(l.stock) > 0));
   const submit = () => start(async () => {
     setErr(null);
     const save = kind === 'RI' ? (_: string | null, a: any, b: any[]) => saveGoodsReceiptFull(a, b) : savePurchaseOrder;
     const r = await save(id, { ...h, credit_days: Number(h.credit_days) || 0 },
-      lines.filter(l => l.product_id).map(l => ({ product_id: l.product_id, description: l.description, unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
+      lines.filter(l => l.product_id).map(l => ({ product_id: l.product_id, description: l.description, unit: l.unit, qty: Number(l.qty), stock_qty: diffUnit(l.unit, products.find(x => x.id === l.product_id)?.unit) ? Number(l.stock) : undefined, unit_price: Number(l.unit_price),
         discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 })));
     if (r.error) return setErr(r.error);
     router.push(back); router.refresh();
@@ -129,7 +131,10 @@ export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses,
                 {canCreateProduct && <button type="button" className="btn sm ghost" onClick={() => setNp({ row: i, code: '', name: '', unit: 'ชิ้น', buy: '' })}>+ เพิ่มสินค้าใหม่</button>}
               </td>
               <td><input aria-label={`จำนวน ${i + 1}`} inputMode="decimal" value={l.qty} onChange={e => setL(i, { qty: e.target.value })} /></td>
-              <td><input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} /></td>
+              <td><input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} />
+                {p && diffUnit(l.unit, p.unit) && <>
+                  <input aria-label={`จำนวนรับจริง ${i + 1}`} inputMode="decimal" placeholder={`ได้รับจริง (${p.unit})`} title={`จำนวน ${p.unit} ที่ได้รับจริง`} value={l.stock ?? ''} onChange={e => setL(i, { stock: e.target.value })} style={{ marginTop: 4 }} />
+                  <div className="sub">รับเข้าสต็อกเป็น {p.unit}{Number(l.stock) > 0 && <> · ต้นทุน ≈ {fmt(r2(calc.per[i].net / Number(l.stock)))}/{p.unit}</>}</div></>}</td>
               <td><input aria-label={`ราคา ${i + 1}`} inputMode="decimal" value={l.unit_price} onChange={e => setL(i, { unit_price: e.target.value })} /></td>
               <td>{F('discount') ? <span className="sub">ท้ายเอกสาร</span> : <input aria-label={`ส่วนลด ${i + 1}`} inputMode="decimal" value={l.dval} onChange={e => setL(i, { dval: e.target.value })} />}</td>
               <td>{F('vat') ? <span className="sub">ท้ายเอกสาร</span> : <select aria-label={`ภาษี ${i + 1}`} value={l.vat} onChange={e => setL(i, { vat: e.target.value })}><option value="0">0%</option><option value="7">7%</option><option value="exempt">ยกเว้น</option></select>}</td>

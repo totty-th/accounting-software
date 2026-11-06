@@ -18,7 +18,7 @@ export default async function EditPo({ params }: { params: { id: string } }) {
   const header = { date: d10(o.po_date), contact: o.contact_id, credit_days: String(o.credit_days), due_date: d10(o.due_date), purchaser: o.purchaser ?? '',
     project: o.project ?? '', ref_no: o.ref_no ?? '', description: o.description ?? '', price_mode: o.price_mode, warehouse_id: o.warehouse_id ?? '',
     show_signature: o.show_signature, note: o.note ?? '', internal_note: o.internal_note ?? '' };
-  const lines = ls.map(l => ({ product_id: l.product_id, description: l.description ?? '', unit: l.unit ?? '', qty: n(l.qty), unit_price: n(l.unit_price),
+  const lines = ls.map(l => ({ product_id: l.product_id, description: l.description ?? '', unit: l.unit ?? '', stock: l.stock_qty == null ? '' : n(l.stock_qty), qty: n(l.qty), unit_price: n(l.unit_price),
     dtype: l.discount_type, dval: Number(l.discount_value) ? n(l.discount_value) : '', vat: l.vat_exempt ? 'exempt' : n(l.vat_rate), wht: n(l.wht_rate) }));
   return (<>
     <div className="top"><div><h1>แก้ไขใบสั่งซื้อ {o.po_no}</h1></div></div>
