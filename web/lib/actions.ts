@@ -657,6 +657,14 @@ export const resetDocDesign = async () => run(call('select reset_doc_design()'),
 // ---- ตั้งค่าเอกสาร (0068) ----
 const SC = 'settings.company';
 export async function saveDocNumberFormat(f: FormData): Promise<Result> {
+  const fmt = str(f, 'date_fmt'), rs = str(f, 'reset'), pre = (str(f, 'custom') ?? '').trim();
+  const OK: Record<string, string[]> = { none: ['never'], YYYY: ['never', 'yearly'], YYYYMM: ['never', 'yearly', 'monthly'], YYYYMMDD: ['never', 'yearly', 'monthly', 'daily'] };
+  const RS: Record<string, string> = { daily: 'รีเซ็ตทุกวัน', monthly: 'รีเซ็ตทุกเดือน', yearly: 'รีเซ็ตทุกปี', never: 'ไม่รีเซ็ต' };
+  if (pre.length > 10) return { error: `คำนำหน้ายาว ${pre.length} ตัวอักษร (ได้ไม่เกิน 10)` };
+  if (fmt && rs && OK[fmt] && !OK[fmt].includes(rs)) {
+    const DL: Record<string, string> = { none: 'ไม่แสดงวันที่', YYYY: 'ปี', YYYYMM: 'ปีเดือน', YYYYMMDD: 'ปีเดือนวัน' };
+    return { error: `เลือกวันที่แบบ "${DL[fmt]}" แต่ "เริ่มลำดับใหม่" เป็น "${RS[rs]}" — เลขจะซ้ำกันข้ามช่วง (เช่น ปีเดือนเหมือนกันแต่ลำดับกลับไปเริ่ม 0001) · ให้เปลี่ยน "เริ่มลำดับใหม่" เป็น ${OK[fmt].map(x => `"${RS[x]}"`).join(' หรือ ')}` };
+  }
   return run(call('select save_doc_number_format($1,$2,$3,$4,$5)', str(f, 'prefix'), str(f, 'custom') ?? '', str(f, 'date_fmt'), Number(str(f, 'seq')) || 4, str(f, 'reset')), ['/settings/numbering'], SC);
 }
 export async function resetDocNumberFormat(f: FormData): Promise<Result> {
