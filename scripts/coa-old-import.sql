@@ -53,7 +53,6 @@ select create_account('2131.08', 'ดอกเบี้ยเงินกู้�
 select create_account('2131.09', 'ค่าใช้จ่ายค้างจ่าย-อื่น ๆ', null, '21910');
 select create_account('2131.10', 'ค่าใช้จ่ายนำเข้าค้างจ่าย', null, '21910');
 select create_account('2131.11', 'ค่าใช้จ่ายยานพาหนะค้างจ่าย', null, '21910');
-select create_account('2131.12', 'ดอกเบี้ยจ่าย-ค้างจ่าย', null, '21910');
 select create_account('2131.13', 'เงินปันผล-ค้างจ่าย', null, '21910');
 select create_account('2131.14', 'ค่าตรวจสอบบัญชีและปรึกษากฎหมาย-ค้างจ่าย', null, '21910');
 select create_account('2132.01', 'ภาษีหัก ณ ที่จ่ายค้างจ่าย ภงด.1', null, '27120');
@@ -120,7 +119,6 @@ select create_account('5200.16', 'ค่าใช้จ่ายยานพา�
 select create_account('5200.17', 'ค่าใช้จ่ายยานพาหนะ-ค่าน้ำมัน', null, '52010');
 select create_account('5200.18', 'ค่าใช้จ่ายยานพาหนะ-ค่าบริการซ่อมรถและอะไหล่', null, '52010');
 select create_account('5200.19', 'ค่าใช้จ่ายยานพาหนะ-ค่าภาษี.พรบ.ตรอ', null, '52010');
-select create_account('5200.20', 'ค่าใช้จ่ายยานพาหนะ-ค่าปรับตำรวจ', null, '52010');
 select create_account('5310.01', 'เงินเดือน', null, '53011');
 select create_account('5310.02', 'ค่าล่วงเวลา', null, '53011');
 select create_account('5310.03', 'ค่าเบี้ยเลี้ยง', null, '53011');
