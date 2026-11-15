@@ -185,7 +185,7 @@ export async function buildPurchasePdf(v: PView): Promise<Uint8Array> {
         try { return u.startsWith('data:image/png') ? await pdf.embedPng(b) : await pdf.embedJpg(b); } catch { return null; } };
       const sg = await img(v.sign.signature), st = await img(v.sign.stamp);
       if (sg) { const k = Math.min(110 / sg.width, 42 / sg.height); page.drawImage(sg, { x: 322, y: sy + 18, width: sg.width * k, height: sg.height * k }); }
-      if (st) { const k = Math.min(70 / st.width, 70 / st.height); page.drawImage(st, { x: 440, y: sy + 8, width: st.width * k, height: st.height * k, opacity: 0.85 }); }
+      if (st) { const k = Math.min(1, 110 / st.width, 36 / st.height), h = st.height * k; page.drawImage(st, { x: 381 - (st.width * k) / 2, y: sy - 6 - h, width: st.width * k, height: h, opacity: 0.9 }); } // ตราประทับอยู่ใต้คำว่า "ผู้อนุมัติ" ไม่ทับเส้นลายเซ็น
     }
   }
   [[L, v.signers[0]], [312, v.signers[1]]].forEach(([x, cap]) => {
