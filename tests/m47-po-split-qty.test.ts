@@ -66,4 +66,14 @@ describe('PO แบ่งตามจำนวน', () => {
     await db.query('select cancel_goods_receipt($1)', [id]);
     expect(await poSt(po)).toBe('partial');
   });
+  it('ไม่อนุมัติ RI ที่แบ่งแล้ว (FA 15-11-2026): จำนวนกลับมาคงเหลือ PO ยังแบ่งจ่าย · รีเซ็ตแล้วนับกลับ', async () => {
+    const before = +(await one<any>('select po_line_billed_qty($1,1) v', [po])).v;
+    const id = await split([{ line_no: 1, qty: 5 }]);
+    expect(+(await one<any>('select po_line_billed_qty($1,1) v', [po])).v).toBe(before + 5);
+    await db.query('select reject_goods_receipt($1)', [id]);
+    expect(+(await one<any>('select po_line_billed_qty($1,1) v', [po])).v).toBe(before);
+    expect(await poSt(po)).toBe('partial');
+    await db.query('select reset_goods_receipt($1)', [id]);
+    expect(+(await one<any>('select po_line_billed_qty($1,1) v', [po])).v).toBe(before + 5);
+  });
 });

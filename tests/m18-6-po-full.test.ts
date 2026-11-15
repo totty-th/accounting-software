@@ -75,13 +75,16 @@ describe('M18.6 ใบสั่งซื้อเต็มรูปแบบ', (
     const l = await one<any>('select * from purchase_order_lines where po_id=$1', [d]);
     expect([l.vat_exempt, l.description, +l.wht_rate]).toEqual([true, 'รายละเอียด', 3]);
   });
-  it('แปลง PO→RI ใช้โหมดราคา/ครบกำหนดของ PO · มีส่วนลดแปลงไม่ได้', async () => {
+  it('แปลง PO→RI ใช้โหมดราคา/ครบกำหนดของ PO · ส่วนลด/หัก ณ ที่จ่ายคัดลอกมาด้วย (FA 15-11-2026)', async () => {
     const id = await save(null, { price_mode: 'inclusive', credit_days: 10 }, [L({ qty: 1, unit_price: 1070 })]);
     const ri = (await one<any>('select upgrade_po_to_ri($1) id', [id])).id;
     const r = await one<any>('select * from goods_receipts where id=$1', [ri]);
     expect([+r.total, +r.subtotal, r.ref_no, String(r.due_date.toISOString().slice(0, 10))]).toEqual([1070, 1000, 'PO202610150001', '2026-10-25']);
     const id2 = await save(null, {}, [L({ discount_type: 'amount', discount_value: 50 })]);
-    expect(await err(db.query('select upgrade_po_to_ri($1)', [id2]))).toContain('ส่วนลด');
+    const ri2 = (await one<any>('select upgrade_po_to_ri($1) id', [id2])).id;
+    const r2 = await one<any>('select * from goods_receipts where id=$1', [ri2]);
+    expect(+r2.discount_total).toBe(50);
+    expect(+r2.total).toBe(+(await one<any>('select total from purchase_orders where id=$1', [id2])).total);
   });
   it('ลายเซ็น/ตรายางเก็บใน company_profile', async () => {
     await db.query(`insert into company_profile(name,address,tax_id,signature_img,stamp_img) values ('บ','ที่อยู่','0105500000001','data:image/png;base64,AA==','data:image/png;base64,BB==')`);

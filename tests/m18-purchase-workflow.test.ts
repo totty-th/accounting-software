@@ -145,6 +145,17 @@ describe('M18 จ่ายหลายช่องทาง', () => {
     expect(await entries(v)).toEqual([['21311', 2568, 0], ['21379.01', 0, 1568], ['11112', 0, 1000]]);
     expect(+(await one<any>('select count(*) c from purchase_payments')).c).toBe(2);
   });
+  it('RI ตั้งหัก ณ ที่จ่าย 3% ที่บรรทัด (FA 15-11-2026): PV Dr 21311 เต็ม / Cr 27124 / Cr เงินสดสุทธิ · รีเซ็ตกลับหมด', async () => {
+    const id = (await one<{ id: string }>('select save_goods_receipt($1::jsonb,$2::jsonb) as id',
+      [JSON.stringify({ date: D, contact: vendor }), JSON.stringify([{ product_id: prod, qty: 10, unit_price: 600, wht_rate: 3 }])])).id;
+    expect(+(await R(id)).wht_total).toBe(180);
+    const v = (await one<any>('select pay_goods_receipt($1,$2::date,$3::jsonb) v', [id, D, null])).v;
+    expect(await entries(v)).toEqual([['21311', 6420, 0], ['27124', 0, 180], ['11112', 0, 6240]]);
+    expect(+(await R(id)).wht_paid).toBe(180);
+    await call('select reset_goods_receipt($1)', [id]);
+    expect(await tb('27124')).toBe(0);
+    expect(+(await R(id)).wht_paid).toBe(0);
+  });
   it('โอนเงินเข้าต้องเลือกบัญชีธนาคาร และลงบัญชีของธนาคารนั้น', async () => {
     const id = await exp(1000);
     expect(await err(call('select pay_expense($1,$2::date,\'11112\',true,\'PND53\',null,$3::jsonb)',

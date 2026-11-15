@@ -45,7 +45,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
   const ri = kind === 'PO' && h.ri_id ? (await db.q<any>('select id, ri_no from goods_receipts where id=$1', [h.ri_id]))[0] : null;
   const [back, backName] = BACK[kind];
   const payable = kind === 'EXP' ? ['pending', 'approved'] : ['unpaid', 'approved'];
-  const net = kind === 'EXP' ? Number(h.total) - Number(h.wht_total) : Number(h.total);
+  const net = Number(h.total) - Number(h.wht_total);
   const A_ = kind === 'EXP' ? { approve: A.approveExpense, reject: A.rejectExpense, reset: A.resetExpense, cancel: A.cancelExpense }
     : kind === 'RI' ? { approve: A.approveGoodsReceipt, reject: A.rejectGoodsReceipt, reset: A.resetGoodsReceipt, cancel: A.cancelGoodsReceipt }
       : { approve: A.approvePurchaseOrder, reject: A.rejectPurchaseOrder, reset: A.resetPurchaseOrder, cancel: A.cancelPurchaseOrder };
@@ -58,6 +58,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
         <div className="acts"><PrintButton />
         <a className="btn ghost" href={`/purchases/${kind.toLowerCase()}/${id}/pdf`}>ดาวน์โหลด PDF</a>
         <ActsMenu dropdown>
+          {kind === 'RI' && W && (st === pendingKey || st === 'approved') && <Link className="btn ghost" href={`/purchases/ri/${id}/edit`}>แก้ไข</Link>}
           {kind === 'PO' && W && st === 'pending' && <Link className="btn ghost" href={`/purchases/orders/${id}/edit`}>แก้ไข</Link>}
           {kind === 'PO' && W && <ActionButton label="สร้างซ้ำ" variant="ghost" action={A.duplicatePurchaseOrder.bind(null, id)} />}
           {AP && st === pendingKey && <ActionButton label="อนุมัติ" action={(A_.approve as any).bind(null, id)} />}

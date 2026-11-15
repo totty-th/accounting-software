@@ -290,6 +290,11 @@ export async function saveGoodsReceiptFull(header: Record<string, unknown>, line
     [...ALL, '/purchases', '/purchases/new'], 'expenses.write');
   return { ...r, id: out };
 }
+export async function updateGoodsReceiptFull(id: string, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
+  const r = await run(async () => { await (await getDb()).q('select update_goods_receipt($1,$2::jsonb,$3::jsonb)', [id, JSON.stringify(header), JSON.stringify(lines)]); },
+    [...ALL, '/purchases', `/purchases/ri/${id}`], 'expenses.write');
+  return { ...r, id };
+}
 export async function saveExpenseFull(header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
   let out: string | undefined;
   const r = await run(async () => { out = (await (await getDb()).q<any>('select save_expense($1::jsonb,$2::jsonb) as id', [JSON.stringify(header), JSON.stringify(lines)]))[0].id; },

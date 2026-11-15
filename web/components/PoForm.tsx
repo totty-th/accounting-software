@@ -1,12 +1,12 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { savePurchaseOrder, saveGoodsReceiptFull, quickCreateVendor, quickCreateProduct } from '@/lib/actions';
+import { savePurchaseOrder, saveGoodsReceiptFull, updateGoodsReceiptFull, quickCreateVendor, quickCreateProduct } from '@/lib/actions';
 
 export interface Vendor { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
 export interface Prod { id: string; code: string; name: string; unit: string; price: number; onhand: number }
 interface Wh { id: string; label: string }
-interface Line { product_id: string; description: string; unit: string; stock?: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
+interface Line { line_no?: number; product_id: string; description: string; unit: string; stock?: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
 // ซื้อคนละหน่วยกับหน่วยสต็อกของสินค้า → ต้องกรอกจำนวนที่ได้รับจริง (แบบ B)
 const diffUnit = (unit: string, base?: string) => !!base && !!unit.trim() && unit.trim().toLowerCase() !== base.trim().toLowerCase();
 const blank = (): Line => ({ product_id: '', description: '', unit: '', qty: '1', unit_price: '', dtype: 'percent', dval: '', vat: '7', wht: '0' });
@@ -16,12 +16,12 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2,
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
 /** ใบสั่งซื้อ: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) — สร้างและแก้ไข */
-export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses, today, purchaser, init, canCreateVendor, canCreateProduct, remark = '', lv, wh }: {
+export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses, today, purchaser, init, lockLines = false, canCreateVendor, canCreateProduct, remark = '', lv, wh }: {
   remark?: string;
   wh?: { show: boolean; defMain: boolean };
   lv?: { vat: string; discount: string; wht: string };
   kind?: 'PO' | 'RI'; id: string | null; vendors: Vendor[]; products: Prod[]; warehouses: Wh[]; today: string; purchaser: string;
-  init?: { header: Record<string, any>; lines: Line[] }; canCreateVendor: boolean; canCreateProduct: boolean;
+  init?: { header: Record<string, any>; lines: Line[] }; lockLines?: boolean; canCreateVendor: boolean; canCreateProduct: boolean;
 }) {
   const router = useRouter();
   const back = kind === 'RI' ? '/purchases' : '/purchases/orders';
@@ -62,9 +62,9 @@ export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses,
   const ok = (!needWh || !!h.warehouse_id) && h.contact && lines.some(l => l.product_id) && lines.filter(l => l.product_id).every(l => Number(l.qty) > 0 && l.unit_price !== '' && (!diffUnit(l.unit, products.find(x => x.id === l.product_id)?.unit) || Number(l.stock) > 0));
   const submit = () => start(async () => {
     setErr(null);
-    const save = kind === 'RI' ? (_: string | null, a: any, b: any[]) => saveGoodsReceiptFull(a, b) : savePurchaseOrder;
+    const save = kind === 'RI' ? (id0: string | null, a: any, b: any[]) => (id0 ? updateGoodsReceiptFull(id0, a, b) : saveGoodsReceiptFull(a, b)) : savePurchaseOrder;
     const r = await save(id, { ...h, credit_days: Number(h.credit_days) || 0 },
-      lines.filter(l => l.product_id).map(l => ({ product_id: l.product_id, description: l.description, unit: l.unit, qty: Number(l.qty), stock_qty: diffUnit(l.unit, products.find(x => x.id === l.product_id)?.unit) ? Number(l.stock) : undefined, unit_price: Number(l.unit_price),
+      lines.filter(l => l.product_id).map(l => ({ line_no: l.line_no, product_id: l.product_id, description: l.description, unit: l.unit, qty: Number(l.qty), stock_qty: diffUnit(l.unit, products.find(x => x.id === l.product_id)?.unit) ? Number(l.stock) : undefined, unit_price: Number(l.unit_price),
         discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 })));
     if (r.error) return setErr(r.error);
     router.push(back); router.refresh();
@@ -124,24 +124,24 @@ export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses,
           <tbody>{lines.map((l, i) => { const p = products.find(x => x.id === l.product_id); return (
             <tr key={i} style={{ verticalAlign: 'top' }}><td>{i + 1}</td>
               <td>
-                <select aria-label={`สินค้า ${i + 1}`} value={l.product_id} onChange={e => pickProduct(i, e.target.value)}>
+                <select aria-label={`สินค้า ${i + 1}`} disabled={lockLines} value={l.product_id} onChange={e => pickProduct(i, e.target.value)}>
                   <option value="">เลือกสินค้า</option>{products.map(x => <option key={x.id} value={x.id}>{x.code} {x.name} (คงเหลือ {x.onhand})</option>)}</select>
                 {p && <div className="sub">คงเหลือ {p.onhand} {p.unit} · {p.code}</div>}
                 <textarea aria-label={`รายละเอียด ${i + 1}`} rows={1} placeholder="รายละเอียด (Shift+Enter ขึ้นบรรทัดใหม่)" value={l.description} onChange={e => setL(i, { description: e.target.value })} style={{ width: '100%' }} />
                 {canCreateProduct && <button type="button" className="btn sm ghost" onClick={() => setNp({ row: i, code: '', name: '', unit: 'ชิ้น', buy: '' })}>+ เพิ่มสินค้าใหม่</button>}
               </td>
               <td><input aria-label={`จำนวน ${i + 1}`} inputMode="decimal" value={l.qty} onChange={e => setL(i, { qty: e.target.value })} /></td>
-              <td><input aria-label={`หน่วย ${i + 1}`} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} />
+              <td><input aria-label={`หน่วย ${i + 1}`} disabled={lockLines} value={l.unit} onChange={e => setL(i, { unit: e.target.value })} />
                 {p && diffUnit(l.unit, p.unit) && <>
                   <input aria-label={`จำนวนรับจริง ${i + 1}`} inputMode="decimal" placeholder={`ได้รับจริง (${p.unit})`} title={`จำนวน ${p.unit} ที่ได้รับจริง`} value={l.stock ?? ''} onChange={e => setL(i, { stock: e.target.value })} style={{ marginTop: 4 }} />
                   <div className="sub">รับเข้าสต็อกเป็น {p.unit}{Number(l.stock) > 0 && <> · ต้นทุน ≈ {fmt(r2(calc.per[i].net / Number(l.stock)))}/{p.unit}</>}</div></>}</td>
-              <td><input aria-label={`ราคา ${i + 1}`} inputMode="decimal" value={l.unit_price} onChange={e => setL(i, { unit_price: e.target.value })} /></td>
-              <td>{F('discount') ? <span className="sub">ท้ายเอกสาร</span> : <input aria-label={`ส่วนลด ${i + 1}`} inputMode="decimal" value={l.dval} onChange={e => setL(i, { dval: e.target.value })} />}</td>
-              <td>{F('vat') ? <span className="sub">ท้ายเอกสาร</span> : <select aria-label={`ภาษี ${i + 1}`} value={l.vat} onChange={e => setL(i, { vat: e.target.value })}><option value="0">0%</option><option value="7">7%</option><option value="exempt">ยกเว้น</option></select>}</td>
-              <td>{F('wht') ? <span className="sub">ท้ายเอกสาร</span> : <select aria-label={`หัก ณ ที่จ่าย ${i + 1}`} value={l.wht} onChange={e => setL(i, { wht: e.target.value })}>{WHT.map(w => <option key={w} value={w}>{w === '0' ? 'ไม่หัก' : `${w}%`}</option>)}</select>}</td>
+              <td><input aria-label={`ราคา ${i + 1}`} disabled={lockLines} inputMode="decimal" value={l.unit_price} onChange={e => setL(i, { unit_price: e.target.value })} /></td>
+              <td>{F('discount') ? <span className="sub">ท้ายเอกสาร</span> : <input aria-label={`ส่วนลด ${i + 1}`} disabled={lockLines} inputMode="decimal" value={l.dval} onChange={e => setL(i, { dval: e.target.value })} />}</td>
+              <td>{F('vat') ? <span className="sub">ท้ายเอกสาร</span> : <select aria-label={`ภาษี ${i + 1}`} disabled={lockLines} value={l.vat} onChange={e => setL(i, { vat: e.target.value })}><option value="0">0%</option><option value="7">7%</option><option value="exempt">ยกเว้น</option></select>}</td>
+              <td>{F('wht') ? <span className="sub">ท้ายเอกสาร</span> : <select aria-label={`หัก ณ ที่จ่าย ${i + 1}`} disabled={lockLines} value={l.wht} onChange={e => setL(i, { wht: e.target.value })}>{WHT.map(w => <option key={w} value={w}>{w === '0' ? 'ไม่หัก' : `${w}%`}</option>)}</select>}</td>
               <td className="num">{fmt(calc.per[i].total)}</td>
-              <td>{lines.length > 1 && <button type="button" className="btn sm ghost" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}>ลบ</button>}</td></tr>); })}</tbody></table>
-        <button type="button" className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => setLines(ls => [...ls, { ...blank(), ...(F('vat') ? { vat: ls[0]?.vat ?? '7' } : {}), ...(F('wht') ? { wht: ls[0]?.wht ?? '0' } : {}), ...(F('discount') ? { dval: ls[0]?.dval ?? '', dtype: 'percent' as const } : {}) }])}>+ เพิ่มแถวรายการ</button>
+              <td>{!lockLines && lines.length > 1 && <button type="button" className="btn sm ghost" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}>ลบ</button>}</td></tr>); })}</tbody></table>
+        {!lockLines && <button type="button" className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => setLines(ls => [...ls, { ...blank(), ...(F('vat') ? { vat: ls[0]?.vat ?? '7' } : {}), ...(F('wht') ? { wht: ls[0]?.wht ?? '0' } : {}), ...(F('discount') ? { dval: ls[0]?.dval ?? '', dtype: 'percent' as const } : {}) }])}>+ เพิ่มแถวรายการ</button>}
         {np && <div className="panel" style={{ padding: 10, marginTop: 8, display: 'grid', gap: 6, maxWidth: 520 }}>
           <b>สร้างสินค้านับสต็อกใหม่ (แถว {np.row + 1})</b>
           <input aria-label="รหัสสินค้าใหม่" placeholder="รหัสสินค้า" value={np.code} onChange={e => setNp({ ...np, code: e.target.value })} />
