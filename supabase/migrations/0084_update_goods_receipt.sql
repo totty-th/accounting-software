@@ -4,7 +4,8 @@
 --  • RI ที่แบ่งจากจำนวนใน PO: ล็อกผู้จำหน่าย/คลัง/สินค้า/ราคา/ส่วนลด แก้ได้เฉพาะจำนวน (ไม่เกินจำนวนคงเหลือของ PO)
 --  • RI ที่อยู่ในใบเตรียมจ่าย (รอชำระเงิน): แก้ได้เฉพาะข้อมูลที่ไม่กระทบการเงิน (โปรเจ็ค รายละเอียด หมายเหตุ เลขอ้างอิง)
 --  • จ่ายแล้ว/ไม่อนุมัติ/ยกเลิก: แก้ไม่ได้ (ต้องรีเซ็ตก่อน)
--- ยังไม่ทดสอบบน FA (ห้ามแก้บรรทัด): RI จาก PO ที่แปลงเต็มจำนวน หรือแบ่งแบบ %/บาท
+--  • RI ที่แปลงจาก PO เต็มจำนวน (split_mode ว่าง): FA แก้จำนวน/ราคาได้อิสระ ไม่มีเพดานตาม PO (ทดสอบ 15-11-2026) → แก้ได้เหมือน RI ปกติ
+-- ยังไม่ทดสอบบน FA (ห้ามแก้บรรทัด): RI ที่แบ่งจาก PO แบบ %/บาท
 create or replace function update_goods_receipt(p_id uuid, p_header jsonb, p_lines jsonb) returns uuid language plpgsql as $$
 declare r goods_receipts; h jsonb := coalesce(p_header, '{}'); l jsonb; n int := 0; pr products; c record; v uuid;
         v_date date; v_mode text; v_cd int; v_dt text; v_dv numeric; v_wr numeric; v_wht numeric; wh uuid; v_qty numeric; v_price numeric; v_vat text;
@@ -22,15 +23,15 @@ begin
            internal_note = coalesce(h->>'internal_note', internal_note) where id = p_id;
     return p_id;
   end if;
-  v_po_lines := r.po_id is not null;
-  if v_po_lines and coalesce(r.split_mode, '') <> 'qty' then
-    -- ยังไม่ทดสอบ: RI จาก PO แบบเต็มจำนวน/เปอร์เซ็นต์/จำนวนเงิน → แก้ได้เฉพาะหัวเอกสาร
+  v_po_lines := r.po_id is not null and r.split_mode = 'qty';
+  if r.po_id is not null and r.split_mode in ('percent','amount') then
+    -- ยังไม่ทดสอบ: RI แบ่งจาก PO แบบเปอร์เซ็นต์/จำนวนเงิน → แก้ได้เฉพาะหัวเอกสาร
     update goods_receipts set ri_date = coalesce(nullif(h->>'date','')::date, ri_date), purchaser = coalesce(h->>'purchaser', purchaser),
            project = coalesce(h->>'project', project), ref_no = coalesce(h->>'ref_no', ref_no),
            description = coalesce(h->>'description', description), note = coalesce(h->>'note', note),
            internal_note = coalesce(h->>'internal_note', internal_note) where id = p_id;
     if p_lines is not null and jsonb_array_length(p_lines) > 0 then
-      raise exception 'แก้บรรทัดของใบรับสินค้าที่สร้างจาก PO แบบเต็มจำนวน/แบ่งตาม % หรือบาท ยังไม่รองรับ (ยังไม่ทดสอบ)', '%';
+      raise exception 'แก้บรรทัดของใบรับสินค้าที่แบ่งจาก PO ตาม % หรือบาท ยังไม่รองรับ (ยังไม่ทดสอบ)', '%';
     end if;
     return p_id;
   end if;

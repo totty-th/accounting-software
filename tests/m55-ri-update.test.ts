@@ -63,4 +63,13 @@ describe('แก้ RI หลังบันทึก', () => {
     expect(await err(upd(id, {}, [{ line_no: 2, qty: 1 }]))).toContain('เพิ่มบรรทัดใหม่ไม่ได้');
     expect(+(await one<any>('select po_line_billed_qty($1,1) v', [po])).v).toBe(1);
   });
+  it('RI แปลงจาก PO เต็มจำนวน: แก้จำนวน/ราคาได้อิสระ (ตาม FA) · ยังผูก PO เดิม', async () => {
+    const p2 = (await one<any>('select save_purchase_order(null,$1::jsonb,$2::jsonb) id', [J({ date: '2026-10-02', contact: sup }),
+      J([{ product_id: a, qty: 4, unit_price: 100 }])])).id;
+    await db.query('select approve_purchase_order($1)', [p2]);
+    const id = (await one<any>('select upgrade_po_to_ri($1,$2::date) id', [p2, '2026-11-04'])).id;
+    await upd(id, {}, [{ product_id: a, qty: 3, unit_price: 120 }]);
+    const r = await one<any>('select total, po_id from goods_receipts where id=$1', [id]);
+    expect([+r.total, r.po_id]).toEqual([385.2, p2]);
+  });
 });

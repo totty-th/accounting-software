@@ -14,14 +14,14 @@ begin
            internal_note = coalesce(h->>'internal_note', internal_note) where id = p_id;
     return p_id;
   end if;
-  v_po_lines := r.po_id is not null;
-  if v_po_lines and coalesce(r.split_mode, '') <> 'qty' then
+  v_po_lines := r.po_id is not null and r.split_mode = 'qty';
+  if r.po_id is not null and r.split_mode in ('percent','amount') then
     update goods_receipts set ri_date = coalesce(nullif(h->>'date','')::date, ri_date), purchaser = coalesce(h->>'purchaser', purchaser),
            project = coalesce(h->>'project', project), ref_no = coalesce(h->>'ref_no', ref_no),
            description = coalesce(h->>'description', description), note = coalesce(h->>'note', note),
            internal_note = coalesce(h->>'internal_note', internal_note) where id = p_id;
     if p_lines is not null and jsonb_array_length(p_lines) > 0 then
-      raise exception 'แก้บรรทัดของใบรับสินค้าที่สร้างจาก PO แบบเต็มจำนวน/แบ่งตาม % หรือบาท ยังไม่รองรับ (ยังไม่ทดสอบ)', '%';
+      raise exception 'แก้บรรทัดของใบรับสินค้าที่แบ่งจาก PO ตาม % หรือบาท ยังไม่รองรับ (ยังไม่ทดสอบ)', '%';
     end if;
     return p_id;
   end if;
