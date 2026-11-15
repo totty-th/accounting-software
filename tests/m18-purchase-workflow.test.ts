@@ -6,7 +6,7 @@ const dir = new URL('../supabase/migrations/', import.meta.url);
 let db: PGlite;
 let vendor: string, prod: string;
 const ACCOUNTS: [string, string, string][] = [
-  ['11112', 'เงินสด', 'asset'], ['11122', 'ธนาคาร', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'],
+  ['11112', 'เงินสด', 'asset'], ['11122', 'ธนาคาร', 'asset'], ['53211', 'ค่าธรรมเนียมธนาคาร', 'expense'], ['11500', 'สินค้าคงเหลือ', 'asset'],
   ['17113', 'ภาษีซื้อยังไม่ถึงกำหนด', 'asset'], ['21311', 'เจ้าหนี้การค้า', 'liability'], ['21399', 'เจ้าหนี้อื่นๆ', 'liability'],
   ['27124', 'ภาษีหัก ณ ที่จ่าย', 'liability'], ['53101', 'ค่าบริการ', 'expense'], ['51100', 'ต้นทุนขาย', 'expense'],
   ['41110', 'รายได้ขาย', 'revenue'], ['11311', 'ลูกหนี้', 'asset'], ['27111', 'ภาษีขาย', 'liability'], ['11319', 'รอเก็บ', 'asset'], ['41210', 'รายได้บริการ', 'revenue'],
@@ -202,14 +202,22 @@ describe('M18.2 เช็คและเงินสดย่อย', () => {
     expect(await tb('21329.01')).toBe(0);      // พักแล้วตัดหมดเมื่อถึงวันตัดบัญชี
     expect(await tb('11122')).toBe(-1070);
   });
-  it('เช็คต้องมีเลขที่/วันตัดบัญชี/ห้ามค่าธรรมเนียม · ตัดก่อนวันจ่ายไม่ได้', async () => {
+  it('เช็คต้องมีเลขที่/วันตัดบัญชี/ค่าธรรมเนียมติดลบไม่ได้ · ตัดก่อนวันจ่ายไม่ได้', async () => {
     const bk = await bank(); const id = await exp(1000);
     const base = { method: 'cheque', bank_account_id: bk, amount: 1070 };
     expect(await err(payEx(id, [{ ...base, clear_date: '2026-10-31' }]))).toContain('เลขที่เช็ค');
     expect(await err(payEx(id, [{ ...base, cheque_no: '1' }]))).toContain('วันที่ถูกตัดบัญชี');
     expect(await err(payEx(id, [{ ...base, cheque_no: '1', clear_date: '2026-10-01' }]))).toContain('ไม่ก่อนวันที่จ่าย');
-    expect(await err(payEx(id, [{ ...base, cheque_no: '1', clear_date: '2026-10-31', fee: 30 }]))).toContain('ค่าธรรมเนียมเช็ค');
+    expect(await err(payEx(id, [{ ...base, cheque_no: '1', clear_date: '2026-10-31', fee: -5 }]))).toContain('ค่าธรรมเนียมเช็ค');
     expect(await err(payEx(id, [{ method: 'cheque', cheque_no: '1', clear_date: '2026-10-31', amount: 1070 }]))).toContain('บัญชีเช็คจ่าย');
+  });
+  it('เช็คมีค่าธรรมเนียม (FA 15-11-2026): PV วันจ่ายมี Dr 53211 / Cr ธนาคาร เพิ่ม · รีเซ็ตกลับทั้งค่าธรรมเนียม', async () => {
+    const bk = await bank(); const id = await exp(1000);
+    const { v } = await payEx(id, [{ method: 'cheque', bank_account_id: bk, cheque_no: '0002', clear_date: '2026-10-31', amount: 1070, fee: 10 }]);
+    expect(await entries(v)).toEqual([['21399', 1070, 0], ['53211', 10, 0], ['11122', 0, 10], ['21329.01', 0, 1070]]);
+    expect(await tb('53211')).toBe(10);
+    await call('select reset_expense($1)', [id]);
+    expect(await tb('53211')).toBe(0);
   });
   it('รีเซ็ตเอกสารที่จ่ายด้วยเช็ค: PV และใบตัดเช็คได้ -R ทั้งคู่ ยอดกลับเป็นเจ้าหนี้', async () => {
     const bk = await bank(); const id = await exp(1000);
