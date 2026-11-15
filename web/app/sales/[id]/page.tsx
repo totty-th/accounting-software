@@ -59,13 +59,13 @@ export default async function SalesDetail({ params }: { params: { id: string } }
       <div className="top noprint">
         <div><h1>{v.doc.doc_no} <Pill s={v.doc.status} /></h1>
           <p className="sub"><Link href={`/sales?type=${v.doc.doc_type}`}>← {DOC_TYPE[v.doc.doc_type]}</Link></p></div>
+        <div className="acts"><PrintButton />
+        <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf`}>ดาวน์โหลด PDF</a>
         <ActsMenu dropdown>
-          <PrintButton />
-          <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf`}>ดาวน์โหลด PDF</a>
           <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf?both=1`}>PDF ต้นฉบับ+สำเนา</a>
           {dlvOk && <a className="btn ghost" href={`/sales/${v.doc.doc_no}/delivery`}>พิมพ์ใบส่งของ</a>}
           <SalesActions d={v.doc} role={user.role} detail />
-        </ActsMenu>
+        </ActsMenu></div>
       </div>
       <div className="detail">
         <PdfPreview src={`/sales/${v.doc.doc_no}/pdf`} />

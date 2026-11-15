@@ -8,6 +8,8 @@ import { dateTh, money, partyName } from '@/lib/format';
 import { loadPurchaseView, type PKind } from '@/lib/purchase-pdf';
 import { Pill } from '@/components/Pill';
 import { ActionButton } from '@/components/ActionButton';
+import { PdfPreview } from '@/components/PdfPreview';
+import { PrintButton } from '@/components/ShareTools';
 import { PurchaseDocTools } from '@/components/PurchaseDocTools';
 import { TaxInvoiceBox } from '@/components/TaxInvoiceBox';
 import { PayForm } from '@/components/PayForm';
@@ -53,8 +55,9 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
     <>
       <div className="top noprint">
         <div><h1>{v.no} <Pill s={pillKey} /></h1><p className="sub"><Link href={back}>← {backName}</Link></p></div>
+        <div className="acts"><PrintButton />
+        <a className="btn ghost" href={`/purchases/${kind.toLowerCase()}/${id}/pdf`}>ดาวน์โหลด PDF</a>
         <ActsMenu dropdown>
-          <a className="btn ghost" href={`/purchases/${kind.toLowerCase()}/${id}/pdf`} target="_blank">ดาวน์โหลด PDF</a>
           {kind === 'PO' && W && st === 'pending' && <Link className="btn ghost" href={`/purchases/orders/${id}/edit`}>แก้ไข</Link>}
           {kind === 'PO' && W && <ActionButton label="สร้างซ้ำ" variant="ghost" action={A.duplicatePurchaseOrder.bind(null, id)} />}
           {AP && st === pendingKey && <ActionButton label="อนุมัติ" action={(A_.approve as any).bind(null, id)} />}
@@ -70,29 +73,13 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
           {AP && (st === pendingKey || st === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={(A_.reject as any).bind(null, id)} />}
           {W && (kind === 'PO' ? ['approved', 'rejected', 'converted', 'partial'] : ['approved', 'paid', 'rejected']).includes(st) && <ActionButton label="รีเซ็ต" variant="ghost" confirmText={kind === 'PO' && (st === 'partial' || st === 'converted') ? 'ยืนยันการรีเซ็ต: อาจทำให้เปิดบิลซ้ำหรือรับเข้าสต็อกซ้ำได้ หากมียอดแบ่งจ่ายเหลือต้องเริ่มแบ่งจ่ายใหม่' : undefined} action={(A_.reset as any).bind(null, id)} />}
           {W && st !== 'cancelled' && st !== 'converted' && st !== 'partial' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={(A_.cancel as any).bind(null, id)} />}
-        </ActsMenu>
+        </ActsMenu></div>
       </div>
       <div className="detail">
-        <section className="panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            <div><div className="sub">{kind === 'PO' ? 'ผู้จำหน่าย' : 'ผู้จำหน่าย'}</div><h3 style={{ margin: '2px 0' }}>{v.party?.name}</h3>
-              <div style={{ whiteSpace: 'pre-line' }}>{v.party?.address}</div>{v.party?.tax_id && <div className="sub">เลขประจำตัวผู้เสียภาษี {v.party.tax_id}</div>}</div>
-            <table style={{ minWidth: 0, width: 'auto' }}><tbody>
-              <tr><td className="sub">{v.title}เลขที่</td><td>{v.no}</td></tr><tr><td className="sub">วันที่</td><td>{dateTh(v.date)}</td></tr>
-              {h.due_date && <tr><td className="sub">ครบกำหนด</td><td>{dateTh(h.due_date)}</td></tr>}
-              {v.meta.filter(m => m[0] !== 'ครบกำหนด').map(([k, x]) => <tr key={k}><td className="sub">{k}</td><td>{x}</td></tr>)}
-            </tbody></table>
-          </div>
-          <div style={{ overflowX: 'auto', marginTop: 14 }}>
-            <table><thead><tr>{v.cols.map((c, i) => <th key={i} className={c.right ? 'num' : ''}>{c.h}</th>)}</tr></thead>
-              <tbody>{v.rows.map((r, i) => <tr key={i}>{r.map((x, j) => <td key={j} className={v.cols[j].right ? 'num' : ''} style={{ whiteSpace: 'pre-line' }}>{x}</td>)}</tr>)}</tbody></table>
-          </div>
-          <div className="totals" style={{ maxWidth: 360 }}>
-            {v.totals.map(([k, x, strong], i) => <div key={i} className={strong ? 't' : ''}><span>{k}</span><span>{x}</span></div>)}
-          </div>
-          {v.note && <p style={{ whiteSpace: 'pre-line' }}><span className="sub">หมายเหตุ</span><br />{v.note}</p>}
-          {kind === 'PO' && h.internal_note && <p style={{ whiteSpace: 'pre-line' }}><span className="sub">โน้ตภายในบริษัท</span><br />{h.internal_note}</p>}
-        </section>
+        <div>
+          <PdfPreview src={`/purchases/${kind.toLowerCase()}/${id}/pdf`} />
+          {kind === 'PO' && h.internal_note && <section className="panel noprint"><span className="sub">โน้ตภายในบริษัท (ไม่แสดงในเอกสาร)</span><p style={{ whiteSpace: 'pre-line', margin: '4px 0 0' }}>{h.internal_note}</p></section>}
+        </div>
         <aside className="side-panels noprint">
           {kind !== 'EXP' && <section className="panel"><h3>ลิงก์แชร์</h3>
             <PurchaseDocTools kind={kind} id={id} token={h.share_token ?? null} canWrite={W} /></section>}

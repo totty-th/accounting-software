@@ -4,6 +4,8 @@ import { requirePage } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { money, dateTh, dateIso, partyName } from '@/lib/format';
 import { SlipPay } from '@/components/SlipPay';
+import { PdfPreview } from '@/components/PdfPreview';
+import { PrintButton } from '@/components/ShareTools';
 import { PurchaseDocTools } from '@/components/PurchaseDocTools';
 import { SlipStatus } from '@/components/SlipStatus';
 import { SLIP_TH, SLIP_COLOR } from '@/lib/slip-state';
@@ -44,10 +46,11 @@ export default async function SlipPage({ params }: { params: { id: string } }) {
     .map(c => ({ key: `${c.t}:${c.id}`, label: c.doc_no as string })) : [];
   return (
     <>
+      <div className="noprint">
       <div className="top"><div>
         <h1>{editable ? 'แก้ไขใบเตรียมจ่าย/ใบสำคัญจ่าย' : 'ใบเตรียมจ่าย/ใบสำคัญจ่าย'} <span className="no">{s.pay_no}</span> {editable && <SlipRename id={s.id} no={s.pay_no} />}</h1>
         <p className="sub"><a href="/payments">← กลับรายการ</a> · วันที่ {dateTh(s.pay_date)} · ผู้จ่าย {s.vendors.join(', ')}</p></div>
-        <div className="acts" style={{ gap: 8 }}><SlipStatus id={s.id} state={s.state} canWrite={W} /></div></div>
+        <div className="acts" style={{ gap: 8 }}><PrintButton /><a className="btn ghost" href={`/purchases/pay/${s.id}/pdf`}>ดาวน์โหลด PDF</a><SlipStatus id={s.id} state={s.state} canWrite={W} /></div></div>
       <div className="panel" id="share"><div className="acts" style={{ justifyContent: 'space-between' }}>
         <div><span className="sub">จำนวนเงินรวมทั้งสิ้น</span><div style={{ fontSize: 24, color: SLIP_COLOR[s.state] }}>{money(s.gross)}</div><span className="sub">{SLIP_TH[s.state]}</span></div>
         <PurchaseDocTools kind="PAY" id={s.id} token={h.share_token ?? null} canWrite={W} /></div></div>
@@ -75,6 +78,9 @@ export default async function SlipPage({ params }: { params: { id: string } }) {
       <div className="panel" id="history"><h3>ประวัติเอกสาร</h3>
         {events.length === 0 ? <p className="sub">ยังไม่มีประวัติ</p> : <table><thead><tr><th>วันที่-เวลา</th><th>รายการ</th></tr></thead>
           <tbody>{events.map((e, k) => <tr key={k}><td>{new Date(e.at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}</td><td>{e.text}</td></tr>)}</tbody></table>}</div>
+      </div>
+      <h3 className="noprint" style={{ margin: '18px 0 8px' }}>ตัวอย่างเอกสาร (A4)</h3>
+      <PdfPreview src={`/purchases/pay/${s.id}/pdf`} />
     </>
   );
 }
