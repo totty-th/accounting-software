@@ -31,7 +31,7 @@ export function ProductTable({ rows, canWrite, showCost, sortHref, sort, dir, ex
     <>
       <div className="noprint" style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8, minHeight: 30 }}>
         {sel.size > 0 && <span className="pill blue" style={{ display: 'inline-flex', gap: 8, minWidth: 0, alignItems: 'center' }}>เลือก {sel.size} รายการ <button type="button" aria-label="ล้างการเลือก" onClick={() => setSel(new Set())} style={{ background: 'none', border: 0, color: '#fff', cursor: 'pointer', padding: 0 }}>✕</button></span>}
-        <a className="btn sm ghost" href={exportHref} title={sel.size ? 'ดาวน์โหลด Excel เฉพาะที่เลือก' : 'ดาวน์โหลด Excel ตามตัวกรองที่แสดง'}>⬇ ดาวน์โหลด Excel{sel.size ? ` (${sel.size})` : ''}</a>
+        <a className="btn sm ghost" href={exportHref} title={sel.size ? 'ดาวน์โหลด Excel เฉพาะที่เลือก' : 'ดาวน์โหลด Excel ตามตัวกรองที่แสดง'}>ดาวน์โหลด Excel{sel.size ? ` (${sel.size})` : ''}</a>
       </div>
       {msg && <div className="toast" role="alert" onClick={() => setMsg(null)}>{msg}</div>}
       <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>

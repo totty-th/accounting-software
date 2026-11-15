@@ -25,9 +25,9 @@ export function ReportTools({ title, meta = [], exportBase, modes }: { title: st
       {exportBase
         ? (modes ?? [['', 'ดาวน์โหลด Excel']]).map(([m, l]) => <button key={m} className="btn sm ghost" onClick={() => {
             const u = new URL(window.location.href); const q = new URLSearchParams(u.search); if (m) q.set('mode', m); else q.delete('mode'); q.delete('view'); q.delete('doc');
-            window.location.href = `${exportBase}?${q}`; }}>⬇ {l}</button>)
-        : <button className="btn sm ghost" disabled={busy} onClick={xlsx}>⬇ ดาวน์โหลด Excel</button>}
-      <button className="btn sm" onClick={() => window.print()}>🖨 พิมพ์รายงาน</button>
+            window.location.href = `${exportBase}?${q}`; }}>{l}</button>)
+        : <button className="btn sm ghost" disabled={busy} onClick={xlsx}>ดาวน์โหลด Excel</button>}
+      <button className="btn sm" onClick={() => window.print()}>พิมพ์รายงาน</button>
       {err && <span style={{ color: 'var(--red)' }}>{err}</span>}
     </div>
   );

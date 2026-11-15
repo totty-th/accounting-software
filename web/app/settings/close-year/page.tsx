@@ -29,7 +29,7 @@ export default async function CloseList({ searchParams }: { searchParams: { st?:
             <td>{dateTh(r.f)} - {dateTh(r.t)}</td>
             <td className="num">{money(r.rev)}</td><td className="num">{money(r.exp)}</td>
             <td><span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 12, background: r.status === 'approved' ? '#d9f6e6' : '#ffe9c7', color: r.status === 'approved' ? '#037f4c' : '#a8610a' }}>{STATUS_TH[r.status]}</span></td>
-            <td><a className="btn sm ghost" href={`/settings/close-year/${r.id}/xlsx`}>⬇ ดาวน์โหลด</a></td></tr>)}
+            <td><a className="btn sm ghost" href={`/settings/close-year/${r.id}/xlsx`}>ดาวน์โหลด</a></td></tr>)}
             {rows.length === 0 && <tr><td colSpan={7} className="empty">ยังไม่มีเอกสารปิดบัญชี</td></tr>}</tbody></table>
       </div>
     </>

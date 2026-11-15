@@ -86,12 +86,12 @@ export function QtTable({ rows, canWrite, canApprove, canOwn, exportHref }: { ro
         {sel.size === 0 ? <span className="chip">แสดงทั้งหมด</span> : <>
           <strong>เลือก {sel.size} รายการ</strong>
           <button className="btn sm ghost" onClick={() => setSel(new Set())}>✕ ล้างที่เลือก</button>
-          <a className="btn sm ghost" href={`${exportHref}&ids=${[...sel].join(',')}`}>⬇ Excel เฉพาะที่เลือก</a>
-          <a className="btn sm ghost" href={`/sales/batch-pdf?download=1&ids=${[...sel].join(',')}`}>⬇ ดาวน์โหลด PDF</a>
-          <a className="btn sm ghost" target="_blank" href={`/sales/batch-pdf?ids=${[...sel].join(',')}`}>🖨 พิมพ์เอกสาร</a>
+          <a className="btn sm ghost" href={`${exportHref}&ids=${[...sel].join(',')}`}>Excel เฉพาะที่เลือก</a>
+          <a className="btn sm ghost" href={`/sales/batch-pdf?download=1&ids=${[...sel].join(',')}`}>ดาวน์โหลด PDF</a>
+          <a className="btn sm ghost" target="_blank" href={`/sales/batch-pdf?ids=${[...sel].join(',')}`}>พิมพ์เอกสาร</a>
           <a className="btn sm ghost" target="_blank" href={`/sales/envelope?ids=${[...sel].join(',')}`}>✉ พิมพ์จ่าหน้าซอง</a>
         </>}
-        <a className="btn sm ghost" href={exportHref} title="ดาวน์โหลดตามเงื่อนไขที่กรองอยู่ (ทุกหน้า)">⬇ ดาวน์โหลด Excel</a>
+        <a className="btn sm ghost" href={exportHref} title="ดาวน์โหลดตามเงื่อนไขที่กรองอยู่ (ทุกหน้า)">ดาวน์โหลด Excel</a>
       </div>
       <div className="panel" style={{ padding: 0, overflow: 'visible' }}>
         <div style={{ minHeight: 200 }}>

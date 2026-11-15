@@ -24,8 +24,8 @@ export function Kebab({ print, download }: { print?: string; download?: string }
   return (
     <details className="kebab noprint"><summary aria-label="เมนู">•••</summary>
       <div className="kebab-pop">
-        {print && <a href={print} target="_blank" rel="noreferrer">🖨 พิมพ์เอกสาร</a>}
-        {download && <a href={download} download>⬇ ดาวน์โหลด</a>}
+        {print && <a href={print} target="_blank" rel="noreferrer">พิมพ์เอกสาร</a>}
+        {download && <a href={download} download>ดาวน์โหลด</a>}
       </div></details>
   );
 }

@@ -16,7 +16,8 @@ export default async function Dep({ searchParams: sp }: { searchParams: { year?:
   const nav = (n: number, t = tab) => `/assets/depreciation?year=${n}&tab=${t}`;
   return (<>
     <div className="top"><div><h1>บันทึกค่าเสื่อมราคา</h1><p className="sub">ค่าเสื่อม = ค่าเสื่อม/ปี × จำนวนวันที่ใช้ ÷ 365 · ลงบัญชีรายเดือน (JV วันสิ้นเดือน) ทุกเดือนของปี · ถ้าข้อมูลสินทรัพย์เปลี่ยน ระบบกลับรายการ (-R) ใบเดิมแล้วลงใหม่ให้เอง</p></div>
-      <div className="acts"><Link className="btn sm ghost" href="/assets">รายการสินทรัพย์</Link></div></div>
+      <div className="acts"><Link className="btn sm ghost" href="/assets">รายการสินทรัพย์</Link>
+        <a className="btn sm ghost" href={`/assets/depreciation/xlsx?year=${y}`}>ดาวน์โหลดเป็น Excel</a>{W && <PostDepButton year={y} />}</div></div>
     <div className="row-inline" style={{ alignItems: 'center' }}>
       <Link className="btn sm ghost" href={nav(y - 1)}>◀</Link><b style={{ fontSize: 18 }}>ปี {y + 543} ({y})</b><Link className="btn sm ghost" href={nav(y + 1)}>▶</Link>
       <Link className={`btn sm ${tab === 'calc' ? '' : 'ghost'}`} href={nav(y, 'calc')}>ตารางคำนวณค่าเสื่อมราคา</Link>
@@ -28,8 +29,6 @@ export default async function Dep({ searchParams: sp }: { searchParams: { year?:
         <div className="card kpi" style={{ ['--c' as any]: 'var(--orange)' }}><span>ค่าเสื่อมราคารวมของงวด</span><b>{money(sum(rows, 'dep'))}</b></div>
         <div className="card kpi" style={{ ['--c' as any]: 'var(--green)' }}><span>ราคาตามบัญชีใหม่รวม</span><b>{money(sum(rows, 'book_out'))}</b></div>
       </div>
-      <div className="acts" style={{ justifyContent: 'flex-start', marginBottom: 10 }}>
-        <a className="btn sm ghost" href={`/assets/depreciation/xlsx?year=${y}`}>⬇ ดาวน์โหลดเป็น Excel</a>{W && <PostDepButton year={y} />}</div>
       {rows.length === 0 ? <div className="empty">ไม่พบสินทรัพย์ที่ต้องคิดค่าเสื่อมในปีนี้</div> : <div data-report>{cats.map(c => { const g = rows.filter(r => r.cat_name === c); return (
         <section key={c} className="panel" style={{ marginBottom: 12, overflowX: 'auto' }}>
           <h3 style={{ padding: '10px 14px 0' }}>{c} <small className="sub">{g.length} รายการ</small></h3>

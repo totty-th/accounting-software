@@ -65,7 +65,7 @@ export function GlBar({ label, from, to, mode, types = [], total, code }: { labe
       <span className="sub" style={{ marginLeft: 'auto' }}>{mode === 'list' ? `ทั้งหมด ${total} รายการ` : `รายการทั้งหมด ${total} รายการ`}</span>
       {mode === 'list'
         ? <Pop label="ดาวน์โหลด" w={230}>{close => (<><button type="button" className="btn sm ghost" onClick={() => { dl('ledger'); close(); }}>บัญชีแยกประเภท (Excel)</button><div className="sub" style={{ marginTop: -4 }}>ติ๊กเลือกบัญชีในตารางก่อน หรือไม่ติ๊ก = ตามตัวกรองที่แสดง (เฉพาะบัญชีที่มีรายการ)</div><button type="button" className="btn sm ghost" onClick={() => { dl('chart'); close(); }}>โครงสร้างผังบัญชี (Excel)</button></>)}</Pop>
-        : <button type="button" className="btn sm ghost" onClick={() => dl('ledger')}>⬇ ดาวน์โหลด</button>}
+        : <button type="button" className="btn sm ghost" onClick={() => dl('ledger')}>ดาวน์โหลด</button>}
     </div>
   );
 }

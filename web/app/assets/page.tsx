@@ -18,7 +18,7 @@ export default async function Assets({ searchParams: sp }: { searchParams: { q?:
     <>
       <div className="top"><div><h1>รายการสินทรัพย์</h1><p className="sub">ทะเบียนสินทรัพย์ถาวร มูลค่าทางบัญชี ณ {dateTh(asof)} · ซื้อผ่านเอกสารค่าใช้จ่ายแล้วเลือกหมวดสินทรัพย์ ระบบสร้างให้เอง</p></div>
         <div className="acts">
-          <a className="btn sm ghost" href={`/assets/xlsx?${qs}`}>⬇ ดาวน์โหลด Excel</a>
+          <a className="btn sm ghost" href={`/assets/xlsx?${qs}`}>ดาวน์โหลด Excel</a>
           <Link className="btn sm ghost" href="/assets/depreciation">บันทึกค่าเสื่อมราคา</Link>
           <Link className="btn sm ghost" href="/assets/categories">หมวดหมู่สินทรัพย์</Link>
           {W && <Link className="btn" href="/assets/new">+ เพิ่มสินทรัพย์ยกมา</Link>}</div></div>

@@ -47,7 +47,7 @@ export async function ClosingDoc({ id, q, role }: { id?: string; q: Q; role: str
       <div className="top"><div><p className="sub"><Link href="/settings/close-year">← ปิดบัญชีรายได้และค่าใช้จ่าย</Link></p>
         <h1>{doc ? doc.doc_no : 'สร้างรายการปิดบัญชีรายได้และค่าใช้จ่าย'} {doc && <small style={{ fontWeight: 400, fontSize: 14 }}>{STATUS_TH[doc.status]}</small>}</h1></div>
         <div className="noprint" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {doc && <a className="btn ghost" href={`/settings/close-year/${doc.id}/xlsx`}>⬇ ดาวน์โหลด Excel</a>}
+          {doc && <a className="btn ghost" href={`/settings/close-year/${doc.id}/xlsx`}>ดาวน์โหลด Excel</a>}
           {approved && <Link className="btn ghost" href={`/journals/${doc.voucher_id}`}>ดูใบสำคัญ {doc.voucher_no}</Link>}
           {(!doc || !approved) && !clash && (rev.length + exp.length > 0) && <ClosingActions id={doc?.id} status={doc?.status} canWrite={canW} vals={{ date, from: rg.from, to: rg.to, equity: eq }} />}
           {approved && <ClosingActions id={doc.id} status="approved" canWrite={canW} vals={{ date, from: doc.f, to: doc.t, equity: eq }} />}</div></div>
