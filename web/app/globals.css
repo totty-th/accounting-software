@@ -353,3 +353,6 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
 
 /* พรีวิวบนหน้าตั้งค่าดีไซน์: เอกสารเต็มความกว้างกระดาษ (ไม่ใช้ max-width ของหน้าจอ) */
 .paper-pv .sheet{max-width:none;box-shadow:none;border-radius:0;border-top-width:6px}
+.pdf-preview{max-width:794px;margin:0 auto}
+.pdf-preview .pdf-page{display:block;width:100%;height:auto;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 0 12px}
+@media print{.pdf-preview{max-width:none}.pdf-preview .pdf-page{box-shadow:none;margin:0;page-break-after:always;break-after:page}}

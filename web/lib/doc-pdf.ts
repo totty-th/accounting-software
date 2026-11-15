@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { DOC_ORANGE } from './doc-title';
 import path from 'node:path';
 import { PDFDocument, PDFFont, PDFPage, rgb, degrees } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -31,7 +32,7 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
   const f = (n: string) => pdf.embedFont(fs.readFileSync(path.join(dir, 'fonts', n)), { subset: true });
   const F = { th: await f('sarabun-thai-400-normal.woff'), la: await f('sarabun-latin-400-normal.woff'),
               thB: await f('sarabun-thai-700-normal.woff'), laB: await f('sarabun-latin-700-normal.woff') };
-  const t = dlv ? { title: 'ใบส่งของ', rgb: [0.18, 0.49, 0.43] as [number, number, number] } : DOC_TITLE[v.doc.doc_type], dz = v.design, col = (dz?.bw || dz?.paper === 'continuous') && !dlv ? rgb(0.1, 0.1, 0.12) : rgb(...t.rgb), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
+  const t = dlv ? { title: 'ใบส่งของ', rgb: DOC_ORANGE } : { ...DOC_TITLE[v.doc.doc_type], rgb: DOC_ORANGE }, dz = v.design, col = (dz?.bw || dz?.paper === 'continuous') && !dlv ? rgb(0.1, 0.1, 0.12) : rgb(...t.rgb), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
 
   const runs = (s: string) => { const out: [string, boolean][] = []; for (const ch of s) {
     const th = isThai(ch) || ch === '฿'; const last = out[out.length - 1];

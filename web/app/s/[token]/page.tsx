@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { loadViewByToken, DOC_TITLE } from '@/lib/doc-view';
-import { DocSheet } from '@/components/DocSheet';
+import { PdfPreview } from '@/components/PdfPreview';
 import { PrintButton } from '@/components/ShareTools';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,7 @@ export default async function Shared({ params, searchParams }: { params: { token
         <span>{v.company?.name}</span>
         <span className="acts"><PrintButton /><a className="btn" href={`/s/${params.token}/pdf`}>ดาวน์โหลด PDF</a></span>
       </div>
-      <DocSheet v={v} copy={searchParams.c === '1'} />
+      <PdfPreview src={`/s/${params.token}/pdf${searchParams.c === '1' ? '?c=1' : ''}`} />
     </div>
   );
 }

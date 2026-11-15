@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { loadReceiptView, receiptIdByToken } from '@/lib/receipt-view';
-import { ReceiptSheet } from '@/components/ReceiptSheet';
+import { PdfPreview } from '@/components/PdfPreview';
 import { PrintButton } from '@/components/ShareTools';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,7 @@ export default async function SharedReceipt({ params, searchParams }: { params: 
         <span>{v.company?.name}</span>
         <span className="acts"><PrintButton /><a className="btn" href={`/r/${params.token}/pdf`}>ดาวน์โหลด PDF</a></span>
       </div>
-      <ReceiptSheet v={v} copy={searchParams.c === '1'} />
+      <PdfPreview src={`/r/${params.token}/pdf${searchParams.c === '1' ? '?c=1' : ''}`} />
     </div>
   );
 }

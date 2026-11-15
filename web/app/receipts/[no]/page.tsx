@@ -6,7 +6,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { getDb } from '@/lib/db';
 import { Pill } from '@/components/Pill';
-import { ReceiptSheet } from '@/components/ReceiptSheet';
+import { PdfPreview } from '@/components/PdfPreview';
 import { PrintButton, CopyBox } from '@/components/ShareTools';
 import { ActionButton } from '@/components/ActionButton';
 import { CollectForm } from '@/components/CollectForm';
@@ -43,7 +43,7 @@ export default async function ReceiptDetail({ params }: { params: { no: string }
           {W && v.receipt.status !== 'cancelled' && <ActionButton label="ยกเลิกใบเสร็จ" variant="danger" confirmText="ยกเลิกใบเสร็จ?" action={cancelReceipt.bind(null, id)} />}</ActsMenu>
       </div>
       <div className="detail">
-        <ReceiptSheet v={v} />
+        <PdfPreview src={`/receipts/${no}/pdf`} />
         <aside className="side-panels noprint">
           {W && v.receipt.status === 'pending' && <CollectForm id={id} net={net} banks={banks} />}
           <section className="panel">

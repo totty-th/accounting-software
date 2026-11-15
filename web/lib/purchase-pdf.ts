@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { DOC_ORANGE } from './doc-title';
 import path from 'node:path';
 import { PDFDocument, PDFFont, PDFPage, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -15,7 +16,7 @@ export type PView = {
   totals: [string, string, boolean?][]; total?: number; note?: string; signers: [string, string];
   onBehalf?: [string, string]; sign?: { show: boolean; signature?: string | null; stamp?: string | null };
 };
-const COLOR = { PO: rgb(0.16, 0.38, 0.7), RI: rgb(0.1, 0.5, 0.35), PAY: rgb(0.55, 0.3, 0.65), EXP: rgb(0.75, 0.4, 0.15) };
+const COLOR = { PO: rgb(...DOC_ORANGE), RI: rgb(...DOC_ORANGE), PAY: rgb(...DOC_ORANGE), EXP: rgb(...DOC_ORANGE) };
 const ASSETS = () => { const a = path.join(process.cwd(), 'assets'); return fs.existsSync(a) ? a : path.join(process.cwd(), 'web/assets'); };
 const fmt = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qty = (n: unknown) => Number(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: 4 });

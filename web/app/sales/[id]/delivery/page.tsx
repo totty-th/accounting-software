@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { loadView } from '@/lib/doc-view';
 import { requirePage, canViewSalesDoc } from '@/lib/auth';
-import { DeliverySheet } from '@/components/DeliverySheet';
+import { PdfPreview } from '@/components/PdfPreview';
 import { PrintButton } from '@/components/ShareTools';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ export default async function DeliveryPrint({ params, searchParams }: { params: 
       </div>
       {!ok && <p className="sub noprint">ใบเสนอราคายังไม่อนุมัติ — ยังไม่ควรออกใบส่งของ</p>}
       {!v.doc.delivery_mode && <p className="sub noprint">ยังไม่ได้กรอกข้อมูลจัดส่ง (กรอกได้ที่หน้าเอกสาร) ใบส่งของจะไม่มีบล็อกที่อยู่ส่ง</p>}
-      <DeliverySheet v={v} copy={searchParams.c === '1'} />
+      <PdfPreview src={`/sales/${v.doc.doc_no}/pdf?kind=delivery${searchParams.c === '1' ? '&copy=1' : ''}`} />
     </>
   );
 }

@@ -7,7 +7,7 @@ import { DOC_TYPE } from '@/lib/status';
 import { money, dateTh } from '@/lib/format';
 import { ActsMenu } from '@/components/ActsMenu';
 import { Pill } from '@/components/Pill';
-import { DocSheet } from '@/components/DocSheet';
+import { PdfPreview } from '@/components/PdfPreview';
 import { SalesActions } from '@/components/SalesActions';
 import { ActionButton } from '@/components/ActionButton';
 import { CopyBox, PrintButton } from '@/components/ShareTools';
@@ -68,7 +68,7 @@ export default async function SalesDetail({ params }: { params: { id: string } }
         </ActsMenu>
       </div>
       <div className="detail">
-        <DocSheet v={v} />
+        <PdfPreview src={`/sales/${v.doc.doc_no}/pdf`} />
         <aside className="side-panels noprint">
           {can(user.role, 'sales.write') && v.doc.doc_type === 'CA' && v.doc.status === 'pending_collect' && <CashCollectForm id={v.doc.id} total={+v.doc.total} banks={banks} />}
           <section className="panel">

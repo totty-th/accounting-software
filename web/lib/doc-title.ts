@@ -1,4 +1,6 @@
 // ชื่อเอกสารและสีประจำชนิด (ใช้ทั้งหน้าจอ พิมพ์ และ PDF)
+// สีหลักของเอกสาร PDF ทุกชนิด (ส้มเดียวกับเว็บ) — พรีวิว/ลิงก์ลูกค้าแสดง PDF จริง จึงตรงกันเสมอ
+export const DOC_ORANGE: [number, number, number] = [0.91, 0.53, 0.06];
 export const DOC_TITLE: Record<string, { title: string; color: string; rgb: [number, number, number] }> = {
   QT: { title: 'ใบเสนอราคา', color: '#e8870e', rgb: [0.91, 0.53, 0.06] },
   INV: { title: 'ใบแจ้งหนี้/ใบกำกับภาษี', color: '#1f6fb5', rgb: [0.12, 0.44, 0.71] },
