@@ -154,7 +154,7 @@ export async function createExpense(p: { date: string; contact: string; lines: a
 }
 export const approveExpense = async (id: string) => run(call('select approve_expense($1)', id), ALL, 'expenses.approve');
 export type PurchasePay = { method: string; bank_account_id?: string; credit_card_id?: string; petty_fund_id?: string;
-  cheque_no?: string; cheque_date?: string; clear_date?: string; amount: number };
+  cheque_no?: string; cheque_date?: string; clear_date?: string; fee?: number; amount: number };
 const payJson = (p?: PurchasePay[]) => (p && p.length ? JSON.stringify(p) : null);
 export const payExpense = async (id: string, payments?: PurchasePay[]) =>
   run(call(`select pay_expense($1,$2::date,'11112',true,'PND53',null,$3::jsonb)`, id, today(), payJson(payments)), ALL, 'expenses.write');

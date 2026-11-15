@@ -3,8 +3,8 @@ import { useState, useTransition } from 'react';
 import type { PurchasePay } from '@/lib/actions';
 
 const METHODS: [string, string][] = [['cash', 'เงินสด'], ['transfer', 'โอนเงิน'], ['cheque', 'เช็ค'], ['card', 'บัตรเครดิต'], ['petty', 'เงินสดย่อย']];
-interface Row { method: string; bank_account_id: string; credit_card_id: string; petty_fund_id: string; cheque_no: string; clear_date: string; amount: string }
-const blank = (amount = ''): Row => ({ method: 'cash', bank_account_id: '', credit_card_id: '', petty_fund_id: '', cheque_no: '', clear_date: '', amount });
+interface Row { method: string; bank_account_id: string; credit_card_id: string; petty_fund_id: string; cheque_no: string; clear_date: string; fee: string; amount: string }
+const blank = (amount = ''): Row => ({ method: 'cash', bank_account_id: '', credit_card_id: '', petty_fund_id: '', cheque_no: '', clear_date: '', fee: '', amount });
 export interface Opt { id: string; label: string }
 
 // จ่ายเงินฝั่งซื้อ: หลายช่องทาง (เงินสด/โอน/บัตรเครดิต) ผลรวมต้องเท่ายอดจ่ายสุทธิ · เช็คและช่องทางอื่นยังไม่เปิด (ยังไม่ทดสอบการลงบัญชี)
@@ -18,12 +18,13 @@ export function PayForm({ net, banks, cards, petties = [], onPay, label = 'จ�
   const shortOk = allowShort && short && sum > 0 && sum < net;
   const set = (i: number, p: Partial<Row>) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, ...p } : r)));
   const bad = (r: Row) => (r.method === 'transfer' && !r.bank_account_id) || (r.method === 'card' && !r.credit_card_id) ||
-    (r.method === 'petty' && !r.petty_fund_id) || (r.method === 'cheque' && (!r.bank_account_id || !r.cheque_no || !r.clear_date));
+    (r.method === 'petty' && !r.petty_fund_id) || (r.method === 'cheque' && (!r.bank_account_id || !r.cheque_no || !r.clear_date || Number(r.fee || 0) < 0));
   const submit = () => start(async () => {
     const res = await onPay(rows.map(r => ({ method: r.method, amount: Number(r.amount),
       bank_account_id: r.method === 'transfer' || r.method === 'cheque' ? r.bank_account_id : undefined,
       credit_card_id: r.method === 'card' ? r.credit_card_id : undefined, petty_fund_id: r.method === 'petty' ? r.petty_fund_id : undefined,
-      cheque_no: r.method === 'cheque' ? r.cheque_no : undefined, clear_date: r.method === 'cheque' ? r.clear_date : undefined })),
+      cheque_no: r.method === 'cheque' ? r.cheque_no : undefined, clear_date: r.method === 'cheque' ? r.clear_date : undefined,
+      fee: r.method === 'cheque' && Number(r.fee) > 0 ? Number(r.fee) : undefined })),
       shortOk ? 'discount' : undefined);
     setMsg(res.error ?? null);
   });
@@ -47,9 +48,10 @@ export function PayForm({ net, banks, cards, petties = [], onPay, label = 'จ�
           <input aria-label="จำนวนเงิน" inputMode="decimal" value={r.amount} onChange={e => set(i, { amount: e.target.value })} />
           {rows.length > 1 ? <button type="button" className="btn sm ghost" onClick={() => setRows(rs => rs.filter((_, j) => j !== i))}>ลบ</button> : <span />}
           {r.method === 'cheque' && (
-            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
               <input aria-label="เลขที่เช็ค" placeholder="เลขที่เช็ค" value={r.cheque_no} onChange={e => set(i, { cheque_no: e.target.value })} />
               <input aria-label="วันที่ถูกตัดบัญชี" type="date" value={r.clear_date} onChange={e => set(i, { clear_date: e.target.value })} />
+              <input aria-label="ค่าธรรมเนียมเช็ค" placeholder="ค่าธรรมเนียม (ถ้ามี)" inputMode="decimal" value={r.fee} onChange={e => set(i, { fee: e.target.value })} />
             </div>)}
         </div>))}
       <div className="acts" style={{ justifyContent: 'flex-start', gap: 8 }}>
