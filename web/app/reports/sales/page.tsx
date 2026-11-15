@@ -88,10 +88,10 @@ export default async function SalesReport({ searchParams }: { searchParams: Sp }
         <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {emp ? emp.totals.docs + emp.acctDocs : tot.n} เอกสาร</div>
         <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 8 }}>
           {emp ? <>
-            <div title={`เอกสารขาย ${money(emp.totals.sub)} · เอกสารบัญชี ${money(emp.acctTotal)}`}><div className="sub">ยอดรวมก่อนภาษี (ขาย+บัญชี) ⓘ</div><strong>{money(emp.totals.sub + emp.acctTotal)}</strong><div className="sub">เอกสารขาย {money(emp.totals.sub)} · เอกสารบัญชี {money(emp.acctTotal)}</div></div>
+            <div title={`เอกสารขาย ${money(emp.totals.sub)} · เอกสารบัญชี ${money(emp.acctTotal)}`}><div className="sub">ยอดรวมก่อนภาษี (ขาย+บัญชี) <span className="info-dot" aria-hidden>i</span></div><strong>{money(emp.totals.sub + emp.acctTotal)}</strong><div className="sub">เอกสารขาย {money(emp.totals.sub)} · เอกสารบัญชี {money(emp.acctTotal)}</div></div>
             <div><div className="sub">ภาษีมูลค่าเพิ่ม</div><strong>{money(emp.totals.vat)}</strong></div>
             <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(emp.totals.total + emp.acctTotal)}</strong></div></> : <>
-          <div><div className="sub">มูลค่าก่อนภาษี</div><strong>{money(tot.sub)}</strong></div>{view === 'product' && <div title={`เอกสารขาย ${money(salesTotal)} · เอกสารบัญชี ${money(acctTotal)}`}><div className="sub">ยอดรวมก่อนภาษี (ขาย+บัญชี) ⓘ</div><strong>{money(salesTotal + acctTotal)}</strong><div className="sub">เอกสารขาย {money(salesTotal)} · เอกสารบัญชี {money(acctTotal)}</div></div>}
+          <div><div className="sub">มูลค่าก่อนภาษี</div><strong>{money(tot.sub)}</strong></div>{view === 'product' && <div title={`เอกสารขาย ${money(salesTotal)} · เอกสารบัญชี ${money(acctTotal)}`}><div className="sub">ยอดรวมก่อนภาษี (ขาย+บัญชี) <span className="info-dot" aria-hidden>i</span></div><strong>{money(salesTotal + acctTotal)}</strong><div className="sub">เอกสารขาย {money(salesTotal)} · เอกสารบัญชี {money(acctTotal)}</div></div>}
           <div><div className="sub">ภาษีมูลค่าเพิ่ม</div><strong>{money(tot.vat)}</strong></div>
           <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(tot.total)}</strong></div></>}
         </div>

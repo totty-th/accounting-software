@@ -84,7 +84,7 @@ export default async function PurchaseReport({ searchParams }: { searchParams: S
       <div className="panel">
         <div className="sub">ณ วันที่ {dateTh(t)} · ช่วงเวลา {range ? `${dateTh(range[0])} - ${dateTh(range[1])}` : 'ทั้งหมด'} · {tot.n + acct.length} เอกสาร (เอกสารซื้อ {tot.n} · เอกสารบัญชี {acct.length})</div>
         <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 8 }}>
-          <div title={`เอกสารซื้อ ${money(tot.net)} · เอกสารบัญชี ${money(acctTot)}`}><div className="sub">ยอดรวมก่อนภาษี (ซื้อ+บัญชี) ⓘ</div><strong>{money(Number(tot.net) + acctTot)}</strong>
+          <div title={`เอกสารซื้อ ${money(tot.net)} · เอกสารบัญชี ${money(acctTot)}`}><div className="sub">ยอดรวมก่อนภาษี (ซื้อ+บัญชี) <span className="info-dot" aria-hidden>i</span></div><strong>{money(Number(tot.net) + acctTot)}</strong>
             <div className="sub">เอกสารซื้อ {money(tot.net)} · เอกสารบัญชี {money(acctTot)}</div></div>
           <div><div className="sub">ภาษีซื้อ</div><strong>{money(tot.vat)}</strong></div>
           <div><div className="sub">ยอดรวมทั้งสิ้น</div><strong>{money(Number(tot.total) + acctTot)}</strong></div>

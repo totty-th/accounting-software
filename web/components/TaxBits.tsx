@@ -10,7 +10,7 @@ export function Dot({ s }: { s: string }) {
 export function RelPop({ rel, extra }: { rel: { no: string; kind: string; href: string }[]; extra?: string }) {
   if (!rel.length && !extra) return null;
   return (
-    <span className="relpop noprint" tabIndex={0} aria-label="เอกสารที่เกี่ยวข้อง"><span className="relpop-ico" aria-hidden>🗎</span>
+    <span className="relpop noprint" tabIndex={0} aria-label="เอกสารที่เกี่ยวข้อง"><span className="info-dot" aria-hidden>i</span>
       <span className="relpop-body" role="tooltip"><b>เอกสารที่เกี่ยวข้อง</b>
         {rel.length > 0 && <span className="sub">เอกสารอ้างอิง</span>}
         {rel.map(r => <Link key={r.no} href={r.href} target="_blank" title={r.kind}>↗ {r.no}</Link>)}

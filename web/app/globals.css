@@ -213,7 +213,7 @@ tr.dl-sub td{background:rgba(127,127,127,.06);font-size:13px}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:var(--muted)}
 .dot-green{background:var(--green)}.dot-orange{background:var(--orange)}.dot-red{background:var(--red)}.dot-blue{background:var(--blue)}.dot-purple{background:var(--purple)}.dot-teal{background:#2aa}.dot-grey{background:#bbb}
 .relpop{display:inline-block;position:relative;margin-left:6px;cursor:default;outline:none;color:var(--blue)}
-.relpop-ico{font-size:13px}
+
 .relpop-body{display:none;position:absolute;z-index:40;left:-8px;top:100%;min-width:190px;background:var(--surface);color:var(--text,inherit);border:1px solid var(--line);border-top:4px solid #4fc1ea;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:10px 12px;font-size:13px;white-space:nowrap;flex-direction:column;gap:4px}
 .relpop:hover .relpop-body,.relpop:focus .relpop-body,.relpop:focus-within .relpop-body{display:flex}
 .relpop-body b{color:var(--blue);font-size:14px;border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:2px}
@@ -356,3 +356,6 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
 .pdf-preview{max-width:794px;margin:0 auto}
 .pdf-preview .pdf-page{display:block;width:100%;height:auto;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.18);margin:0 0 12px}
 @media print{.pdf-preview{max-width:none}.pdf-preview .pdf-page{box-shadow:none;margin:0;page-break-after:always;break-after:page}}
+/* ไอคอน "ดูเพิ่มเติม" วงกลมวาดด้วย CSS (ไม่พึ่งอักขระพิเศษ/อีโมจิ จึงไม่เป็นสี่เหลี่ยมบนเครื่องที่ไม่มีฟอนต์) — ใช้ทั้งระบบ */
+.info-dot{--i:var(--blue);display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:1.5px solid var(--i);color:var(--i);font:700 11px/1 var(--font-sans,system-ui,sans-serif);vertical-align:middle;cursor:pointer;transition:background .12s,color .12s}
+.relpop:hover .info-dot,.relpop:focus .info-dot,button:hover>.info-dot{background:var(--i);color:#fff}

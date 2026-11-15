@@ -44,7 +44,7 @@ export default async function Payments({ searchParams }: { searchParams: { q?: s
               <td>{r.due_date ? dateTh(r.due_date) : dateTh(r.pay_date)}</td>
               <td className="no"><span style={{ color: DOT[r.state] }}>●</span> <a href={`/payments/${r.id}`}>{r.pay_no}</a></td>
               <td>{r.vendors.join(', ')}<div className="sub">{r.docs} เอกสาร</div></td>
-              <td className="num">{money(r.net)}{r.wht > 0 && <div className="sub" title={`ยอดตามเอกสาร ${money(r.gross)} · หัก ณ ที่จ่าย ${money(r.wht)}`}>ⓘ หัก {money(r.wht)}</div>}</td>
+              <td className="num">{money(r.net)}{r.wht > 0 && <div className="sub" title={`ยอดตามเอกสาร ${money(r.gross)} · หัก ณ ที่จ่าย ${money(r.wht)}`}><span className="info-dot" aria-hidden>i</span> หัก {money(r.wht)}</div>}</td>
               <td><SlipStatus id={r.id} state={r.state} canWrite={W} /></td>
               <td className="noprint"><details style={{ position: 'relative' }}><summary className="btn sm ghost" style={{ listStyle: 'none', cursor: 'pointer' }}>⋯</summary>
                 <div className="panel" style={{ position: 'absolute', right: 0, zIndex: 5, minWidth: 170, padding: 6, display: 'grid', gap: 4 }}>

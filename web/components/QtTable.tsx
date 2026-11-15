@@ -119,7 +119,7 @@ export function QtTable({ rows, canWrite, canApprove, canOwn, exportHref }: { ro
                   <td className="c-cust">{r.customer}{r.project ? <div className="sub">{r.project}</div> : null}</td>
                   <td className="num c-total">{fmt(r.total)}
                     {r.billing && <div className="sub">{r.billing.deposit ? 'รับมัดจำแล้ว' : 'เรียกเก็บแล้ว'} {fmt(r.billing.billed)} <button aria-label="ประวัติการเรียกเก็บ" onClick={() => setInfo(r)}
-                      style={{ background: 'none', border: 0, cursor: 'pointer', color: '#db2777' }}>ⓘ</button></div>}</td>
+                      style={{ background: 'none', border: 0, cursor: 'pointer', padding: 0, marginLeft: 4 }}><span className="info-dot" aria-hidden>i</span></button></div>}</td>
                   <td className="c-st"><Menu trigger={<span className="pill" style={{ background: toneColor[tone], color: '#fff', padding: '3px 10px', borderRadius: 12 }}>{label} ▾</span>} items={its} onRun={run} /></td>
                   <td className="c-more"><Menu align="right" trigger={<span style={{ padding: '0 8px', fontWeight: 700 }}>⋯</span>} items={more} onRun={run} /></td>
                 </tr>);
