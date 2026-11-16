@@ -80,7 +80,7 @@ describe('M38 ใบเตรียมจ่าย รอบ 2', () => {
 
 describe('M38 หัก ณ ที่จ่ายในหน้าจ่าย (RI)', () => {
   it('หักบางส่วน: PV เจ้าหนี้เต็ม/หัก/จ่ายสุทธิ · ออกใบหัก ณ ที่จ่ายฐานก่อน VAT · ยกเลิกใบ → ใบหักถูกยกเลิก', async () => {
-    await call(`insert into accounts(code,name,type) values ('11500','สินค้า','asset') on conflict do nothing`);
+    await call(`insert into accounts(code,name,type) values ('11500','สินค้า','asset'), ('51111.01','ซื้อสินค้า','expense') on conflict do nothing`);
     const p = (await one<any>(`insert into products(code,name,kind,purchase_price) values ('T','T','goods_stock',500) returning id`)).id;
     const r = (await one<any>('select create_goods_receipt($1::date,$2,$3::jsonb) id', [D, v1, JSON.stringify([{ product_id: p, qty: 1, unit_price: 500 }])])).id;
     const s = await slip([{ type: 'RI', id: r }]);   // รวม VAT 535

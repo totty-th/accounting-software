@@ -7,7 +7,7 @@ let db: PGlite;
 let cust: string, vendor: string, prod: string, mainWh: string;
 const ACCOUNTS: [string, string, string][] = [
   ['11112', 'เงินสด', 'asset'], ['11311', 'ลูกหนี้', 'asset'], ['11319', 'ใบเสร็จรอเรียกเก็บ', 'asset'],
-  ['11500', 'สินค้าคงเหลือ', 'asset'], ['17113', 'ภาษีซื้อยังไม่ถึงกำหนด', 'asset'],
+  ['11500', 'สินค้าคงเหลือ', 'asset'], ['51111.01', 'ซื้อสินค้า', 'expense'], ['17113', 'ภาษีซื้อยังไม่ถึงกำหนด', 'asset'],
   ['21311', 'เจ้าหนี้การค้า', 'liability'], ['27111', 'ภาษีขาย', 'liability'],
   ['41110', 'รายได้ขายสินค้า', 'revenue'], ['41210', 'รายได้บริการ', 'revenue'], ['51100', 'ต้นทุนขาย', 'expense'],
 ];
@@ -58,7 +58,7 @@ describe('PUR-07 ใบรับสินค้า (D-01 แบบ B)', () => {
     const id = await ri(10, 600);
     const r = await one<any>('select * from goods_receipts where id=$1', [id]);
     expect([r.ri_no, +r.subtotal, +r.vat, +r.total]).toEqual(['RI202610150001', 6000, 420, 6420]);
-    expect(await entries(r.uv_voucher_id)).toEqual([['11500', 6000, 0], ['17113', 420, 0], ['21311', 0, 6420]]);
+    expect(await entries(r.uv_voucher_id)).toEqual([['51111.01', 6000, 0], ['17113', 420, 0], ['21311', 0, 6420]]);
     expect(await onHand()).toBe(10);
     expect(await ps()).toMatchObject({ q: 10, v: 6000, a: 600 });
   });
@@ -102,7 +102,7 @@ describe('STK-03/13/14 ตัดสต็อกและต้นทุนขา
     await ri(3, 100.01); // 300.03 รวม 600.03 / 6
     await sell(6);
     expect(await ps()).toMatchObject({ q: 0, v: 0 });
-    expect(await tb('11500')).toBe(600.03);   // บัญชีมีแต่ใบรับสินค้า ไม่มีการตัดต้นทุน
+    expect(await tb('51111.01')).toBe(600.03);   // บัญชีมีแต่ใบรับสินค้า ไม่มีการตัดต้นทุน
   });
   it('D-03 สินค้าตั้งบล็อก: ขายเกินไม่ได้ ไม่เหลือเอกสารหรือรายการค้าง', async () => {
     const p = await mkProduct('BLK', 'goods_stock', { block: true });
@@ -127,7 +127,7 @@ describe('STK-03/13/14 ตัดสต็อกและต้นทุนขา
   it('การขาย/ยกเลิกไม่แตะบัญชีสินค้าคงเหลือ (ตามต้นแบบ ไม่ลงต้นทุน)', async () => {
     await ri(10, 600); const i1 = await sell(3); await ri(10, 800); await sell(5);
     await call('select cancel_sales_doc($1)', [i1]);
-    expect(await tb('11500')).toBe(14000);   // ใบรับสินค้า 6,000 + 8,000 เท่านั้น
+    expect(await tb('51111.01')).toBe(14000);   // ใบรับสินค้า 6,000 + 8,000 เท่านั้น
   });
 });
 
@@ -148,7 +148,7 @@ describe('ยกเลิกใบรับสินค้า', () => {
     await call('select pay_goods_receipt($1,$2::date)', [id, D]);
     await call('select cancel_goods_receipt($1)', [id]);
     expect(await onHand()).toBe(0);
-    expect(await tb('11500')).toBe(0); expect(await tb('21311')).toBe(0); expect(await tb('11112')).toBe(0);
+    expect(await tb('51111.01')).toBe(0); expect(await tb('21311')).toBe(0); expect(await tb('11112')).toBe(0);
   });
 });
 

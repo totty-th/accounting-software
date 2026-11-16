@@ -6,7 +6,7 @@ const dir = new URL('../supabase/migrations/', import.meta.url);
 let db: PGlite;
 let v1: string, prod: string;
 const ACCOUNTS: [string, string, string][] = [
-  ['11112', 'เงินสด', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['17113', 'ภาษีซื้อ', 'asset'],
+  ['11112', 'เงินสด', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['51111.01', 'ซื้อสินค้า', 'expense'], ['17113', 'ภาษีซื้อ', 'asset'],
   ['21311', 'เจ้าหนี้การค้า', 'liability'], ['21399', 'เจ้าหนี้อื่นๆ', 'liability'], ['27124', 'ภาษีหัก ณ ที่จ่าย', 'liability'], ['53101', 'ค่าบริการ', 'expense'],
 ];
 const D = '2026-10-15';

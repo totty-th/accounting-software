@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 const dir = new URL('../supabase/migrations/', import.meta.url);
 let db: PGlite; let cust: string, prod: string;
 const ACCOUNTS: [string, string, string][] = [
-  ['11311', 'ลูกหนี้การค้า', 'asset'], ['11319', 'ลูกหนี้อื่น', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['27111', 'ภาษีขาย', 'liability'],
+  ['11311', 'ลูกหนี้การค้า', 'asset'], ['11319', 'ลูกหนี้อื่น', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['51111.01', 'ซื้อสินค้า', 'expense'], ['27111', 'ภาษีขาย', 'liability'],
   ['41110', 'รายได้ขายสินค้า', 'revenue'], ['41210', 'รายได้บริการ', 'revenue'], ['41400', 'รับคืน', 'revenue'], ['21921', 'มัดจำรับ', 'liability'],
 ];
 const D = '2026-10-15';

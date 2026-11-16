@@ -6,7 +6,7 @@ import { related } from '../web/lib/related';
 const dir = new URL('../supabase/migrations/', import.meta.url);
 let db: PGlite, v1: string, prod: string;
 const ACC: [string, string, string][] = [['17113', 'ภาษีซื้อ', 'asset'], ['21399', 'เจ้าหนี้อื่น', 'liability'], ['21311', 'เจ้าหนี้การค้า', 'liability'],
-  ['11500', 'สินค้าคงเหลือ', 'asset'], ['53101', 'ค่าโฆษณา', 'expense']];
+  ['11500', 'สินค้าคงเหลือ', 'asset'], ['51111.01', 'ซื้อสินค้า', 'expense'], ['53101', 'ค่าโฆษณา', 'expense']];
 const D = '2026-10-25';
 const q = async <T = any>(s: string, a: unknown[] = []) => (await db.query<any>(s, a)).rows as T[];
 const one = async <T = any>(s: string, a: unknown[] = []) => (await q<T>(s, a))[0];

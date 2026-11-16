@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 const dir = new URL('../supabase/migrations/', import.meta.url);
 let db: PGlite; let v1: string, prod: string;
 const ACCOUNTS: [string, string, string][] = [
-  ['11112', 'เงินสด', 'asset'], ['11122', 'ธนาคาร', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['12612', 'ค่าบริการ', 'expense'], ['53110', 'ค่าเช่า', 'expense'],
+  ['11112', 'เงินสด', 'asset'], ['11122', 'ธนาคาร', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['51111.01', 'ซื้อสินค้า', 'expense'], ['12612', 'ค่าบริการ', 'expense'], ['53110', 'ค่าเช่า', 'expense'],
   ['17113', 'ภาษีซื้อ', 'asset'], ['21311', 'เจ้าหนี้การค้า', 'liability'], ['21399', 'เจ้าหนี้อื่น', 'liability'], ['52110', 'ค่าธรรมเนียมธนาคาร', 'expense'], ['27124', 'ภาษีหัก ณ ที่จ่ายค้างจ่าย', 'liability'], ['27121', 'ภงด ค้างจ่าย', 'liability'], ['27122', 'ภงด ค้างจ่าย 2', 'liability'], ['27123', 'ภงด ค้างจ่าย 3', 'liability'],
 ];
 const D = '2026-10-15';
@@ -38,7 +38,7 @@ describe('M20 รายงานซื้อ/ค่าใช้จ่ายต�
     const r = await rec();
     expect(+r.doc.ri).toBe(2360); expect(+r.doc.exp).toBe(1000 + 5000 + 300); expect(+r.doc.total).toBe(2360 + 6300);
     expect(+r.diff).toBe(0); expect(+r.vat_diff).toBe(0);
-    expect(r.gl.by_account.find((a: any) => a.code === '11500').amount).toBe(2360 as any);
+    expect(r.gl.by_account.find((a: any) => a.code === '51111.01').amount).toBe(2360 as any);
     expect(r.doc.exp_by_account.map((a: any) => [a.code, +a.amount])).toEqual([['12612', 1300], ['53110', 5000]]);
   });
 

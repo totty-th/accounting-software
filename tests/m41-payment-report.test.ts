@@ -7,7 +7,7 @@ import { channelOptions, paymentRows, groupPayments, paymentExportRows } from '.
 const dir = new URL('../supabase/migrations/', import.meta.url);
 let db: PGlite; const D = '2026-10-15';
 const ACCOUNTS: [string, string, string][] = [
-  ['11112', 'เงินสด', 'asset'], ['11122', 'ธนาคาร', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['17113', 'ภาษีซื้อยังไม่ถึงกำหนด', 'asset'], ['17111', 'ภาษีซื้อ', 'asset'],
+  ['11112', 'เงินสด', 'asset'], ['11122', 'ธนาคาร', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['51111.01', 'ซื้อสินค้า', 'expense'], ['17113', 'ภาษีซื้อยังไม่ถึงกำหนด', 'asset'], ['17111', 'ภาษีซื้อ', 'asset'],
   ['21311', 'เจ้าหนี้การค้า', 'liability'], ['21399', 'เจ้าหนี้อื่นๆ', 'liability'], ['27124', 'ภาษีหัก ณ ที่จ่าย', 'liability'], ['53101', 'ค่าบริการ', 'expense'], ['11113', 'เงินสดย่อย', 'asset'],
 ];
 const one = async <T = any>(q: string, a: unknown[] = []) => (await db.query<any>(q, a)).rows[0] as T;

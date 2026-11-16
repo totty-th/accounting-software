@@ -6,7 +6,7 @@ import { employeeReport } from '../web/lib/sales-by-employee';
 const dir = new URL('../supabase/migrations/', import.meta.url);
 let db: PGlite; let cust: string, cust2: string;
 const ACCOUNTS: [string, string, string][] = [
-  ['11112', 'เงินสด', 'asset'], ['11311', 'ลูกหนี้การค้า', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['27111', 'ภาษีขาย', 'liability'],
+  ['11112', 'เงินสด', 'asset'], ['11311', 'ลูกหนี้การค้า', 'asset'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['51111.01', 'ซื้อสินค้า', 'expense'], ['27111', 'ภาษีขาย', 'liability'],
   ['41110', 'รายได้ขายสินค้า', 'revenue'], ['41210', 'รายได้บริการ', 'revenue'], ['11319', 'ลูกหนี้อื่น', 'asset'], ['41400', 'รับคืน', 'revenue'], ['21921', 'มัดจำรับ', 'liability'], ['49010', 'ดอกเบี้ยรับ', 'revenue'],
 ];
 const D = '2026-10-15';

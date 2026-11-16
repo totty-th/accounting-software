@@ -6,7 +6,7 @@ const dir = new URL('../supabase/migrations/', import.meta.url);
 let db: PGlite;
 let vendor: string, prod: string;
 const ACCOUNTS: [string, string, string][] = [
-  ['11112', 'เงินสด', 'asset'], ['11122', 'ธนาคาร', 'asset'], ['53211', 'ค่าธรรมเนียมธนาคาร', 'expense'], ['11500', 'สินค้าคงเหลือ', 'asset'],
+  ['11112', 'เงินสด', 'asset'], ['11122', 'ธนาคาร', 'asset'], ['53211', 'ค่าธรรมเนียมธนาคาร', 'expense'], ['11500', 'สินค้าคงเหลือ', 'asset'], ['51111.01', 'ซื้อสินค้า', 'expense'],
   ['17113', 'ภาษีซื้อยังไม่ถึงกำหนด', 'asset'], ['21311', 'เจ้าหนี้การค้า', 'liability'], ['21399', 'เจ้าหนี้อื่นๆ', 'liability'],
   ['27124', 'ภาษีหัก ณ ที่จ่าย', 'liability'], ['53101', 'ค่าบริการ', 'expense'], ['51100', 'ต้นทุนขาย', 'expense'],
   ['41110', 'รายได้ขาย', 'revenue'], ['11311', 'ลูกหนี้', 'asset'], ['27111', 'ภาษีขาย', 'liability'], ['11319', 'รอเก็บ', 'asset'], ['41210', 'รายได้บริการ', 'revenue'],
@@ -64,7 +64,7 @@ describe('M18 ใบรับสินค้า: อนุมัติ / ไม�
     expect(await reversals()).toEqual(['UV0001-R']);
     expect(await onHand()).toBe(0);
     expect(await tb('21311')).toBe(0);
-    expect(await tb('11500')).toBe(0);
+    expect(await tb('51111.01')).toBe(0);
   });
   it('รีเซ็ตหลังไม่อนุมัติ: ออก UV ใหม่ + สต็อกคืน กลับเป็นรออนุมัติ · ยอดเท่าเดิม', async () => {
     const id = await ri();
@@ -72,7 +72,7 @@ describe('M18 ใบรับสินค้า: อนุมัติ / ไม�
     await call('select reset_goods_receipt($1)', [id]);
     const r = await R(id);
     expect(r.status).toBe('unpaid');
-    expect(await entries(r.uv_voucher_id)).toEqual([['11500', 2400, 0], ['17113', 168, 0], ['21311', 0, 2568]]);
+    expect(await entries(r.uv_voucher_id)).toEqual([['51111.01', 2400, 0], ['17113', 168, 0], ['21311', 0, 2568]]);
     expect(await onHand()).toBe(4);
     expect(await tb('21311')).toBe(-2568);
     expect(await reversals()).toEqual(['UV0001-R']);   // ใบ -R เดิมยังอยู่ ไม่ถูกลบ
