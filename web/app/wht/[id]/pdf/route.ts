@@ -1,4 +1,4 @@
-import { apiUser } from '@/lib/auth';
+import { apiUser, canViewBuyDoc } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { buildCertPdf, type CertData } from '@/lib/wht-pdf';
 
@@ -8,7 +8,8 @@ export const runtime = 'nodejs';
 // GET /wht/{id}/pdf            → PDF 50 ทวิ (ถ้ายังขาดข้อมูลสำคัญ ตอบ 422 พร้อมรายการที่ขาด)
 // GET /wht/{id}/pdf?draft=1    → ออกได้แม้ข้อมูลไม่ครบ (ช่องที่ขาดเว้นว่าง) สำหรับร่าง
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const au = await apiUser('wht.read'); if (au instanceof Response) return au;
+  const au = await apiUser(['wht.read', 'buy.own']); if (au instanceof Response) return au;
+  if (!(await canViewBuyDoc(au, 'WT', params.id))) return Response.json({ error: 'ไม่มีสิทธิ์' }, { status: 403 });
   const db = await getDb();
   let data: CertData;
   try {

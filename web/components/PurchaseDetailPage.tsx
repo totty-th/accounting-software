@@ -2,8 +2,8 @@ import { ActsMenu } from '@/components/ActsMenu';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDb } from '@/lib/db';
-import { requirePage } from '@/lib/auth';
-import { can } from '@/lib/permissions';
+import { requirePage, canViewBuyDoc } from '@/lib/auth';
+import { can, buyScope } from '@/lib/permissions';
 import { dateTh, money, partyName } from '@/lib/format';
 import { loadPurchaseView, type PKind } from '@/lib/purchase-pdf';
 import { Pill } from '@/components/Pill';
@@ -21,8 +21,10 @@ const METHOD: Record<string, string> = { cash: 'เงินสด', transfer: '
 
 /** หน้าเอกสารซื้อ (ค่าใช้จ่าย / ใบรับสินค้า / ใบสั่งซื้อ): ตัวเอกสาร + แถบทำรายการ + ข้อมูลที่เกี่ยวข้อง */
 export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'PO'; id: string }) {
-  const user = await requirePage('expenses.read');
-  const W = can(user.role, 'expenses.write'), AP = can(user.role, 'expenses.approve'), MW = can(user.role, 'master.write');
+  const user = await requirePage(['expenses.read', 'expenses.own', 'buy.own']);
+  if (!(await canViewBuyDoc(user, kind, id))) notFound();
+  const PW = can(user.role, 'expenses.write');                      // จ่ายเงิน: ต้องมีสิทธิ์เต็ม
+  const W = PW || buyScope(user.role, kind) === 'own', AP = can(user.role, 'expenses.approve'), MW = can(user.role, 'master.write');
   const v = await loadPurchaseView(kind as PKind, id);
   if (!v) notFound();
   const db = await getDb();
@@ -67,7 +69,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
             <details><summary className="btn ghost">แบ่งจ่ายใบรับสินค้า</summary>
               <SplitRiForm poId={id} total={Number(h.total)} billed={Number(h.billed)} today={todayIso} lines={splitLines} status={st} /></details>)}
           {kind === 'PO' && W && (st === 'pending' || st === 'approved') && <Link className="btn ghost" href={`/expenses/new?po=${id}`}>สร้างค่าใช้จ่าย</Link>}
-          {kind !== 'PO' && W && payable.includes(st) && (
+          {kind !== 'PO' && PW && payable.includes(st) && (
             <details><summary className="btn">จ่ายเงิน</summary>
               <PayForm net={net} banks={banks} cards={cards} petties={petties} allowShort={kind === 'RI'}
                 onPay={(kind === 'EXP' ? A.payExpense : A.payGoodsReceipt).bind(null, id) as any} /></details>)}

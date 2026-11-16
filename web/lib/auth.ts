@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getDb } from './db';
 import { COOKIE, verifySession } from './session';
-import { can, isRole, homeOf, type Perm, type Role } from './permissions';
+import { can, isRole, homeOf, buyScope, type BuyKind, type Perm, type Role } from './permissions';
 
 export type AuthUser = { id: string; username: string; displayName: string; role: Role };
 
@@ -39,4 +39,24 @@ export async function canViewSalesDoc(u: AuthUser, docId: string): Promise<boole
   if (can(u.role, 'sales.own')) return (await (await getDb()).q(`select 1 from sales_docs where id=$1 and created_by=$2`, [docId, u.id])).length > 0;
   if (!can(u.role, 'quote.own')) return false;
   return (await (await getDb()).q(`select 1 from sales_docs where id=$1 and doc_type='QT' and created_by=$2`, [docId, u.id])).length > 0;
+}
+
+const BUY_TABLE: Record<BuyKind, string> = { EXP: 'expenses', RI: 'goods_receipts', PO: 'purchase_orders', WT: 'wht_certs' };
+/** เจ้าของเอกสารซื้อ (ผู้สร้าง) · 50 ทวิ นับรวมเอกสารต้นทางที่ตัวเองสร้าง */
+export async function ownsBuyDoc(u: { id: string }, kind: BuyKind, id: string): Promise<boolean> {
+  const db = await getDb();
+  const sql = kind === 'WT'
+    ? `select 1 from wht_certs w where w.id=$1 and (w.created_by=$2 or exists (select 1 from expenses e where e.id=w.expense_id and e.created_by=$2))`
+    : `select 1 from ${BUY_TABLE[kind]} where id=$1 and created_by=$2`;
+  return (await db.q(sql, [id, u.id])).length > 0;
+}
+/** ดู/แก้เอกสารซื้อใบนี้ได้ไหม: ตำแหน่งที่ดูทั้งหมดได้ = ได้ · ตำแหน่ง "ของตัวเอง" ต้องเป็นผู้สร้าง */
+export async function canViewBuyDoc(u: AuthUser, kind: BuyKind, id: string): Promise<boolean> {
+  const sc = buyScope(u.role, kind);
+  return sc === 'all' || (sc === 'own' && (await ownsBuyDoc(u, kind, id)));
+}
+/** แก้/ยกเลิกเอกสารซื้อได้ไหม: expenses.write (หรือ wht.write สำหรับ 50 ทวิ) หรือเป็นผู้สร้างในตำแหน่ง "ของตัวเอง" */
+export async function canEditBuyDoc(u: AuthUser, kind: BuyKind, id: string): Promise<boolean> {
+  if (can(u.role, kind === 'WT' ? 'wht.write' : 'expenses.write')) return true;
+  return buyScope(u.role, kind) === 'own' && (await ownsBuyDoc(u, kind, id));
 }

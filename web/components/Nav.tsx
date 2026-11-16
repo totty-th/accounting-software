@@ -27,11 +27,11 @@ const GROUPS: Group[] = [
     { href: '/sales?type=CN', label: 'ใบลดหนี้', perms: ['sales.read', 'sales.own'], gap: true },
     { href: '/sales?type=DN', label: 'ใบเพิ่มหนี้', perms: ['sales.read', 'sales.own'] }] },
   { key: 'buy', label: 'เอกสารซื้อ', c: 'var(--purple)', items: [
-    { href: '/purchases/orders', label: 'ใบสั่งซื้อ', perms: ['expenses.read'] },
-    { href: '/purchases', label: 'ใบรับสินค้า', perms: ['expenses.read'] }] },
+    { href: '/purchases/orders', label: 'ใบสั่งซื้อ', perms: ['expenses.read', 'buy.own'] },
+    { href: '/purchases', label: 'ใบรับสินค้า', perms: ['expenses.read', 'buy.own'] }] },
   { key: 'exp', label: 'ค่าใช้จ่าย', c: 'var(--purple)', items: [
-    { href: '/expenses', label: 'ค่าใช้จ่าย', perms: ['expenses.read'] },
-    { href: '/wht', label: 'หัก ณ ที่จ่าย (50 ทวิ)', perms: ['wht.read'] },
+    { href: '/expenses', label: 'ค่าใช้จ่าย', perms: ['expenses.read', 'expenses.own', 'buy.own'] },
+    { href: '/wht', label: 'หัก ณ ที่จ่าย (50 ทวิ)', perms: ['wht.read', 'buy.own'] },
     { href: '/payments', label: 'ใบเตรียมจ่าย', perms: ['expenses.read'] },
     { href: '/assets', label: 'จัดการสินทรัพย์', perms: ['expenses.read'], gap: true },
     { href: '/assets/depreciation', label: 'บันทึกค่าเสื่อมราคา', perms: ['expenses.read'] },

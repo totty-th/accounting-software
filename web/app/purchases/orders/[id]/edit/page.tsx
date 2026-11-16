@@ -1,16 +1,16 @@
 import { notFound } from 'next/navigation';
 import { can } from '@/lib/permissions';
-import { requirePage } from '@/lib/auth';
+import { requirePage, canEditBuyDoc } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { poFormData } from '@/lib/po-data';
 import { PoForm } from '@/components/PoForm';
 
 const d10 = (x: unknown) => (x ? new Date(x as any).toISOString().slice(0, 10) : '');
 export default async function EditPo({ params }: { params: { id: string } }) {
-  const user = await requirePage('expenses.write');
+  const user = await requirePage(['expenses.write', 'buy.own']);
   const db = await getDb();
   const o = (await db.q('select * from purchase_orders where id=$1', [params.id]))[0];
-  if (!o) notFound();
+  if (!o || !(await canEditBuyDoc(user, 'PO', o.id))) notFound();
   if (o.status !== 'pending') return <div className="panel empty">แก้ไขได้เฉพาะใบสั่งซื้อที่รออนุมัติ (แก้ใบที่อนุมัติแล้วยังไม่ทดสอบบน FA)</div>;
   const ls = await db.q('select * from purchase_order_lines where po_id=$1 order by line_no', [params.id]);
   const n = (x: unknown) => String(Number(x));

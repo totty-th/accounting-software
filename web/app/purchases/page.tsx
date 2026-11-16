@@ -1,4 +1,4 @@
-import { can } from '@/lib/permissions';
+import { can, buyScope } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
@@ -11,13 +11,14 @@ import { DocList, type DocRow } from '@/components/DocList';
 import { STATUS } from '@/lib/status';
 
 export default async function Purchases() {
-  const user = await requirePage('expenses.read');
-  const W = can(user.role, 'expenses.write'), MW = can(user.role, 'master.write');
+  const user = await requirePage(['expenses.read', 'buy.own']);
+  const own = buyScope(user.role, 'RI') === 'own';
+  const W = can(user.role, 'expenses.write') || own, MW = can(user.role, 'master.write');
   const db = await getDb();
   const rows = await db.q(`select g.*, c.business_name, c.contact_name,
       (select string_agg(p.code || ' ×' || trim(trailing '.' from trim(trailing '0' from l.qty::text)), ', ' order by l.line_no)
          from goods_receipt_lines l join products p on p.id=l.product_id where l.ri_id=g.id) items
-    from goods_receipts g join contacts c on c.id=g.contact_id order by g.ri_date desc, g.ri_no desc`);
+    from goods_receipts g join contacts c on c.id=g.contact_id where ($1::uuid is null or g.created_by=$1::uuid) order by g.ri_date desc, g.ri_no desc`, [own ? user.id : null]);
   const vendors = (await db.q(`select id, business_name, contact_name from contacts where not is_cash_default and is_vendor order by business_name nulls last`))
     .map(c => ({ id: c.id as string, label: partyName(c) }));
   const products = (await db.q(`select id, code, name, purchase_price from products where kind='goods_stock' order by code`))

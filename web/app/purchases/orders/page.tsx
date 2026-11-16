@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { can } from '@/lib/permissions';
+import { can, buyScope } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { dateTh, partyName } from '@/lib/format';
@@ -8,14 +8,16 @@ import { related } from '@/lib/related';
 import { DocList, type DocRow } from '@/components/DocList';
 
 export default async function PurchaseOrders() {
-  const user = await requirePage('expenses.read');
-  const W = can(user.role, 'expenses.write');
+  const user = await requirePage(['expenses.read', 'buy.own']);
+  const own = buyScope(user.role, 'PO') === 'own';
+  const W = can(user.role, 'expenses.write') || own;
   const db = await getDb();
   const rows = await db.q(`select o.*, c.business_name, c.contact_name, r.ri_no,
       (select string_agg(p.code || ' ×' || trim(trailing '.' from trim(trailing '0' from l.qty::text)), ', ' order by l.line_no)
          from purchase_order_lines l join products p on p.id=l.product_id where l.po_id=o.id) items
     from purchase_orders o join contacts c on c.id=o.contact_id left join goods_receipts r on r.id=o.ri_id
-    order by o.po_date desc, o.po_no desc`);
+    where ($1::uuid is null or o.created_by=$1::uuid)
+    order by o.po_date desc, o.po_no desc`, [own ? user.id : null]);
   const relMap = await related(db, 'po', rows.map((r: any) => r.id));
   const list: DocRow[] = rows.map(r => { const k = r.status === 'pending' ? 'pending_approval' : r.status;
     return { id: r.id, href: `/purchases/orders/${r.id}`, date: dateTh(r.po_date), no: r.po_no, party: partyName(r), detail: r.items ?? '',

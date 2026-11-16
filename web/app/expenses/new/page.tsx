@@ -1,5 +1,5 @@
 import { can } from '@/lib/permissions';
-import { requirePage } from '@/lib/auth';
+import { requirePage, ownsBuyDoc } from '@/lib/auth';
 import { today } from '@/lib/db';
 import { getDb } from '@/lib/db';
 import { poFormData } from '@/lib/po-data';
@@ -8,7 +8,7 @@ import { defaultRemark, purchaseLevels } from '@/lib/doc-remarks';
 import { ExpForm } from '@/components/ExpForm';
 
 export default async function NewExpense({ searchParams }: { searchParams: { po?: string } }) {
-  const user = await requirePage('expenses.write');
+  const user = await requirePage(['expenses.write', 'expenses.own', 'buy.own']);
   const { vendors } = await poFormData();
   const db = await getDb();
   const accounts = (await db.q(`select code, name from accounts where type in ('expense','asset') and not is_control and code not in ('11112','11311','11319','17111','17113','17114','17120') order by code`))
@@ -18,7 +18,7 @@ export default async function NewExpense({ searchParams }: { searchParams: { po?
   let fromPo: any;
   if (searchParams.po && /^[0-9a-f-]{36}$/.test(searchParams.po)) {
     const po = (await db.q<any>(`select * from purchase_orders where id=$1 and status in ('pending','approved')`, [searchParams.po]))[0];
-    if (po) {
+    if (po && (can(user.role, 'expenses.read') || (await ownsBuyDoc(user, 'PO', po.id)))) {
       const ls = await db.q<any>(`select l.*, p.name pname from purchase_order_lines l join products p on p.id=l.product_id where l.po_id=$1 order by l.line_no`, [po.id]);
       fromPo = { id: po.id, no: po.po_no,
         header: { contact: po.contact_id, credit_days: String(po.credit_days ?? 0), due_date: po.due_date ? dateIso(po.due_date) : undefined, purchaser: po.purchaser ?? undefined,

@@ -1,4 +1,4 @@
-import { can } from '@/lib/permissions';
+import { can, buyScope } from '@/lib/permissions';
 import { requirePage } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
@@ -14,14 +14,16 @@ const CONDS: [string, string][] = [['withhold', 'หัก ณ ที่จ่�
 type SP = { q?: string; status?: string; dup?: string };
 const STAT: [string, string][] = [['', 'แสดงทั้งหมด'], ['active', 'ดำเนินการแล้ว'], ['pending', 'รอดำเนินการ'], ['cancelled', 'ยกเลิก']];
 export default async function Wht({ searchParams }: { searchParams: SP }) {
-  const user = await requirePage('wht.read');
-  const W = can(user.role, 'wht.write');
+  const user = await requirePage(['wht.read', 'buy.own']);
+  const own = buyScope(user.role, 'WT') === 'own';
+  const W = can(user.role, 'wht.write') || own;
   const db = await getDb();
   const q = (searchParams.q ?? '').trim().toLowerCase(), st = searchParams.status ?? '';
   const all = await db.q(`select w.*, e.exp_no, c.id contact_id, c.business_name, c.contact_name, c.tax_id, c.address, c.person_kind,
       (select d->'missing' from (select wht_cert_data(w.id) d where w.status='active') x) missing
     from wht_certs w left join expenses e on e.id=w.expense_id join contacts c on c.id=w.contact_id
-    order by w.pay_date desc, w.cert_no desc`);
+    where ($1::uuid is null or w.created_by=$1::uuid or e.created_by=$1::uuid)
+    order by w.pay_date desc, w.cert_no desc`, [own ? user.id : null]);
   const rows = all.filter(r => (!st || r.status === st) && (!q || `${r.cert_no} ${partyName(r)} ${r.exp_no ?? ''}`.toLowerCase().includes(q)));
   const lineRows = await db.q(`select cert_id, income_type, rate, wht, count(*) over (partition by cert_id) n, row_number() over (partition by cert_id order by line_no) rn from wht_cert_lines`);
   const rateOf = (id: string) => { const ls = lineRows.filter(l => l.cert_id === id); return ls.length === 0 ? '' : ls.length > 1 ? 'หลายอัตรา' : ls[0].rate != null ? `${+ls[0].rate}%` : money(ls[0].wht); };

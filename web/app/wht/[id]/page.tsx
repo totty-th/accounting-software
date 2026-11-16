@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { can } from '@/lib/permissions';
-import { requirePage } from '@/lib/auth';
+import { can, buyScope } from '@/lib/permissions';
+import { requirePage, canViewBuyDoc } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { WhtStatus } from '@/components/WhtStatus';
@@ -14,8 +14,9 @@ const VAT_TH: Record<string, string> = { none: 'ไม่มี/ยกเว้�
 
 // หน้ารายละเอียดใบหัก ณ ที่จ่าย: ตัวเลขใหญ่ (ฐานภาษี/ภาษีที่หัก) · ผู้ถูกหัก · รายการ · สรุปยอดถึงยอดชำระ · ผู้จ่ายเงิน · ข้อมูลที่ต้องกรอกในแบบ · ที่มาของเอกสาร
 export default async function WhtDetail({ params }: { params: { id: string } }) {
-  const user = await requirePage('wht.read');
-  const W = can(user.role, 'wht.write');
+  const user = await requirePage(['wht.read', 'buy.own']);
+  if (!(await canViewBuyDoc(user, 'WT', params.id))) notFound();
+  const W = can(user.role, 'wht.write') || buyScope(user.role, 'WT') === 'own';
   const db = await getDb();
   const c = (await db.q<any>(`select w.*, c.id contact_id, c.business_name, c.contact_name, c.tax_id, c.address, c.person_kind, c.branch_code, c.branch_name,
       e.exp_no, g.ri_no, (select d->'missing' from (select wht_cert_data(w.id) d where w.status='active') x) missing

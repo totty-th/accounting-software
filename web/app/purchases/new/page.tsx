@@ -6,7 +6,7 @@ import { defaultRemark, purchaseLevels, warehouseSettings } from '@/lib/doc-rema
 import { PoForm } from '@/components/PoForm';
 
 export default async function NewRi() {
-  const user = await requirePage('expenses.write');
+  const user = await requirePage(['expenses.write', 'buy.own']);
   const d = await poFormData();
   return (<>
     <div className="top"><div><h1>สร้างใบรับสินค้า</h1><p className="sub">บันทึกแล้วสินค้าเข้าสต็อกและตั้งเจ้าหนี้ทันที</p></div></div>

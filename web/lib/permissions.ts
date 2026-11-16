@@ -13,6 +13,8 @@ export const PERMS = [
   'dash.view',
   'sales.read', 'sales.write', 'sales.approve',      // เอกสารขายทุกประเภท
   'sales.own',                                       // เอกสารขายทุกประเภทที่ตัวเองสร้าง (M14.4 ตาม FA "เห็นเฉพาะเอกสารของตัวเอง")
+  'buy.own',                                         // ใบสั่งซื้อ/ใบรับสินค้า/ค่าใช้จ่าย/50 ทวิ ที่ตัวเองสร้าง (M14.5)
+  'expenses.own',                                    // ค่าใช้จ่ายที่ตัวเองสร้าง (ตำแหน่งขายตาม FA)
   'quote.own',                                       // ใบเสนอราคาของตัวเองเท่านั้น (สร้าง/ดู/พิมพ์/แชร์/ยกเลิก)
   'receipts.read', 'receipts.write',
   'expenses.read', 'expenses.write', 'expenses.approve',
@@ -46,13 +48,13 @@ const MATRIX: Record<Role, readonly Perm[]> = {
   // ตำแหน่งตาม FA (M14.3) — FA: สำนักงานบัญชี ≈ นักบัญชี (ปรับสิทธิ์รายคนได้ใน FA)
   accounting_firm: [...READ_ALL, ...ACCOUNTING_WRITE],
   // FA: ผู้จัดการฝ่ายขาย เมนูขาย+ใบลดหนี้/เพิ่มหนี้เต็ม, ดูได้แค่แดชบอร์ด, สินค้า/ลูกค้าไม่เห็นราคาซื้อ ไม่ลบ
-  sales_manager: ['dash.view', 'sales.read', 'sales.write', 'receipts.read', 'receipts.write', 'master.read', 'contact.create'],
+  sales_manager: ['dash.view', 'sales.read', 'sales.write', 'receipts.read', 'receipts.write', 'expenses.own', 'master.read', 'contact.create'],
   // FA: พนักงานขายอาวุโส/ธุรการฝ่ายขาย/แคชเชียร์/เจ้าหน้าที่ขายและจัดซื้อ เห็นเฉพาะเอกสารของตัวเอง
   // sales.own = เอกสารขายทุกประเภทของตัวเอง (M14.4) · ธุรการฝ่ายขายเห็นเฉพาะใบเสนอราคา (ตาม FA) · ฝั่งซื้อ/หัก ณ ที่จ่ายของตัวเอง ยังไม่รองรับ
-  senior_sales: ['sales.own', 'quote.own', 'master.read', 'contact.create'],
-  sales_admin: ['quote.own', 'master.read', 'contact.create'],
-  cashier: ['sales.own', 'quote.own', 'master.read', 'contact.create'],
-  sales_purchasing: ['sales.own', 'quote.own', 'master.read', 'contact.create'],
+  senior_sales: ['sales.own', 'expenses.own', 'quote.own', 'master.read', 'contact.create'],
+  sales_admin: ['quote.own', 'expenses.own', 'master.read', 'contact.create'],
+  cashier: ['sales.own', 'expenses.own', 'quote.own', 'master.read', 'contact.create'],
+  sales_purchasing: ['sales.own', 'buy.own', 'expenses.own', 'quote.own', 'master.read', 'contact.create'],
 };
 
 export const isRole = (r: unknown): r is Role => ROLES.includes(r as Role);
@@ -63,3 +65,10 @@ export const homeOf = (role: Role) => (can(role, 'dash.view') ? '/' : can(role, 
 /** ดูเอกสารขายได้ทุกใบหรือเฉพาะใบเสนอราคาของตัวเอง */
 export const salesScope = (role: Role): 'all' | 'own-all' | 'own-quotes' | 'none' =>
   can(role, 'sales.read') ? 'all' : can(role, 'sales.own') ? 'own-all' : can(role, 'quote.own') ? 'own-quotes' : 'none';
+
+/** เอกสารฝั่งซื้อ: EXP ค่าใช้จ่าย · RI ใบรับสินค้า · PO ใบสั่งซื้อ · WT หนังสือรับรองหัก ณ ที่จ่าย */
+export type BuyKind = 'EXP' | 'RI' | 'PO' | 'WT';
+/** ดูทุกใบได้ (all) / เห็นเฉพาะของตัวเอง (own) / ไม่มีสิทธิ์ (none) */
+export const buyScope = (role: Role, kind: BuyKind): 'all' | 'own' | 'none' =>
+  can(role, kind === 'WT' ? 'wht.read' : 'expenses.read') ? 'all'
+    : can(role, 'buy.own') || (kind === 'EXP' && can(role, 'expenses.own')) ? 'own' : 'none';

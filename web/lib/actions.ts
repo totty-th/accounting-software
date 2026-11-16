@@ -2,8 +2,8 @@
 import { revalidatePath } from 'next/cache';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { getDb, today } from './db';
-import { currentUser, type AuthUser } from './auth';
-import { can, type Perm } from './permissions';
+import { currentUser, ownsBuyDoc, type AuthUser } from './auth';
+import { can, buyScope, type BuyKind, type Perm } from './permissions';
 
 export type Result = { error?: string; ok?: true };
 
@@ -58,6 +58,13 @@ const ownAny = async (u: AuthUser, id: string) =>
   (await (await getDb()).q(`select 1 from sales_docs where id=$1 and created_by=$2`, [id, u.id])).length > 0;
 /** ทำรายการกับเอกสารขาย: sales.write หรือ (sales.own และเป็นเอกสารของตัวเอง) */
 const ownWriteGate = (id: string): Gate => async u => can(u.role, 'sales.write') || (can(u.role, 'sales.own') && (await ownAny(u, id)));
+/** เอกสารซื้อ: แก้/ยกเลิก/รีเซ็ต/แนบ ได้ถ้ามี expenses.write หรือเป็นผู้สร้างและตำแหน่งมีสิทธิ์ "ของตัวเอง" (จ่ายเงินและอนุมัติยังต้องใช้สิทธิ์เต็ม) */
+const buyOwnTable: Record<string, BuyKind> = { EXP: 'EXP', RI: 'RI', PO: 'PO' };
+const buyCreate = (kind: BuyKind): Gate => u => can(u.role, 'expenses.write') || buyScope(u.role, kind) === 'own';
+const buyGate = (kind: BuyKind, id: string): Gate => async u =>
+  can(u.role, 'expenses.write') || (buyScope(u.role, kind) === 'own' && (await ownsBuyDoc(u, kind, id)));
+const buyDocGate = (type: string, id: string): Gate => { const k = buyOwnTable[String(type).toUpperCase()]; return k ? buyGate(k, id) : 'expenses.write'; };
+const whtGate = (id: string): Gate => async u => can(u.role, 'wht.write') || (buyScope(u.role, 'WT') === 'own' && (await ownsBuyDoc(u, 'WT', id)));
 const salesDocGate = (id: string): Gate => async u => can(u.role, 'sales.write') || (can(u.role, 'sales.own') && (await ownAny(u, id))) || (can(u.role, 'quote.own') && (await ownQuote(u, id)));
 
 export async function createSalesDoc(p: { type: string; date: string; contact: string | null; mode: string; lines: any[]; reason?: string; ref?: string }) {
@@ -155,7 +162,7 @@ export const resetReceipt = async (id: string) => run(call('select reset_receipt
 export const cancelReceipt = async (id: string) => run(call('select cancel_receipt($1)', id), ALL, 'receipts.write');
 
 export async function createExpense(p: { date: string; contact: string; lines: any[] }) {
-  return run(call('select create_expense($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), ALL, 'expenses.write');
+  return run(call('select create_expense($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), ALL, buyCreate('EXP'));
 }
 export const approveExpense = async (id: string) => run(call('select approve_expense($1)', id), ALL, 'expenses.approve');
 export type PurchasePay = { method: string; bank_account_id?: string; credit_card_id?: string; petty_fund_id?: string;
@@ -166,12 +173,12 @@ export const payExpense = async (id: string, payments?: PurchasePay[]) =>
 export const rejectExpense = async (id: string) => run(call('select reject_expense($1)', id), ALL, 'expenses.approve');
 // ใบรับสินค้า (RI)
 export async function createGoodsReceipt(p: { date: string; contact: string; lines: any[] }) {
-  return run(call('select create_goods_receipt($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), [...ALL, '/purchases'], 'expenses.write');
+  return run(call('select create_goods_receipt($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), [...ALL, '/purchases'], buyCreate('RI'));
 }
 export const approveGoodsReceipt = async (id: string) => run(call('select approve_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.approve');
 export const rejectGoodsReceipt = async (id: string) => run(call('select reject_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.approve');
-export const resetGoodsReceipt = async (id: string) => run(call('select reset_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.write');
-export const cancelGoodsReceipt = async (id: string) => run(call('select cancel_goods_receipt($1)', id), [...ALL, '/purchases'], 'expenses.write');
+export const resetGoodsReceipt = async (id: string) => run(call('select reset_goods_receipt($1)', id), [...ALL, '/purchases'], buyGate('RI', id));
+export const cancelGoodsReceipt = async (id: string) => run(call('select cancel_goods_receipt($1)', id), [...ALL, '/purchases'], buyGate('RI', id));
 export const payGoodsReceipt = async (id: string, payments?: PurchasePay[], shortReason?: string) =>
   run(call('select pay_goods_receipt($1,$2::date,$3::jsonb,$4)', id, today(), payJson(payments), shortReason ?? null), [...ALL, '/purchases'], 'expenses.write');
 const FIN = ['/finance/petty-cash', '/finance/credit-card', '/finance/cheque', '/bank'];
@@ -194,8 +201,8 @@ export const deleteCard = async (id: string) => run(call('select delete_credit_c
 export const addChequeAccount = async (bank: string) => run(call('select add_cheque_account($1)', bank), FIN, 'master.write');
 export const setChequeActive = async (bank: string, active: boolean) => run(call('select set_cheque_account_active($1,$2)', bank, active), FIN, 'master.write');
 export const deleteChequeAccount = async (bank: string) => run(call('select delete_cheque_account($1)', bank), FIN, 'master.write');
-export const resetExpense = async (id: string) => run(call('select reset_expense($1)', id), ALL, 'expenses.write');
-export const cancelExpense = async (id: string) => run(call('select cancel_expense($1)', id), ALL, 'expenses.write');
+export const resetExpense = async (id: string) => run(call('select reset_expense($1)', id), ALL, buyGate('EXP', id));
+export const cancelExpense = async (id: string) => run(call('select cancel_expense($1)', id), ALL, buyGate('EXP', id));
 
 export async function saveContact(id: string | null, p: Record<string, unknown>): Promise<Result & { id?: string }> {
   let out: string | undefined;
@@ -219,7 +226,7 @@ export async function saveCertDetails(f: FormData): Promise<void> {
   const d = { book_no: str(f, 'book_no'), run_no: str(f, 'run_no'), seq_in_form: num('seq_in_form'),
     income_category: str(f, 'income_category'), payer_condition: str(f, 'payer_condition'),
     payer_condition_note: str(f, 'payer_condition_note'), fund_gpf: num('fund_gpf'), fund_sso: num('fund_sso'), fund_pvd: num('fund_pvd') };
-  await run(call('select set_cert_details($1,$2::jsonb)', str(f, 'id'), JSON.stringify(d)), ['/wht'], 'wht.write');
+  await run(call('select set_cert_details($1,$2::jsonb)', str(f, 'id'), JSON.stringify(d)), ['/wht'], whtGate(str(f, 'id') ?? ''));
 }
 export async function saveCompany(f: FormData): Promise<void> {
   const br = f.get('is_branch') === 'branch';
@@ -281,38 +288,38 @@ export async function bankTransfer(p: { from: string; to: string; date: string; 
 // ใบสั่งซื้อ (PO)
 const PO = [...ALL, '/purchases/orders', '/purchases'];
 export async function createPurchaseOrder(p: { date: string; contact: string; lines: any[] }) {
-  return run(call('select create_purchase_order($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), PO, 'expenses.write');
+  return run(call('select create_purchase_order($1::date,$2,$3::jsonb)', p.date, p.contact, JSON.stringify(p.lines)), PO, buyCreate('PO'));
 }
 export async function savePurchaseOrder(id: string | null, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
   let out: string | undefined;
-  const r = await run(async () => { out = (await (await getDb()).q<any>('select save_purchase_order($1,$2::jsonb,$3::jsonb) as id', [id, JSON.stringify(header), JSON.stringify(lines)]))[0].id; },
-    [...PO, '/purchases/orders/new'], 'expenses.write');
+  const r = await run(async u => { out = (await (await getDb()).q<any>(`select save_purchase_order($1,$2::jsonb,$3::jsonb) as id from (select set_config('app.user_id',$4,true)) _u`, [id, JSON.stringify(header), JSON.stringify(lines), u.id]))[0].id; },
+    [...PO, '/purchases/orders/new'], id ? buyGate('PO', id) : buyCreate('PO'));
   return { ...r, id: out };
 }
 export async function saveGoodsReceiptFull(header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
   let out: string | undefined;
-  const r = await run(async () => { out = (await (await getDb()).q<any>('select save_goods_receipt($1::jsonb,$2::jsonb) as id', [JSON.stringify(header), JSON.stringify(lines)]))[0].id; },
-    [...ALL, '/purchases', '/purchases/new'], 'expenses.write');
+  const r = await run(async u => { out = (await (await getDb()).q<any>(`select save_goods_receipt($1::jsonb,$2::jsonb) as id from (select set_config('app.user_id',$3,true)) _u`, [JSON.stringify(header), JSON.stringify(lines), u.id]))[0].id; },
+    [...ALL, '/purchases', '/purchases/new'], buyCreate('RI'));
   return { ...r, id: out };
 }
 export async function updateGoodsReceiptFull(id: string, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
   const r = await run(async () => { await (await getDb()).q('select update_goods_receipt($1,$2::jsonb,$3::jsonb)', [id, JSON.stringify(header), JSON.stringify(lines)]); },
-    [...ALL, '/purchases', `/purchases/ri/${id}`], 'expenses.write');
+    [...ALL, '/purchases', `/purchases/ri/${id}`], buyGate('RI', id));
   return { ...r, id };
 }
 export async function saveExpenseFull(header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
   let out: string | undefined;
-  const r = await run(async () => { out = (await (await getDb()).q<any>('select save_expense($1::jsonb,$2::jsonb) as id', [JSON.stringify(header), JSON.stringify(lines)]))[0].id; },
-    [...ALL, '/expenses', '/expenses/new'], 'expenses.write');
+  const r = await run(async u => { out = (await (await getDb()).q<any>(`select save_expense($1::jsonb,$2::jsonb) as id from (select set_config('app.user_id',$3,true)) _u`, [JSON.stringify(header), JSON.stringify(lines), u.id]))[0].id; },
+    [...ALL, '/expenses', '/expenses/new'], buyCreate('EXP'));
   return { ...r, id: out };
 }
 export async function saveExpenseFromPo(po: string, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
   let out: string | undefined;
-  const r = await run(async () => { out = (await (await getDb()).q<any>('select save_expense_from_po($1::uuid,$2::jsonb,$3::jsonb) as id', [po, JSON.stringify(header), JSON.stringify(lines)]))[0].id; },
-    [...ALL, '/expenses', '/expenses/new', '/purchases/orders'], 'expenses.write');
+  const r = await run(async u => { out = (await (await getDb()).q<any>(`select save_expense_from_po($1::uuid,$2::jsonb,$3::jsonb) as id from (select set_config('app.user_id',$4,true)) _u`, [po, JSON.stringify(header), JSON.stringify(lines), u.id]))[0].id; },
+    [...ALL, '/expenses', '/expenses/new', '/purchases/orders'], async u => can(u.role, 'expenses.write') || (buyScope(u.role, 'EXP') === 'own' && (can(u.role, 'expenses.read') || (await ownsBuyDoc(u, 'PO', po)))));
   return { ...r, id: out };
 }
-export const duplicatePurchaseOrder = async (id: string) => run(call('select duplicate_purchase_order($1,$2::date)', id, today()), PO, 'expenses.write');
+export const duplicatePurchaseOrder = async (id: string) => run(call('select duplicate_purchase_order($1,$2::date)', id, today()), PO, buyGate('PO', id));
 /** สร้างผู้จำหน่าย/สินค้าใหม่จากหน้าใบสั่งซื้อ (คืนข้อมูลให้เลือกต่อได้ทันที) */
 export async function quickCreateVendor(p: { name: string; tax_id: string; address: string }): Promise<Result & { vendor?: any }> {
   let out: any;
@@ -370,13 +377,13 @@ export async function saveSignatures(f: FormData): Promise<void> {
 }
 export const approvePurchaseOrder = async (id: string) => run(call('select approve_purchase_order($1)', id), PO, 'expenses.approve');
 export const rejectPurchaseOrder = async (id: string) => run(call('select reject_purchase_order($1)', id), PO, 'expenses.approve');
-export const resetPurchaseOrder = async (id: string) => run(call('select reset_purchase_order($1)', id), PO, 'expenses.write');
-export const cancelPurchaseOrder = async (id: string) => run(call('select cancel_purchase_order($1)', id), PO, 'expenses.write');
-export const upgradePoToRi = async (id: string) => run(call('select upgrade_po_to_ri($1)', id), PO, 'expenses.write');
+export const resetPurchaseOrder = async (id: string) => run(call('select reset_purchase_order($1)', id), PO, buyGate('PO', id));
+export const cancelPurchaseOrder = async (id: string) => run(call('select cancel_purchase_order($1)', id), PO, buyGate('PO', id));
+export const upgradePoToRi = async (id: string) => run(call('select upgrade_po_to_ri($1)', id), PO, buyGate('PO', id));
 export const splitPoToRi = async (id: string, date: string, mode: 'percent' | 'amount', value: number, receiveStock: boolean) =>
-  run(call('select split_ri_from_po($1,$2::date,$3,$4,$5)', id, date, mode, value, receiveStock), PO, 'expenses.write');
+  run(call('select split_ri_from_po($1,$2::date,$3,$4,$5)', id, date, mode, value, receiveStock), PO, buyGate('PO', id));
 export const splitPoToRiQty = async (id: string, date: string, qtys: { line_no: number; qty: number }[]) =>
-  run(call('select split_ri_from_po_qty($1,$2::date,$3::jsonb)', id, date, JSON.stringify(qtys)), PO, 'expenses.write');
+  run(call('select split_ri_from_po_qty($1,$2::date,$3::jsonb)', id, date, JSON.stringify(qtys)), PO, buyGate('PO', id));
 // ใบเตรียมจ่าย
 const SLIP = [...ALL, '/payments', '/purchases'];
 export async function createPaymentSlip(p: { date: string; due: string; docs: { type: string; id: string }[]; preparer?: string; requester?: string; approver?: string; reason?: string }) {
@@ -392,18 +399,18 @@ const PURCHASE_PATHS = ['/purchases', '/purchases/orders', '/payments', '/expens
 export async function savePurchaseTaxInvoice(f: FormData): Promise<void> {
   const d: Record<string, string | undefined> = {};
   for (const k of ['invoice_no', 'invoice_date', 'vat_form', 'vendor_name', 'vendor_tax_id', 'branch', 'base_amount', 'vat_amount']) d[k] = str(f, k);
-  await run(call('select set_purchase_tax_invoice($1,$2,$3::jsonb)', str(f, 'doc_type'), str(f, 'doc_id'), JSON.stringify(d)), PURCHASE_PATHS, 'expenses.write');
+  await run(call('select set_purchase_tax_invoice($1,$2,$3::jsonb)', str(f, 'doc_type'), str(f, 'doc_id'), JSON.stringify(d)), PURCHASE_PATHS, buyDocGate(str(f, 'doc_type') ?? '', str(f, 'doc_id') ?? ''));
 }
 export const clearPurchaseTaxInvoice = async (type: string, id: string) =>
-  run(call('select clear_purchase_tax_invoice($1,$2)', type, id), PURCHASE_PATHS, 'expenses.write');
+  run(call('select clear_purchase_tax_invoice($1,$2)', type, id), PURCHASE_PATHS, buyDocGate(type, id));
 
 export async function createStandaloneWht(p: { date: string; contact: string; form: string; category: string; lines: { income_type: string; rate?: number | null; amount: number; vat_mode?: string; wht?: number }[] }) {
-  return run(call('select create_standalone_wht($1::date,$2,$3,$4::jsonb,$5)', p.date, p.contact, p.form, JSON.stringify(p.lines), p.category), ['/wht'], 'wht.write');
+  return run(call('select create_standalone_wht($1::date,$2,$3,$4::jsonb,$5)', p.date, p.contact, p.form, JSON.stringify(p.lines), p.category), ['/wht'], u => can(u.role, 'wht.write') || buyScope(u.role, 'WT') === 'own');
 }
-export const cancelWhtCert = async (id: string) => run(call('select cancel_wht_cert($1)', id), ['/wht'], 'wht.write');
+export const cancelWhtCert = async (id: string) => run(call('select cancel_wht_cert($1)', id), ['/wht'], whtGate(id));
 
-export const sharePurchaseDoc = async (kind: string, id: string) => run(call('select ensure_purchase_share_token($1,$2)', kind, id), PURCHASE_PATHS, 'expenses.write');
-export const unsharePurchaseDoc = async (kind: string, id: string) => run(call('select revoke_purchase_share_token($1,$2)', kind, id), PURCHASE_PATHS, 'expenses.write');
+export const sharePurchaseDoc = async (kind: string, id: string) => run(call('select ensure_purchase_share_token($1,$2)', kind, id), PURCHASE_PATHS, buyDocGate(kind, id));
+export const unsharePurchaseDoc = async (kind: string, id: string) => run(call('select revoke_purchase_share_token($1,$2)', kind, id), PURCHASE_PATHS, buyDocGate(kind, id));
 
 // ---- โมดูลสินค้า/สต็อก (M26) ----
 const STK = ['/products', '/stock', '/stock/transfers', '/stock/warehouses', '/stock/low'];
@@ -638,8 +645,8 @@ export async function bulkReceiveTaxInvoices(rows: { type: string; id: string; i
     await (await getDb()).q(`select set_purchase_vat_status(x->>'type', (x->>'id')::uuid, 'received', x - 'type' - 'id') from jsonb_array_elements($1::jsonb) x`, [JSON.stringify(rows)]);
   }, ['/tax/purchase-vat', '/reports/purchase-tax', '/expenses', '/purchases'], 'accounts.write');
 }
-export const resetWhtCert = async (id: string) => run(call('select reset_wht_cert($1)', id), ['/wht'], 'wht.write');
-export const activateWhtCert = async (id: string) => run(call('select activate_wht_cert($1)', id), ['/wht'], 'wht.write');
+export const resetWhtCert = async (id: string) => run(call('select reset_wht_cert($1)', id), ['/wht'], whtGate(id));
+export const activateWhtCert = async (id: string) => run(call('select activate_wht_cert($1)', id), ['/wht'], whtGate(id));
 export const receivePaymentSlip = async (id: string) => run(call('select receive_payment_slip($1)', id), SLIP, 'expenses.write');
 export const resetPaymentSlip = async (id: string) => run(call('select reset_payment_slip($1)', id), SLIP, 'expenses.write');
 export const deletePaymentSlip = async (id: string) => run(call('select delete_payment_slip($1)', id), SLIP, 'expenses.write');

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { can } from '@/lib/permissions';
-import { requirePage } from '@/lib/auth';
+import { requirePage, canEditBuyDoc } from '@/lib/auth';
 import { getDb, today } from '@/lib/db';
 import { poFormData } from '@/lib/po-data';
 import { PoForm } from '@/components/PoForm';
@@ -9,10 +9,10 @@ const d10 = (x: unknown) => (x ? new Date(x as any).toISOString().slice(0, 10) :
 // แก้ใบรับสินค้าที่ยังไม่จ่าย: ระบบกลับรายการ UV เดิม (-R) แล้วลงใบใหม่ · กฎล็อกช่องตามผลทดสอบ FA 15-11-2026
 export default async function EditRi({ params }: { params: { kind: string; id: string } }) {
   if (params.kind !== 'ri') notFound();
-  const user = await requirePage('expenses.write');
+  const user = await requirePage(['expenses.write', 'buy.own']);
   const db = await getDb();
   const o = (await db.q('select * from goods_receipts where id=$1', [params.id]))[0];
-  if (!o) notFound();
+  if (!o || !(await canEditBuyDoc(user, 'RI', o.id))) notFound();
   if (!['unpaid', 'approved'].includes(o.status)) return <div className="panel empty">แก้ไขได้เฉพาะใบรับสินค้าที่รออนุมัติหรืออนุมัติแล้ว (จ่ายแล้ว/ไม่อนุมัติต้องรีเซ็ตก่อน)</div>;
   const inSlip = (await db.q(`select 1 from payment_slip_items i join payment_slips s on s.id=i.slip_id where i.doc_type='RI' and i.doc_id=$1 and s.status='active'`, [params.id])).length > 0;
   if (inSlip) return <div className="panel empty">ใบรับสินค้านี้อยู่ในใบเตรียมจ่าย แก้ไขรายการ/ยอดไม่ได้ (ยกเลิกใบเตรียมจ่ายก่อน)</div>;
