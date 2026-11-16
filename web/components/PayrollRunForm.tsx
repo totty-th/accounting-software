@@ -2,7 +2,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { savePayrollRun } from '@/lib/actions';
-import { RUN_TYPE, PAY_METHOD, ssoOf, taxBreakdown } from '@/lib/payroll';
+import { RUN_TYPE, PAY_METHOD, ssoOf, taxBreakdown, whtExtra } from '@/lib/payroll';
 
 type Emp = { id: string; code: string; name: string; salary: number; sso: boolean; auto_tax: boolean; pay_method: string };
 type Line = { employee_id: string; on: boolean; days: string; ot: string; commission: string; absence: string; other_deduct: string;
@@ -29,7 +29,8 @@ export function PayrollRunForm({ id, payType, method, header, emps, init, ssoOn 
   const calc = (e: Emp, l: Line) => {
     const base = payType === 'daily' ? Math.round(n(l.days) * e.salary * 100) / 100 : e.salary;
     const sso = l.sso_employee !== '' ? n(l.sso_employee) : ssoOn && e.sso ? ssoOf(base) : 0;
-    const wht = l.wht_401 !== '' ? n(l.wht_401) : e.auto_tax && payType === 'monthly' ? taxBreakdown(base, sso > 0).month : 0;
+    const wht = l.wht_401 !== '' ? n(l.wht_401) : e.auto_tax && payType === 'monthly'
+      ? Math.max(Math.round((taxBreakdown(base, sso > 0).month + whtExtra(base, sso, n(l.ot) + n(l.commission) - n(l.absence))) * 100) / 100, 0) : 0;
     const add = n(l.ot) + n(l.commission), ded = n(l.absence) + n(l.other_deduct) + sso + wht + n(l.wht_402);
     return { base, sso, wht, add, ded, net: base + add - ded };
   };
@@ -79,7 +80,7 @@ export function PayrollRunForm({ id, payType, method, header, emps, init, ssoOn 
           <div><span>จำนวนพนักงาน</span><b>{tot.n} คน</b></div><div><span>ยอดรวม{RUN_TYPE[payType]}</span><b>{m(tot.base)}</b></div>
           <div><span>รวมรายการปรับเพิ่ม</span><b>{m(tot.add)}</b></div><div><span>รวมรายการปรับลด</span><b>{m(tot.ded)}</b></div>
           <div><span>รวมจ่ายสุทธิ</span><b>{m(tot.net)}</b></div><div><span>รวมค่าใช้จ่ายพนักงาน (รวมสมทบนายจ้าง)</span><b>{m(tot.cost)}</b></div></div>
-        <p className="sub">ช่องประกันสังคม/ภาษีที่เว้นว่างจะคำนวณอัตโนมัติ · ภาษีอัตโนมัติคิดจากฐานเงินเดือนเท่านั้น (ถ้ามี OT/คอมมิชชั่นให้กรอกภาษีเอง — ตาม FA)</p>
+        <p className="sub">ช่องประกันสังคม/ภาษีที่เว้นว่างจะคำนวณอัตโนมัติ · OT/คอมมิชชั่น (หักด้วยเงินหักขาด/ลา/สาย) คิดภาษีแบบเงินได้ไม่ประจำ: ภาษีทั้งปีที่เพิ่มขึ้นหักในเดือนที่จ่าย · รายวันไม่คำนวณภาษีอัตโนมัติ</p>
         {err && <div className="err" role="alert">{err}</div>}
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" disabled={pending || tot.n === 0} onClick={save}>บันทึก</button>

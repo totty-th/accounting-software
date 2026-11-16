@@ -16,6 +16,9 @@ export function taxBreakdown(salary: number, sso: boolean) {
   const net = Math.max(annual - expense - 60000 - s * 12, 0), year = pitAnnual(net);
   return { annual, expense, afterExpense: annual - expense, personal: 60000, ssoYear: s * 12, ssoMonth: s, net, year, month: r2(year / 12) };
 }
+const pitYear = (income: number, ssoYear: number) => pitAnnual(Math.max(income - Math.min(income * 0.5, 100000) - 60000 - ssoYear, 0));
+/** ภาษีเงินได้ไม่ประจำ (OT/คอมมิชชั่น − หักขาด) = ภาษีทั้งปีรวมก้อนนี้ − ภาษีทั้งปีเฉพาะเงินเดือน (เหมือน payroll_wht_extra) */
+export const whtExtra = (salary: number, sso: number, extra: number) => (extra === 0 ? 0 : r2(pitYear(salary * 12 + extra, sso * 12) - pitYear(salary * 12, sso * 12)));
 export const thaiIdValid = (id: string) => /^\d{13}$/.test(id) &&
   (11 - [...id.slice(0, 12)].reduce((s, d, i) => s + Number(d) * (13 - i), 0) % 11) % 10 === Number(id[12]);
 export const empName = (e: { title?: string | null; first_name: string; last_name: string }) => `${e.title ?? ''}${e.first_name} ${e.last_name}`;

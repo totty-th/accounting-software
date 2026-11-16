@@ -39,6 +39,7 @@ const GROUPS: Group[] = [
   { key: 'payroll', label: 'เงินเดือน', c: 'var(--teal)', module: 'payroll', items: [
     { href: '/payroll', label: 'รายการเงินเดือน/ค่าจ้าง', perms: ['payroll.read'] },
     { href: '/payroll/employees', label: 'พนักงาน', perms: ['payroll.read'] },
+    { href: '/payroll/pnd1', label: 'ภ.ง.ด.1 รายเดือน', perms: ['payroll.read'] },
     { href: '/payroll/settings', label: 'ตั้งค่าเงินเดือน', perms: ['payroll.write'] }] },
   { key: 'stock', label: 'สินค้า', c: 'var(--blue)', items: [
     { href: '/products', label: 'สินค้า/บริการ', perms: ['master.read'] },

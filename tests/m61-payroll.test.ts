@@ -47,21 +47,21 @@ describe('M61 เงินเดือน', () => {
     expect([+l.base, +l.sso_employee, +l.wht_401, +l.net]).toEqual([80000, 875, 6075, 73050]);
     const run = await one(`select * from payroll_runs where id=$1`, [r]);
     expect(await lines(run.accrual_voucher_id)).toEqual([['53011.01', 80000, 0], ['53012.01', 875, 0], ['21952.01', 0, 1750], ['27121', 0, 6075], ['21951.01', 0, 73050]]);
-    // แก้ก่อนจ่าย: OT 5,000 + หักขาด 1,000 → ภาษีไม่คำนวณใหม่ (ตาม FA) · JV เดิมกลับรายการแล้วลงใหม่
+    // แก้ก่อนจ่าย: OT 5,000 + หักขาด 1,000 → ภาษีเงินได้ไม่ประจำ 4,000 เพิ่ม 800 (6,075 → 6,875) · JV เดิมกลับรายการแล้วลงใหม่
     await db.query(`select save_payroll_run($1,$2::jsonb,$3::jsonb)`, [r, J({}), J([{ employee_id: e1, ot: 5000, absence: 1000 }])]);
     const r2 = await one(`select * from payroll_runs where id=$1`, [r]);
-    expect((await one(`select * from payroll_lines where run_id=$1`, [r])).net).toBe('77050.00');
+    expect((await one(`select * from payroll_lines where run_id=$1`, [r])).net).toBe('76250.00');
     expect(await lines(r2.accrual_voucher_id)).toEqual([['53011.01', 80000, 0], ['53011.02', 5000, 0], ['53012.01', 875, 0], ['21952.01', 0, 1750],
-      ['27121', 0, 6075], ['49920', 0, 1000], ['21951.01', 0, 77050]]);
-    expect(await gl('21951.01')).toBe(-77050);
+      ['27121', 0, 6875], ['49920', 0, 1000], ['21951.01', 0, 76250]]);
+    expect(await gl('21951.01')).toBe(-76250);
     expect(await err(db.query(`select pay_payroll_run($1,'2026-11-16',15)`, [r]))).toContain('ไม่มีค่าธรรมเนียม');
     const pv = (await one(`select pay_payroll_run($1,'2026-11-16') v`, [r])).v;
-    expect(await lines(pv)).toEqual([['21951.01', 77050, 0], ['11112', 0, 77050]]);
+    expect(await lines(pv)).toEqual([['21951.01', 76250, 0], ['11112', 0, 76250]]);
     expect(await gl('21951.01')).toBe(0);
     expect(await err(db.query(`select save_payroll_run($1,'{}'::jsonb,$2::jsonb)`, [r, J([{ employee_id: e1 }])]))).toContain('รีเซ็ตการชำระก่อน');
     expect(await err(db.query(`select cancel_payroll_run($1)`, [r]))).toContain('รีเซ็ตการชำระก่อน');
     await db.query(`select reset_payroll_payment($1)`, [r]);
-    expect(await gl('11112')).toBe(0); expect(await gl('21951.01')).toBe(-77050);
+    expect(await gl('11112')).toBe(0); expect(await gl('21951.01')).toBe(-76250);
   });
   it('ค่าจ้างรายวัน 20 วัน × 500 · ประกันสังคม 500 · ไม่มีภาษีอัตโนมัติ · จ่ายโอน+ค่าธรรมเนียม 15 → ยกเลิกได้หลังรีเซ็ต', async () => {
     const r = (await one(`select save_payroll_run(null,$1::jsonb,$2::jsonb) id`, [J({ pay_type: 'daily', pay_method: 'transfer', period_from: '2026-11-01', period_to: '2026-11-30', pay_date: '2026-11-16' }),
@@ -75,7 +75,7 @@ describe('M61 เงินเดือน', () => {
     await db.query(`select reset_payroll_payment($1)`, [r]);
     await db.query(`select cancel_payroll_run($1)`, [r]);
     expect(await gl('11122.01')).toBe(0); expect(await gl('53211')).toBe(0);
-    expect(await gl('21951.01')).toBe(-77050);     // เหลือเฉพาะของรายการรายเดือน
+    expect(await gl('21951.01')).toBe(-76250);     // เหลือเฉพาะของรายการรายเดือน
     const t = await one(`select coalesce(sum(debit),0)::float8 d, coalesce(sum(credit),0)::float8 c from journal_lines`);
     expect(t.d).toBe(t.c);
   });
@@ -84,5 +84,17 @@ describe('M61 เงินเดือน', () => {
     expect(+(await one(`select payroll_sso(1000) v`)).v).toBe(83);       // ขั้นต่ำ 1,650 × 5% = 82.5 → 83
     expect(+(await one(`select payroll_wht_monthly(15000, 750) v`)).v).toBe(0);
     expect(+(await one(`select pit_annual(6000000) v`)).v).toBe(1615000);   // 7,500+20,000+37,500+50,000+250,000+900,000+350,000
+  });
+  it('ภาษีเงินได้ไม่ประจำ (OT/คอมมิชชั่น) คิดส่วนต่างภาษีทั้งปี · ภ.ง.ด.1 ดึงเฉพาะที่จ่ายแล้วตามวันที่ชำระ', async () => {
+    expect(+(await one(`select payroll_wht_extra(80000, 875, 4000) v`)).v).toBe(800);
+    expect(+(await one(`select payroll_wht_extra(80000, 875, -1000) v`)).v).toBe(-200);
+    expect(+(await one(`select payroll_wht_extra(20000, 750, 10000) v`)).v).toBe(0);
+    const r = (await one(`select id from payroll_runs where pay_type='monthly' and status='pending'`)).id;
+    expect((await db.query(`select * from pnd1_lines('2026-11-01','2026-11-30')`)).rows).toHaveLength(0);
+    await db.query(`select pay_payroll_run($1,'2026-11-30')`, [r]);
+    const p = (await db.query<any>(`select * from pnd1_lines('2026-11-01','2026-11-30')`)).rows;
+    expect(p.map(x => [x.code, x.national_id, +x.income, +x.wht_401, +x.wht_402, String(x.paid_date).slice(0, 4)]))
+      .toEqual([['EMP001', '1101700203450', 84000, 6875, 0, String(p[0].paid_date).slice(0, 4)]]);
+    expect((await db.query(`select * from pnd1_lines('2026-12-01','2026-12-31')`)).rows).toHaveLength(0);
   });
 });

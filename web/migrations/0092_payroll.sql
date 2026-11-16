@@ -89,6 +89,13 @@ $$;
 create function payroll_wht_monthly(p_salary numeric, p_sso numeric) returns numeric language sql immutable as $$
   select round(pit_annual(greatest(p_salary * 12 - least(p_salary * 12 * 0.5, 100000) - 60000 - p_sso * 12, 0)) / 12, 2)
 $$;
+create function payroll_pit_year(p_income numeric, p_sso_year numeric) returns numeric language sql immutable as $$
+  select pit_annual(greatest(p_income - least(p_income * 0.5, 100000) - 60000 - p_sso_year, 0))
+$$;
+create function payroll_wht_extra(p_salary numeric, p_sso numeric, p_extra numeric) returns numeric language sql immutable as $$
+  select case when coalesce(p_extra, 0) = 0 then 0 else
+    round(payroll_pit_year(p_salary * 12 + p_extra, p_sso * 12) - payroll_pit_year(p_salary * 12, p_sso * 12), 2) end
+$$;
 create function payroll_tax_breakdown(p_salary numeric, p_sso boolean default true) returns jsonb language sql stable as $$
   with x as (select p_salary * 12 y, case when p_sso then payroll_sso(p_salary) else 0 end s)
   select jsonb_build_object('salary', p_salary, 'annual', y, 'expense', least(y * 0.5, 100000),
@@ -160,7 +167,8 @@ begin
   x.absence := coalesce((l->>'absence')::numeric, 0); x.other_deduct := coalesce((l->>'other_deduct')::numeric, 0);
   x.sso_employee := coalesce((l->>'sso_employee')::numeric, case when s.sso_enabled and e.sso then payroll_sso(x.base) else 0 end);
   x.sso_employer := x.sso_employee;
-  x.wht_401 := coalesce((l->>'wht_401')::numeric, case when e.auto_tax and r.pay_type = 'monthly' then payroll_wht_monthly(x.base, x.sso_employee) else 0 end);
+  x.wht_401 := coalesce((l->>'wht_401')::numeric, case when e.auto_tax and r.pay_type = 'monthly' then
+    greatest(payroll_wht_monthly(x.base, x.sso_employee) + payroll_wht_extra(x.base, x.sso_employee, x.ot + x.commission - x.absence), 0) else 0 end);
   x.wht_402 := coalesce((l->>'wht_402')::numeric, 0);
   if least(x.days, x.rate, x.base, x.ot, x.commission, x.absence, x.other_deduct, x.sso_employee, x.wht_401, x.wht_402) < 0 then
     raise exception 'จำนวนเงินของ % ต้องไม่ติดลบ', e.code;
@@ -265,3 +273,11 @@ begin
   if r.accrual_voucher_id is not null then perform reverse_voucher(r.accrual_voucher_id); end if;
   update payroll_runs set status = 'cancelled' where id = p_id;
 end $$;
+create function pnd1_lines(p_from date, p_to date) returns table(employee_id uuid, code text, national_id text, title text, first_name text, last_name text,
+    address text, paid_date date, income numeric, wht_401 numeric, wht_402 numeric) language sql stable as $$
+  select e.id, e.code, e.national_id, e.title, e.first_name, e.last_name, e.address, max(r.paid_date),
+         sum(l.base + l.ot + l.commission - l.absence), sum(l.wht_401), sum(l.wht_402)
+  from payroll_lines l join payroll_runs r on r.id = l.run_id join employees e on e.id = l.employee_id
+  where r.status = 'paid' and r.paid_date between p_from and p_to
+  group by e.id order by e.code
+$$;

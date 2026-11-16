@@ -722,7 +722,7 @@ export async function removeCurrency(f: FormData): Promise<Result> {
 }
 
 // ===== M61 โมดูลเงินเดือน (เปิด/ปิดได้) =====
-const PAYROLL = ['/payroll', '/payroll/employees', '/payroll/settings', '/settings/modules', '/reports/trial-balance', '/journals'];
+const PAYROLL = ['/payroll', '/payroll/pnd1', '/payroll/employees', '/payroll/settings', '/settings/modules', '/reports/trial-balance', '/journals'];
 export const savePayrollSettings = async (p: Record<string, unknown>) =>
   run(u => callAs(u.id, 'save_payroll_settings($1::jsonb)', JSON.stringify(p)), PAYROLL.concat('/'), 'payroll.write');
 export const setPayrollEnabled = async (on: boolean) =>
