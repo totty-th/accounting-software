@@ -720,3 +720,27 @@ export async function saveCurrency(f: FormData): Promise<Result> {
 export async function removeCurrency(f: FormData): Promise<Result> {
   return run(call('select remove_currency($1)', str(f, 'code')), ['/settings/currency'], SC);
 }
+
+// ===== M61 โมดูลเงินเดือน (เปิด/ปิดได้) =====
+const PAYROLL = ['/payroll', '/payroll/employees', '/payroll/settings', '/settings/modules', '/reports/trial-balance', '/journals'];
+export const savePayrollSettings = async (p: Record<string, unknown>) =>
+  run(u => callAs(u.id, 'save_payroll_settings($1::jsonb)', JSON.stringify(p)), PAYROLL.concat('/'), 'payroll.write');
+export const setPayrollEnabled = async (on: boolean) =>
+  run(() => call(`update payroll_settings set enabled=$1, updated_at=now()`, on)(), PAYROLL.concat('/'), 'payroll.write');
+export async function saveEmployee(id: string | null, p: Record<string, unknown>): Promise<Result & { id?: string }> {
+  let newId: string | undefined;
+  const r = await run(async u => { newId = ((await callAs(u.id, 'save_employee($1,$2::jsonb) as id', id, JSON.stringify(p))) as any[])[0]?.id; }, PAYROLL, 'payroll.write');
+  return { ...r, id: newId };
+}
+export async function savePayrollRun(id: string | null, h: Record<string, unknown>, lines: unknown[]): Promise<Result & { id?: string }> {
+  let newId: string | undefined;
+  const r = await run(async u => { newId = ((await callAs(u.id, 'save_payroll_run($1,$2::jsonb,$3::jsonb) as id', id, JSON.stringify(h), JSON.stringify(lines))) as any[])[0]?.id; },
+    PAYROLL.concat(id ? `/payroll/${id}` : []), 'payroll.write');
+  return { ...r, id: newId };
+}
+export const payPayrollRun = async (id: string, date: string, fee: number) =>
+  run(u => callAs(u.id, 'pay_payroll_run($1,$2::date,$3)', id, date, fee), PAYROLL.concat(`/payroll/${id}`), 'payroll.write');
+export const resetPayrollPayment = async (id: string) =>
+  run(u => callAs(u.id, 'reset_payroll_payment($1)', id), PAYROLL.concat(`/payroll/${id}`), 'payroll.write');
+export const cancelPayrollRun = async (id: string) =>
+  run(u => callAs(u.id, 'cancel_payroll_run($1)', id), PAYROLL.concat(`/payroll/${id}`), 'payroll.write');

@@ -8,7 +8,7 @@ import { can, type Perm } from '@/lib/permissions';
 // เมนูจัดกลุ่มแบบ FA (REA 29-10-2026): หมวดหลัก 1 ระดับ → รายการย่อย (บางหมวดมีหัวข้อย่อยคั่น) · เปิดได้ทีละหมวด หมวดที่อยู่ในหน้าปัจจุบันเปิดให้อัตโนมัติ
 // ไม่เปลี่ยนที่อยู่หน้าเดิม: เปลี่ยนเฉพาะการจัดเรียง/ชื่อกลุ่มเมนู
 type Item = { href: string; label: string; perms: Perm[]; gap?: boolean; head?: string };
-type Group = { key: string; label: string; c: string; href?: string; perms?: Perm[]; items?: Item[] };
+type Group = { key: string; label: string; c: string; href?: string; perms?: Perm[]; items?: Item[]; module?: string };
 
 const R: Perm[] = ['reports.read'];
 const GROUPS: Group[] = [
@@ -36,6 +36,10 @@ const GROUPS: Group[] = [
     { href: '/assets', label: 'จัดการสินทรัพย์', perms: ['expenses.read'], gap: true },
     { href: '/assets/depreciation', label: 'บันทึกค่าเสื่อมราคา', perms: ['expenses.read'] },
     { href: '/assets/categories', label: 'หมวดหมู่สินทรัพย์', perms: ['expenses.read'] }] },
+  { key: 'payroll', label: 'เงินเดือน', c: 'var(--teal)', module: 'payroll', items: [
+    { href: '/payroll', label: 'รายการเงินเดือน/ค่าจ้าง', perms: ['payroll.read'] },
+    { href: '/payroll/employees', label: 'พนักงาน', perms: ['payroll.read'] },
+    { href: '/payroll/settings', label: 'ตั้งค่าเงินเดือน', perms: ['payroll.write'] }] },
   { key: 'stock', label: 'สินค้า', c: 'var(--blue)', items: [
     { href: '/products', label: 'สินค้า/บริการ', perms: ['master.read'] },
     { href: '/stock', label: 'สต็อก', perms: ['stock.read'] },
@@ -89,6 +93,7 @@ const GROUPS: Group[] = [
     { href: '/settings/lock', label: 'ล็อกงวดบัญชี', perms: R },
     { href: '/settings/opening-balance', label: 'ยอดเริ่มต้น', perms: R },
     { href: '/stock/settings', label: 'ตั้งค่าสต็อก', perms: ['stock.read'] },
+    { href: '/settings/modules', label: 'โมดูลเสริม', perms: ['payroll.write'] },
     { href: '/settings/users', label: 'ผู้ใช้และสิทธิ์', perms: ['users.manage'] },
     { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', perms: R },
     { href: '/settings/preferences', label: 'ตั้งค่าส่วนตัว', perms: R },
@@ -114,7 +119,7 @@ function activeHref(path: string, sp: URLSearchParams): string | null {
   return path === '/' ? '/' : best;
 }
 
-export function Nav() {
+export function Nav({ modules = [] }: { modules?: string[] }) {
   const path = usePathname(), sp = useSearchParams(), role = useRole();
   const act = activeHref(path, sp);
   const home = GROUPS.find(g => g.items?.some(i => i.href === act))?.key ?? null;
@@ -124,6 +129,7 @@ export function Nav() {
   return (
     <nav className="nav">
       {GROUPS.map(g => {
+        if (g.module && !modules.includes(g.module)) return null;
         if (g.href) {
           if (!g.perms!.some(p => can(role, p))) return null;
           return <Link key={g.key} href={g.href} className={`grp ${act === g.href ? 'on' : ''}`} style={{ ['--c' as any]: g.c }}><i className="dot" style={{ ['--c' as any]: g.c }} />{g.label}</Link>;

@@ -359,3 +359,9 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
 /* ไอคอน "ดูเพิ่มเติม" วงกลมวาดด้วย CSS (ไม่พึ่งอักขระพิเศษ/อีโมจิ จึงไม่เป็นสี่เหลี่ยมบนเครื่องที่ไม่มีฟอนต์) — ใช้ทั้งระบบ */
 .info-dot{--i:var(--blue);display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:1.5px solid var(--i);color:var(--i);font:700 11px/1 var(--font-sans,system-ui,sans-serif);vertical-align:middle;cursor:pointer;transition:background .12s,color .12s}
 .relpop:hover .info-dot,.relpop:focus .info-dot,button:hover>.info-dot{background:var(--i);color:#fff}
+/* M61 เงินเดือน */
+.err{color:var(--red);font-size:13px;margin:6px 0}.okmsg{color:var(--teal);font-size:13px;margin:6px 0}
+.radios{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0}.radios label{display:flex;align-items:center;gap:6px;font-size:14px}.radios input{width:auto}
+.taxbox{border:1px solid var(--line,#e5e7eb);border-radius:8px;padding:10px 12px;font-size:13px;max-width:420px}.taxbox div{display:flex;justify-content:space-between;gap:12px}.taxbox b{font-variant-numeric:tabular-nums}
+.slip{max-width:760px;margin:0 auto;background:#fff;color:#111;padding:28px;border:1px solid #ddd}.slip table{width:100%}.slip h2{margin:0}
+@media print{.slip{border:none;padding:0}}

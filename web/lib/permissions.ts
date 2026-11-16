@@ -28,6 +28,7 @@ export const PERMS = [
   'contact.create',
   'cost.view',                                       // เห็นราคาซื้อ/ต้นทุน
   'settings.company', 'users.manage',
+  'payroll.read', 'payroll.write',                   // โมดูลเงินเดือน (M61) — ข้อมูลเงินเดือนเป็นความลับ ให้เฉพาะเจ้าของ/นักบัญชี (ร่าง รอยืนยัน)
 ] as const;
 export type Perm = (typeof PERMS)[number];
 
@@ -37,16 +38,16 @@ const ACCOUNTING_WRITE: Perm[] = ['sales.write', 'receipts.write', 'expenses.wri
 
 const MATRIX: Record<Role, readonly Perm[]> = {
   // เจ้าของ: เห็นและอนุมัติบัญชีทั้งหมด (ตามที่เจ้าของระบบระบุ) · จัดการผู้ใช้/ตั้งค่าระบบไม่ได้
-  owner: [...READ_ALL, ...ACCOUNTING_WRITE, 'sales.approve', 'expenses.approve'],
+  owner: [...READ_ALL, ...ACCOUNTING_WRITE, 'sales.approve', 'expenses.approve', 'payroll.read', 'payroll.write'],
   // นักบัญชี: ทำงานบัญชีได้ทุกหมวด แต่ไม่อนุมัติ (ร่าง รอยืนยัน)
-  accountant: [...READ_ALL, ...ACCOUNTING_WRITE],
+  accountant: [...READ_ALL, ...ACCOUNTING_WRITE, 'payroll.read', 'payroll.write'],
   // ฝ่ายขาย: ใบเสนอราคาของตัวเองอย่างเดียว + ดูรายชื่อลูกค้า/สินค้า (ไม่เห็นราคาซื้อ) + เพิ่มลูกค้าได้
   sales: ['quote.own', 'master.read', 'contact.create'],
   // Super admin และ IT สิทธิ์เท่ากัน: จัดการผู้ใช้/สิทธิ์/ตั้งค่า + ดูข้อมูลทั้งหมดแบบอ่านอย่างเดียว (ร่าง รอยืนยัน)
   super_admin: [...READ_ALL, 'settings.company', 'users.manage'],
   it: [...READ_ALL, 'settings.company', 'users.manage'],
   // ตำแหน่งตาม FA (M14.3) — FA: สำนักงานบัญชี ≈ นักบัญชี (ปรับสิทธิ์รายคนได้ใน FA)
-  accounting_firm: [...READ_ALL, ...ACCOUNTING_WRITE],
+  accounting_firm: [...READ_ALL, ...ACCOUNTING_WRITE, 'payroll.read', 'payroll.write'],
   // FA: ผู้จัดการฝ่ายขาย เมนูขาย+ใบลดหนี้/เพิ่มหนี้เต็ม, ดูได้แค่แดชบอร์ด, สินค้า/ลูกค้าไม่เห็นราคาซื้อ ไม่ลบ
   sales_manager: ['dash.view', 'sales.read', 'sales.write', 'receipts.read', 'receipts.write', 'expenses.own', 'master.read', 'contact.create'],
   // FA: พนักงานขายอาวุโส/ธุรการฝ่ายขาย/แคชเชียร์/เจ้าหน้าที่ขายและจัดซื้อ เห็นเฉพาะเอกสารของตัวเอง
