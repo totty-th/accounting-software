@@ -31,8 +31,8 @@ export default async function Run({ params }: { params: { id: string } }) {
   const w = can(u.role, 'payroll.write'), daily = r.pay_type === 'daily';
   return (
     <>
-      <div className="top"><div><h1>{RUN_TYPE[r.pay_type]} {dateTh(r.period_from)} – {dateTh(r.period_to)} <span className={`pill ${RUN_STATUS[r.status][1]}`}>{RUN_STATUS[r.status][0]}</span></h1>
-        <p className="sub">ทำรายการ {dateTh(r.doc_date)} · วันที่ชำระ {dateTh(r.paid_date ?? r.pay_date)} · จ่าย{PAY_METHOD[r.pay_method]}{r.note ? ` · ${r.note}` : ''}</p></div>
+      <div className="top"><div><h1>{RUN_TYPE[r.pay_type]} {dateTh(r.period_from)} – {dateTh(r.period_to)}</h1>
+        <p className="sub"><span className={`pill ${RUN_STATUS[r.status][1]}`}>{RUN_STATUS[r.status][0]}</span> ทำรายการ {dateTh(r.doc_date)} · วันที่ชำระ {dateTh(r.paid_date ?? r.pay_date)} · จ่าย{PAY_METHOD[r.pay_method]}{r.note ? ` · ${r.note}` : ''}</p></div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {w && r.status === 'pending' && <Link className="btn sm ghost" href={`/payroll/${r.id}/edit`}>แก้ไข</Link>}
           {w && r.status === 'pending' && <ActionButton action={cancelPayrollRun.bind(null, r.id)} label="ยกเลิก" variant="danger" confirmText="ยกเลิกรายการเงินเดือนนี้? (กลับรายการบัญชีค้างจ่าย)" />}
