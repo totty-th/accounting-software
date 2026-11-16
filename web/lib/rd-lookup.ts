@@ -8,12 +8,12 @@ export type RdRow = { tax_id: string; branch_code: string; name: string; address
 const esc = (s: string) => s.replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]!));
 const unesc = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 
-export function buildRequest(q: string): string {
+export function buildRequest(q: string, branch = 0): string {
   const tin = q;
   const name = '';
   return `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:vat="${NS}"><soap12:Body><vat:Service>`
     + `<vat:username>anonymous</vat:username><vat:password>anonymous</vat:password><vat:TIN>${tin}</vat:TIN><vat:Name>${esc(name)}</vat:Name>`
-    + `<vat:ProvinceCode>0</vat:ProvinceCode><vat:BranchNumber>0</vat:BranchNumber><vat:AmphurCode>0</vat:AmphurCode></vat:Service></soap12:Body></soap12:Envelope>`;
+    + `<vat:ProvinceCode>0</vat:ProvinceCode><vat:BranchNumber>${Math.max(0, Math.floor(branch)) || 0}</vat:BranchNumber><vat:AmphurCode>0</vat:AmphurCode></vat:Service></soap12:Body></soap12:Envelope>`;
 }
 
 /** อ่านผลลัพธ์: แต่ละฟิลด์ (vNID, vName, ...) เป็นอาร์เรย์ของ <anyType> เรียงตามแถวเดียวกัน */
@@ -59,11 +59,11 @@ export function parseResponse(xml: string): RdRow[] {
   return rows;
 }
 
-export async function lookupRd(q: string): Promise<{ rows: RdRow[]; raw?: string }> {
+export async function lookupRd(q: string, branch = 0): Promise<{ rows: RdRow[]; raw?: string }> {
   const query = q.trim();
   if (!/^\d{13}$/.test(query)) throw new Error('กรอกเลขผู้เสียภาษี 13 หลัก (ค้นด้วยชื่อยังไม่รองรับ)');
   const res = await fetch(ENDPOINT, { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(15000),
-    headers: { 'content-type': 'application/soap+xml; charset=utf-8' }, body: buildRequest(query) });
+    headers: { 'content-type': 'application/soap+xml; charset=utf-8' }, body: buildRequest(query, branch) });
   const xml = await res.text();
   if (!res.ok) console.log('[rd-lookup] http', res.status, 'req', query, 'body', xml.slice(0, 1500).replace(/\s+/g, ' '));
   if (!res.ok) throw new Error(`กรมสรรพากรตอบกลับผิดปกติ (${res.status})`);
