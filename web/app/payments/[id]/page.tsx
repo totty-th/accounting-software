@@ -40,9 +40,9 @@ export default async function SlipPage({ params }: { params: { id: string } }) {
   const events = await db.q<any>('select at, text from payment_slip_events where slip_id=$1 order by id desc', [s.id]);
   const canEditDocs = editable && its.length > 0 && its.every(i => !i.paid);
   const cands = canEditDocs ? (await db.q<any>(`select 'EXP' t, e.id, i.doc_no from expenses e cross join lateral slip_doc_info('EXP', e.id) i
-      where e.contact_id=$1 and i.payable and not exists (select 1 from payment_slip_items x where x.doc_type='EXP' and x.doc_id=e.id)
+      where e.contact_id=$1 and i.payable and not exists (select 1 from payment_slip_items x join payment_slips ps on ps.id=x.slip_id where ps.status='active' and x.doc_type='EXP' and x.doc_id=e.id)
     union all select 'RI', g.id, i.doc_no from goods_receipts g cross join lateral slip_doc_info('RI', g.id) i
-      where g.contact_id=$1 and i.payable and not exists (select 1 from payment_slip_items x where x.doc_type='RI' and x.doc_id=g.id) order by 3`, [its[0].contact_id]))
+      where g.contact_id=$1 and i.payable and not exists (select 1 from payment_slip_items x join payment_slips ps on ps.id=x.slip_id where ps.status='active' and x.doc_type='RI' and x.doc_id=g.id) order by 3`, [its[0].contact_id]))
     .map(c => ({ key: `${c.t}:${c.id}`, label: c.doc_no as string })) : [];
   return (
     <>

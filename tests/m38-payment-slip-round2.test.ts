@@ -29,14 +29,16 @@ beforeEach(async () => {
 });
 
 describe('M38 ใบเตรียมจ่าย รอบ 2', () => {
-  it('ยกเลิกใบที่จ่ายแล้ว: กลับรายการจ่าย เอกสารกลับค้างจ่าย แต่ยังถูกล็อกกับใบที่ยกเลิก', async () => {
+  it('ยกเลิกใบที่จ่ายแล้ว: กลับรายการจ่าย เอกสารกลับค้างจ่าย และถูกปล่อยคืนให้เลือกเข้าใบใหม่ได้ (0085)', async () => {
     const e = await ex(v1, 1000); const s = await slip([{ type: 'EXP', id: e }]);
     await call('select pay_payment_slip_vendor($1,$2,$3::date)', [s, v1, D]);
     expect(await st(e)).toBe('paid'); expect(await tb('11112')).toBe(-1070);
     await call('select cancel_payment_slip($1)', [s]);
     expect((await one<any>('select status from payment_slips where id=$1', [s])).status).toBe('cancelled');
     expect(await st(e)).not.toBe('paid'); expect(await tb('11112')).toBe(0);
+    const sNew = await slip([{ type: 'EXP', id: e }]);
     expect(await err(slip([{ type: 'EXP', id: e }]))).toContain('อยู่ในใบเตรียมจ่ายอื่นแล้ว');
+    await call('select cancel_payment_slip($1)', [sNew]);
     const ev = await events(s); expect(ev[0]).toContain('สร้างเอกสาร'); expect(ev.some(x => x.startsWith('บันทึกการชำระเงิน'))).toBe(true);
     expect(ev.some(x => x.startsWith('กลับรายการชำระเงิน'))).toBe(true); expect(ev.at(-1)).toBe('ยกเลิกเอกสาร');
   });

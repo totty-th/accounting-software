@@ -112,12 +112,14 @@ describe('M18.3 ใบเตรียมจ่าย หลายผู้จำ
     expect(rows.reduce((a: number, x: any) => a + +x.amount, 0)).toBe(3210);
     expect(rows.filter((x: any) => x.doc_id === e1).reduce((a: number, x: any) => a + +x.amount, 0)).toBe(1070);
   });
-  it('ยกเลิกใบเตรียมจ่าย: ได้ถ้ายังไม่จ่าย · เอกสารไม่ถูกปล่อยคืนหลังยกเลิก (ตามต้นแบบ 0061) · ยกเลิกใบที่จ่ายแล้วรีเซ็ตเอกสารให้', async () => {
+  it('ยกเลิกใบเตรียมจ่าย: ได้ถ้ายังไม่จ่าย · เอกสารถูกปล่อยคืนหลังยกเลิก (0085) · ยกเลิกใบที่จ่ายแล้วรีเซ็ตเอกสารให้', async () => {
     const e = await ex(v1, 1000), e2 = await ex(v2, 500);
     const s = await slip([{ type: 'EXP', id: e }]);
     await call('select cancel_payment_slip($1)', [s]);
-    // ต้นแบบ FA ไม่ปล่อยเอกสารคืนหลังยกเลิกใบ (migration 0061) → เลือกเอกสารเดิมเข้าใบใหม่ไม่ได้
+    // เจ้าของตัดสินใจ 16-11-2026 (0085): ปล่อยเอกสารคืนหลังยกเลิกใบ (ต่างจาก FA) → เลือกเข้าใบใหม่ได้ · แต่ถ้าอยู่ในใบ active ยังล็อก
+    const sNew = await slip([{ type: 'EXP', id: e }]);
     expect(await err(slip([{ type: 'EXP', id: e }]))).toContain('อยู่ในใบเตรียมจ่ายอื่นแล้ว');
+    await call('select cancel_payment_slip($1)', [sNew]);
     const s2 = await slip([{ type: 'EXP', id: e2 }]);
     await call('select pay_payment_slip_vendor($1,$2,$3::date)', [s2, v2, D]);
     // 0061: ยกเลิกใบที่จ่ายแล้ว = รีเซ็ตเอกสารที่จ่ายให้ก่อนแล้วยกเลิกใบ (ไม่ error)
