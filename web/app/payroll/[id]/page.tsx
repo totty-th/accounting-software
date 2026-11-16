@@ -8,7 +8,7 @@ import { payrollEnabled } from '@/lib/modules';
 import { PayrollOff } from '@/components/PayrollGate';
 import { PayrollPayForm } from '@/components/PayrollPayForm';
 import { ActionButton } from '@/components/ActionButton';
-import { cancelPayrollRun, resetPayrollPayment } from '@/lib/actions';
+import { cancelPayrollRun, deletePayrollRun, resetPayrollPayment } from '@/lib/actions';
 import { RUN_STATUS, RUN_TYPE, PAY_METHOD, empName } from '@/lib/payroll';
 
 export const dynamic = 'force-dynamic';
@@ -36,6 +36,7 @@ export default async function Run({ params }: { params: { id: string } }) {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {w && r.status === 'pending' && <Link className="btn sm ghost" href={`/payroll/${r.id}/edit`}>แก้ไข</Link>}
           {w && r.status === 'pending' && <ActionButton action={cancelPayrollRun.bind(null, r.id)} label="ยกเลิก" variant="danger" confirmText="ยกเลิกรายการเงินเดือนนี้? (กลับรายการบัญชีค้างจ่าย)" />}
+          {w && r.status === 'pending' && !r.status_changed && <ActionButton action={deletePayrollRun.bind(null, r.id)} label="ลบ" variant="danger" after="/payroll" confirmText="ลบรายการเงินเดือนนี้? (ลบเอกสารและกลับรายการบัญชีค้างจ่าย)" />}
           {w && r.status === 'paid' && <ActionButton action={resetPayrollPayment.bind(null, r.id)} label="รีเซ็ตการชำระ" variant="ghost" confirmText="รีเซ็ตการชำระ? (กลับรายการบัญชีจ่ายเงิน)" />}
           <Link className="btn sm ghost" href="/payroll">กลับ</Link></div></div>
       <div className="panel wide" style={{ padding: 0, overflowX: 'auto' }}>

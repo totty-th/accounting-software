@@ -742,5 +742,7 @@ export const payPayrollRun = async (id: string, date: string, fee: number) =>
   run(u => callAs(u.id, 'pay_payroll_run($1,$2::date,$3)', id, date, fee), PAYROLL.concat(`/payroll/${id}`), 'payroll.write');
 export const resetPayrollPayment = async (id: string) =>
   run(u => callAs(u.id, 'reset_payroll_payment($1)', id), PAYROLL.concat(`/payroll/${id}`), 'payroll.write');
+export const deletePayrollRun = async (id: string) =>
+  run(u => callAs(u.id, 'delete_payroll_run($1)', id), PAYROLL, 'payroll.write');
 export const cancelPayrollRun = async (id: string) =>
   run(u => callAs(u.id, 'cancel_payroll_run($1)', id), PAYROLL.concat(`/payroll/${id}`), 'payroll.write');

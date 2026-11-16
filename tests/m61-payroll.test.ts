@@ -97,4 +97,19 @@ describe('M61 เงินเดือน', () => {
       .toEqual([['EMP001', '1101700203450', 84000, 6875, 0, String(p[0].paid_date).slice(0, 4)]]);
     expect((await db.query(`select * from pnd1_lines('2026-12-01','2026-12-31')`)).rows).toHaveLength(0);
   });
+  it('ลบ (ตาม FA): ได้เฉพาะที่ยังไม่เคยเปลี่ยนสถานะ · ลบแล้ว JV ค้างจ่ายถูกกลับรายการ · เคยจ่ายแล้วลบไม่ได้', async () => {
+    const h = J({ pay_type: 'monthly', pay_method: 'cash', period_from: '2026-12-01', period_to: '2026-12-31', pay_date: '2026-12-25' });
+    const before = await gl('21951.01');
+    const r = (await one(`select save_payroll_run(null,$1::jsonb,$2::jsonb) id`, [h, J([{ employee_id: e1 }])])).id;
+    expect(await gl('21951.01')).toBe(before - 73050);
+    await db.query(`select delete_payroll_run($1)`, [r]);
+    expect(await one(`select * from payroll_runs where id=$1`, [r])).toBeUndefined();
+    expect(await gl('21951.01')).toBe(before);
+    const r2 = (await one(`select save_payroll_run(null,$1::jsonb,$2::jsonb) id`, [h, J([{ employee_id: e1 }])])).id;
+    await db.query(`select pay_payroll_run($1,'2026-12-25')`, [r2]);
+    await db.query(`select reset_payroll_payment($1)`, [r2]);
+    expect(await err(db.query(`select delete_payroll_run($1)`, [r2]))).toContain('ยังไม่เคยเปลี่ยนสถานะ');
+    await db.query(`select cancel_payroll_run($1)`, [r2]);
+    expect(await err(db.query(`select delete_payroll_run($1)`, [r2]))).toContain('ยังไม่เคยเปลี่ยนสถานะ');
+  });
 });

@@ -69,6 +69,7 @@ create table payroll_runs (
   accrual_voucher_id uuid references journal_vouchers(id),
   payment_voucher_id uuid references journal_vouchers(id),
   paid_date     date, fee numeric(18,2) not null default 0,
+  status_changed boolean not null default false,          -- เคยจ่าย/ยกเลิกแล้ว = ลบไม่ได้ (ตาม FA)
   created_by    uuid references app_users(id),
   created_at    timestamptz not null default now(),
   check (period_to >= period_from)
@@ -284,7 +285,7 @@ begin
   if p_fee > 0 then v_lines := v_lines || jsonb_build_object('account','53211','debit',p_fee); end if;
   v_lines := v_lines || jsonb_build_object('account',acc,'credit',n + coalesce(p_fee, 0));
   v := post_voucher('JV', coalesce(p_date, r.pay_date), 'ชำระรายการเงินเดือนสำหรับงวด ' || to_char(r.period_to, 'MM/YYYY'), 'PAYROLL_PAY', p_id::text, v_lines);
-  update payroll_runs set status = 'paid', payment_voucher_id = v, paid_date = coalesce(p_date, r.pay_date), fee = coalesce(p_fee, 0) where id = p_id;
+  update payroll_runs set status = 'paid', status_changed = true, payment_voucher_id = v, paid_date = coalesce(p_date, r.pay_date), fee = coalesce(p_fee, 0) where id = p_id;
   return v;
 end $$;
 
@@ -304,7 +305,18 @@ begin
   if not found then raise exception 'ไม่พบรายการเงินเดือน'; end if;
   if r.status <> 'pending' then raise exception 'ยกเลิกได้เฉพาะรายการที่รอดำเนินการ (จ่ายแล้วต้องรีเซ็ตการชำระก่อน)'; end if;
   if r.accrual_voucher_id is not null then perform reverse_voucher(r.accrual_voucher_id); end if;
-  update payroll_runs set status = 'cancelled' where id = p_id;
+  update payroll_runs set status = 'cancelled', status_changed = true where id = p_id;
+end $$;
+
+-- ลบรายการเงินเดือน (ตาม FA: ลบได้เฉพาะที่ยังไม่เคยเปลี่ยนสถานะ) · รายการบัญชีลบไม่ได้ → กลับรายการ JV ค้างจ่าย (-R) แล้วลบเอกสาร
+create function delete_payroll_run(p_id uuid) returns void language plpgsql as $$
+declare r payroll_runs;
+begin
+  select * into r from payroll_runs where id = p_id for update;
+  if not found then raise exception 'ไม่พบรายการเงินเดือน'; end if;
+  if r.status <> 'pending' or r.status_changed then raise exception 'ลบได้เฉพาะรายการที่ยังไม่เคยเปลี่ยนสถานะ (เคยจ่ายหรือยกเลิกแล้วลบไม่ได้)'; end if;
+  if r.accrual_voucher_id is not null then perform reverse_voucher(r.accrual_voucher_id); end if;
+  delete from payroll_runs where id = p_id;
 end $$;
 
 -- ภ.ง.ด.1 รายเดือน: เงินได้ 40(1)/40(2) ที่จ่ายจริง (เฉพาะรายการเงินเดือนที่ชำระแล้ว ตามวันที่ชำระ) รวมต่อพนักงาน
