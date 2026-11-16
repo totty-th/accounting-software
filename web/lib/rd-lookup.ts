@@ -68,6 +68,20 @@ export async function lookupRd(q: string, branch = 0): Promise<{ rows: RdRow[]; 
   if (!res.ok) console.log('[rd-lookup] http', res.status, 'req', query, 'body', xml.slice(0, 1500).replace(/\s+/g, ' '));
   if (!res.ok) throw new Error(`กรมสรรพากรตอบกลับผิดปกติ (${res.status})`);
   const rows = parseResponse(xml).slice(0, 30);
-  if (!rows.length) console.log('[rd-lookup] no rows; status', res.status, 'body', xml.slice(0, 3000).replace(/\s+/g, ' '));
   return { rows, raw: xml };
+}
+
+/** ค้นทุกสาขา: กรมสรรพากรคืนทีละสาขา จึงไล่เลขสาขา 0,1,2,… ทีละชุด 10 สาขาแบบขนาน หยุดเมื่อทั้งชุดไม่พบ (ทนเลขขาดได้ไม่เกิน 9) */
+export async function lookupAllBranches(q: string, maxBranch = 150): Promise<RdRow[]> {
+  const first = (await lookupRd(q, 0)).rows;
+  if (!first.length) return [];
+  const rows = [...first];
+  for (let start = 1; start <= maxBranch; start += 10) {
+    const batch = await Promise.all(Array.from({ length: 10 }, (_, i) => lookupRd(q, start + i).then(r => r.rows).catch(() => [] as RdRow[])));
+    const found = batch.flat();
+    if (!found.length) break;
+    rows.push(...found);
+  }
+  const seen = new Set<string>();
+  return rows.filter(r => (seen.has(r.branch_code) ? false : (seen.add(r.branch_code), true)));
 }

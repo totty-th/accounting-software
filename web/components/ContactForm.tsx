@@ -24,7 +24,7 @@ export function ContactForm({ id, init, canSave }: { id: string | null; init: V;
   const rdSearch = async () => {
     setRdBusy(true); setRdMsg(null); setRdRows(null);
     try {
-      const r = await fetch(`/api/rd-lookup?q=${encodeURIComponent((rdQ || v.tax_id || '').trim())}&branch=${encodeURIComponent(rdBr.replace(/\D/g, '') || '0')}`); const j = await r.json();
+      const r = await fetch(`/api/rd-lookup?q=${encodeURIComponent((rdQ || v.tax_id || '').trim())}${rdBr.replace(/\D/g, '') ? `&branch=${rdBr.replace(/\D/g, '')}` : ''}`); const j = await r.json();
       if (!r.ok) setRdMsg(j.error ?? 'ค้นหาไม่สำเร็จ'); else if (!j.rows.length) setRdMsg('ไม่พบข้อมูล (กรมสรรพากรมีเฉพาะผู้จดทะเบียนภาษีมูลค่าเพิ่ม) กรุณากรอกเอง'); else setRdRows(j.rows);
     } catch { setRdMsg('ค้นหาไม่สำเร็จ กรุณาลองใหม่หรือกรอกเอง'); }
     setRdBusy(false);
@@ -49,7 +49,7 @@ export function ContactForm({ id, init, canSave }: { id: string | null; init: V;
             <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <input style={{ flex: '1 1 200px' }} placeholder="เลขผู้เสียภาษี 13 หลัก" value={rdQ} onChange={e => setRdQ(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); rdSearch(); } }} />
-              <input style={{ flex: '0 0 110px' }} inputMode="numeric" placeholder="สาขา (เว้นว่าง=สนง.ใหญ่)" title="เลขสาขา เช่น 1 หรือ 00001 เว้นว่างเพื่อค้นสำนักงานใหญ่" value={rdBr} onChange={e => setRdBr(e.target.value)} />
+              <input style={{ flex: '0 0 110px' }} inputMode="numeric" placeholder="สาขา (ว่าง=ทุกสาขา)" title="เว้นว่างเพื่อแสดงสำนักงานใหญ่และทุกสาขาให้เลือก หรือใส่เลขสาขาเช่น 1 เพื่อค้นสาขาเดียว" value={rdBr} onChange={e => setRdBr(e.target.value)} />
               <button type="button" className="btn ghost" disabled={rdBusy} onClick={rdSearch}>{rdBusy ? 'กำลังค้นหา…' : 'ค้นหา'}</button></span>
             {rdMsg && <small role="alert">{rdMsg}</small>}
             {rdRows && <div style={{ border: '1px solid var(--line)', borderRadius: 6, maxHeight: 220, overflow: 'auto', marginTop: 6 }}>
