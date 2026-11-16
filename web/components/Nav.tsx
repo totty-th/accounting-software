@@ -89,8 +89,9 @@ const GROUPS: Group[] = [
     { href: '/settings/lock', label: 'ล็อกงวดบัญชี', perms: R },
     { href: '/settings/opening-balance', label: 'ยอดเริ่มต้น', perms: R },
     { href: '/stock/settings', label: 'ตั้งค่าสต็อก', perms: ['stock.read'] },
-    { href: '/admin/users', label: 'ผู้ใช้และสิทธิ์', perms: ['users.manage'] },
-    { href: '/settings/my-signature', label: 'ลายเซ็นของฉัน', perms: R },
+    { href: '/settings/users', label: 'ผู้ใช้และสิทธิ์', perms: ['users.manage'] },
+    { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', perms: R },
+    { href: '/settings/preferences', label: 'ตั้งค่าส่วนตัว', perms: R },
     { href: '/settings/shortcuts', label: 'แป้นพิมพ์ลัด', perms: R }] },
 ];
 

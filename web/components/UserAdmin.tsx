@@ -10,7 +10,7 @@ export function UserAdmin({ users, meId, supabaseMode }: { users: U[]; meId: str
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ t: string; ok: boolean } | null>(null);
-  const [nu, setNu] = useState({ username: '', display: '', role: 'sales', password: '' });
+  const [nu, setNu] = useState({ username: '', display: '', role: 'sales', password: '', first: '', last: '', phone: '', email: '' });
   const [pw, setPw] = useState<Record<string, string>>({});
   const done = (r: { error?: string }, okText: string, after?: () => void) => {
     if (r.error) return setMsg({ t: r.error, ok: false });
@@ -23,13 +23,17 @@ export function UserAdmin({ users, meId, supabaseMode }: { users: U[]; meId: str
         <div className="grid">
           <label className="f">ชื่อผู้ใช้ (a-z 0-9 . _ -)<input value={nu.username} onChange={e => setNu({ ...nu, username: e.target.value })} autoCapitalize="none" /></label>
           <label className="f">ชื่อที่แสดง<input value={nu.display} onChange={e => setNu({ ...nu, display: e.target.value })} /></label>
+          <label className="f">ชื่อจริง<input value={nu.first} onChange={e => setNu({ ...nu, first: e.target.value })} /></label>
+          <label className="f">นามสกุล<input value={nu.last} onChange={e => setNu({ ...nu, last: e.target.value })} /></label>
+          <label className="f">เบอร์โทร<input inputMode="tel" value={nu.phone} onChange={e => setNu({ ...nu, phone: e.target.value })} /></label>
+          <label className="f">อีเมล<input type="email" value={nu.email} onChange={e => setNu({ ...nu, email: e.target.value })} /></label>
           <label className="f">ตำแหน่ง<select value={nu.role} onChange={e => setNu({ ...nu, role: e.target.value })}>
             {ROLES.map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select></label>
           {supabaseMode && <label className="f">รหัสผ่าน (อย่างน้อย 8 ตัว)<input type="password" autoComplete="new-password" value={nu.password} onChange={e => setNu({ ...nu, password: e.target.value })} /></label>}
         </div>
         {!supabaseMode && <p className="sub">โหมดเดโม: ผู้ใช้ทุกคนล็อกอินด้วยรหัสผ่านเดโมเดียวกัน เมื่อเชื่อม Supabase Auth จะตั้งรหัสรายบุคคลที่นี่</p>}
         <button className="btn" disabled={pending || !nu.username.trim() || !nu.display.trim() || (supabaseMode && nu.password.length < 8)}
-          onClick={() => start(async () => done(await createUser(nu), 'เพิ่มผู้ใช้แล้ว', () => setNu({ ...nu, username: '', display: '', password: '' })))}>เพิ่มผู้ใช้</button>
+          onClick={() => start(async () => done(await createUser(nu), 'เพิ่มผู้ใช้แล้ว', () => setNu({ ...nu, username: '', display: '', password: '', first: '', last: '', phone: '', email: '' })))}>เพิ่มผู้ใช้</button>
       </div>
       {msg && <div className="notice" role="alert" style={{ borderLeftColor: msg.ok ? 'var(--green)' : 'var(--red)', marginBottom: 12 }}>{msg.t}</div>}
       <div className="panel" style={{ maxWidth: 'none', overflowX: 'auto' }}>

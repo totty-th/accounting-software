@@ -58,3 +58,17 @@ describe('M14 ผู้สร้างเอกสารขาย', () => {
     expect((await one(`select created_by from sales_docs where id=$1`, [id2])).created_by).toBeNull();
   });
 });
+
+describe('M14.2 ข้อมูลส่วนตัว', () => {
+  it('บันทึกชื่อ นามสกุล เบอร์ อีเมล และตรวจรูปแบบ', async () => {
+    await user('adm1', 'super_admin'); const id = await user('prof1', 'sales');
+    await db.query(`select app_user_set_profile($1,'สมชาย','ใจดี','081-234-5678','A@B.com',true)`, [id]);
+    const r = await one(`select first_name, last_name, phone, email, display_name from app_users where id=$1`, [id]);
+    expect(r).toMatchObject({ first_name: 'สมชาย', last_name: 'ใจดี', phone: '081-234-5678', email: 'a@b.com', display_name: 'สมชาย' });
+    await db.query(`select app_user_set_profile($1,'สมชาย','ใจดี','0899999999')`, [id]);          // ไม่ส่งอีเมล = ไม่แตะอีเมล
+    expect((await one(`select email from app_users where id=$1`, [id])).email).toBe('a@b.com');
+    expect(await err(db.query(`select app_user_set_profile($1,'x','y','abc')`, [id]))).toContain('ไม่ถูกต้อง');
+    expect(await err(db.query(`select app_user_set_profile($1,'x','y','0812345678','bad',true)`, [id]))).toContain('ไม่ถูกต้อง');
+    expect(await err(db.query(`select app_user_set_profile(gen_random_uuid(),'x','y','')`))).toContain('ไม่พบ');
+  });
+});
