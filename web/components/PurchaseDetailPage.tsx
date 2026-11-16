@@ -15,9 +15,15 @@ import { TaxInvoiceBox } from '@/components/TaxInvoiceBox';
 import { PayForm } from '@/components/PayForm';
 import { SplitRiForm } from '@/components/SplitRiForm';
 import * as A from '@/lib/actions';
+import { STATUS } from '@/lib/status';
 
 const BACK: Record<string, [string, string]> = { EXP: ['/expenses', 'ค่าใช้จ่าย'], RI: ['/purchases', 'ใบรับสินค้า'], PO: ['/purchases/orders', 'ใบสั่งซื้อ'] };
 const METHOD: Record<string, string> = { cash: 'เงินสด', transfer: 'โอนเงิน', card: 'บัตรเครดิต' };
+
+const st_ = (t: string) => STATUS[t]?.[0] ?? t;
+/** ข้อความประวัติเอกสารซื้อ (purchase_doc_events) */
+const evText = (e: any) => e.event === 'created' ? `สร้างเอกสาร (${st_(e.detail)})`
+  : e.event === 'status' ? `เปลี่ยนสถานะ: ${String(e.detail).split('>').map(st_).join(' → ')}` : `แก้ไข: ${e.detail}`;
 
 /** หน้าเอกสารซื้อ (ค่าใช้จ่าย / ใบรับสินค้า / ใบสั่งซื้อ): ตัวเอกสาร + แถบทำรายการ + ข้อมูลที่เกี่ยวข้อง */
 export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'PO'; id: string }) {
@@ -40,6 +46,8 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
   const pays = kind !== 'PO' ? await db.q<any>(`select p.*, b.bank_name, b.account_no, cc.card_name, cc.last4, pf.fund_name from purchase_payments p
       left join bank_accounts b on b.id=p.bank_account_id left join credit_cards cc on cc.id=p.credit_card_id left join petty_funds pf on pf.id=p.petty_fund_id where p.doc_type=$1 and p.doc_id=$2 order by p.line_no`, [kind, id]) : [];
   const vouchers = await db.q<any>(`select voucher_no from journal_vouchers where id = any($1::uuid[]) order by voucher_no`, [[h.uv_voucher_id, h.pv_voucher_id].filter(Boolean)]);
+  const events = await db.q<any>(`select e.event, e.detail, e.at, u.display_name from purchase_doc_events e left join app_users u on u.id=e.actor_id
+    where e.doc_type=$1 and e.doc_id=$2 order by e.id desc`, [kind, id]);
   const banks = (await db.q(`select id, bank_name, account_no from bank_accounts where is_active order by bank_name`)).map(b => ({ id: b.id as string, label: `${b.bank_name} ${b.account_no}` }));
   const cards = (await db.q(`select id, card_name, last4 from credit_cards where is_active order by card_name`)).map(c => ({ id: c.id as string, label: `${c.card_name} ****${c.last4}` }));
   const petties = (await db.q(`select id, fund_name from petty_funds where is_active order by fund_name`)).map(f => ({ id: f.id as string, label: f.fund_name as string }));
@@ -93,6 +101,9 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
               <tbody>{pays.map((p: any) => <tr key={p.line_no}><td>{dateTh(p.pay_date)}</td>
                 <td>{METHOD[p.method]}{p.bank_name ? ` ${p.bank_name} ${p.account_no}` : ''}{p.card_name ? ` ${p.card_name} ****${p.last4}` : ''}{p.fund_name ? ` ${p.fund_name}` : ''}{p.cheque_no ? ` เลขที่ ${p.cheque_no}` : ''}</td><td className="num">{money(p.amount)}</td></tr>)}</tbody></table>
               : <p className="sub">{st === 'paid' ? 'จ่ายแล้ว (รายละเอียดช่องทางไม่ได้บันทึกไว้)' : 'ยังไม่มีการชำระเงิน'}</p>}</section>}
+          <section className="panel"><h3>ประวัติเอกสาร</h3>
+            {events.length ? <ul className="rel">{events.map((e: any, i: number) => <li key={i}>{evText(e)} <span className="sub">{new Date(e.at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' })} · {e.display_name ?? 'ระบบ'}</span></li>)}</ul>
+              : <p className="sub">ยังไม่มีประวัติ (เอกสารสร้างก่อนเริ่มเก็บประวัติ 16-11-2026)</p>}</section>
           <section className="panel"><h3>เอกสารที่เกี่ยวข้อง</h3><ul className="rel">
             {po && <li>มาจากใบสั่งซื้อ <Link href={`/purchases/orders/${po.id}`}>{po.po_no}</Link></li>}
             {ri && <li>สร้างต่อเป็นใบรับสินค้า <Link href={`/purchases/ri/${ri.id}`}>{ri.ri_no}</Link></li>}
