@@ -72,3 +72,11 @@ describe('M14.2 ข้อมูลส่วนตัว', () => {
     expect(await err(db.query(`select app_user_set_profile(gen_random_uuid(),'x','y','')`))).toContain('ไม่พบ');
   });
 });
+
+describe('M14.3 ตำแหน่งตาม FA', () => {
+  it('รับตำแหน่ง FA ทั้ง 6 และปฏิเสธตำแหน่งที่ไม่รู้จัก', async () => {
+    for (const r of ['accounting_firm', 'sales_manager', 'senior_sales', 'sales_admin', 'cashier', 'sales_purchasing']) await user('u_' + r, r);
+    expect((await one(`select count(*)::int n from app_users`)).n).toBe(6);
+    expect(await err(db.query(`select app_user_create('abcd','x','manager')`))).toContain('ตำแหน่ง');
+  });
+});

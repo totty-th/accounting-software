@@ -23,6 +23,6 @@ describe('M14 ตารางสิทธิ์', () => {
     expect(can('super_admin', 'reports.read')).toBe(true);
   });
   it('ไม่มีตำแหน่ง/ตำแหน่งแปลก = ไม่มีสิทธิ์อะไรเลย', () => {
-    expect(can(null, 'dash.view')).toBe(false); expect(isRole('hacker')).toBe(false); expect(ROLES).toHaveLength(5);
+    expect(can(null, 'dash.view')).toBe(false); expect(isRole('hacker')).toBe(false); expect(ROLES).toHaveLength(11);
   });
 });

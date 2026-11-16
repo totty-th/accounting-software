@@ -20,7 +20,7 @@ export async function currentUser(): Promise<AuthUser | null> {
 export async function requirePage(perm: Perm | Perm[]): Promise<AuthUser> {
   const u = await currentUser();
   if (!u) redirect('/login');
-  if (!([] as Perm[]).concat(perm).some(p => can(u.role, p))) redirect(u.role === 'sales' ? '/sales' : '/forbidden');
+  if (!([] as Perm[]).concat(perm).some(p => can(u.role, p))) redirect(can(u.role, 'quote.own') ? '/sales' : '/forbidden');
   return u;
 }
 export { homeOf };
