@@ -19,6 +19,22 @@ export function ContactForm({ id, init, canSave }: { id: string | null; init: V;
         : <input type={extra.type ?? 'text'} disabled={!canSave} placeholder={extra.ph} value={v[k] ?? ''} onChange={e => set(k, e.target.value)} />}
     </label>);
   const ind = v.person_kind === 'individual';
+  // ค้นจากฐานข้อมูลกรมสรรพากร (เลขผู้เสียภาษี/ชื่อ → เลือกสำนักงานใหญ่/สาขา แล้วเติมชื่อ ที่อยู่ ให้)
+  const [rdQ, setRdQ] = useState(''); const [rdRows, setRdRows] = useState<any[] | null>(null); const [rdMsg, setRdMsg] = useState<string | null>(null); const [rdBusy, setRdBusy] = useState(false);
+  const rdSearch = async () => {
+    setRdBusy(true); setRdMsg(null); setRdRows(null);
+    try {
+      const r = await fetch(`/api/rd-lookup?q=${encodeURIComponent((rdQ || v.tax_id || '').trim())}`); const j = await r.json();
+      if (!r.ok) setRdMsg(j.error ?? 'ค้นหาไม่สำเร็จ'); else if (!j.rows.length) setRdMsg('ไม่พบข้อมูล (กรมสรรพากรมีเฉพาะผู้จดทะเบียนภาษีมูลค่าเพิ่ม) กรุณากรอกเอง'); else setRdRows(j.rows);
+    } catch { setRdMsg('ค้นหาไม่สำเร็จ กรุณาลองใหม่หรือกรอกเอง'); }
+    setRdBusy(false);
+  };
+  const rdPick = (x: any) => {
+    const head = x.branch_code === '00000';
+    setV(o => ({ ...o, person_kind: 'juristic', business_name: x.name || o.business_name, tax_id: x.tax_id, branch: head ? 'head' : 'branch',
+      branch_code: head ? '' : x.branch_code, address: x.address || o.address, postal_code: x.postal_code || o.postal_code }));
+    setRdRows(null); setRdMsg(null);
+  };
   const submit = () => start(async () => {
     const p = { ...v, branch_code: v.branch === 'branch' ? v.branch_code : '' };
     const r = await saveContact(id, p);
@@ -29,6 +45,15 @@ export function ContactForm({ id, init, canSave }: { id: string | null; init: V;
     <div>
       <div className="grid2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16 }}>
         <section className="panel"><h3>ข้อมูลผู้ติดต่อ</h3>
+          {canSave && <div className="f" style={{ marginBottom: 8 }}>ค้นหาจากฐานข้อมูลกรมสรรพากร
+            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <input style={{ flex: '1 1 200px' }} placeholder="เลขผู้เสียภาษี 13 หลัก หรือชื่อธุรกิจ" value={rdQ} onChange={e => setRdQ(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); rdSearch(); } }} />
+              <button type="button" className="btn ghost" disabled={rdBusy} onClick={rdSearch}>{rdBusy ? 'กำลังค้นหา…' : 'ค้นหา'}</button></span>
+            {rdMsg && <small role="alert">{rdMsg}</small>}
+            {rdRows && <div style={{ border: '1px solid var(--line)', borderRadius: 6, maxHeight: 220, overflow: 'auto', marginTop: 6 }}>
+              {rdRows.map((x, i) => <button type="button" key={i} className="btn ghost" style={{ display: 'block', width: '100%', textAlign: 'left', borderRadius: 0 }} onClick={() => rdPick(x)}>
+                <b>{x.name}</b> · {x.tax_id} · {x.branch_code === '00000' ? 'สำนักงานใหญ่' : `สาขา ${x.branch_code}`}<br /><small>{x.address} {x.postal_code}</small></button>)}</div>}</div>}
           <div className="grid">
             <label className="f">ประเภทผู้ติดต่อ<select disabled={!canSave} value={v.person_kind} onChange={e => set('person_kind', e.target.value)}>
               <option value="juristic">นิติบุคคล</option><option value="individual">บุคคลธรรมดา</option></select></label>
