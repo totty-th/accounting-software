@@ -66,5 +66,7 @@ export async function lookupRd(q: string): Promise<{ rows: RdRow[]; raw?: string
     headers: { 'content-type': 'application/soap+xml; charset=utf-8' }, body: buildRequest(query) });
   const xml = await res.text();
   if (!res.ok) throw new Error(`กรมสรรพากรตอบกลับผิดปกติ (${res.status})`);
-  return { rows: parseResponse(xml).slice(0, 30), raw: xml };
+  const rows = parseResponse(xml).slice(0, 30);
+  if (!rows.length) console.log('[rd-lookup] no rows; status', res.status, 'body', xml.slice(0, 3000).replace(/\s+/g, ' '));
+  return { rows, raw: xml };
 }
