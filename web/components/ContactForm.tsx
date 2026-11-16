@@ -47,7 +47,7 @@ export function ContactForm({ id, init, canSave }: { id: string | null; init: V;
         <section className="panel"><h3>ข้อมูลผู้ติดต่อ</h3>
           {canSave && <div className="f" style={{ marginBottom: 8 }}>ค้นหาจากฐานข้อมูลกรมสรรพากร
             <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <input style={{ flex: '1 1 200px' }} placeholder="เลขผู้เสียภาษี 13 หลัก หรือชื่อธุรกิจ" value={rdQ} onChange={e => setRdQ(e.target.value)}
+              <input style={{ flex: '1 1 200px' }} placeholder="เลขผู้เสียภาษี 13 หลัก" value={rdQ} onChange={e => setRdQ(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); rdSearch(); } }} />
               <button type="button" className="btn ghost" disabled={rdBusy} onClick={rdSearch}>{rdBusy ? 'กำลังค้นหา…' : 'ค้นหา'}</button></span>
             {rdMsg && <small role="alert">{rdMsg}</small>}

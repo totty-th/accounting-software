@@ -35,8 +35,7 @@ describe('M14.6 ค้นกรมสรรพากร', () => {
     expect(r[1].address).toBe('1 & 2 หมู่ 3 ถนนบางนา-ตราด ตำบลบางนา อำเภอบางพลี จังหวัดสมุทรปราการ');
   });
   it('ผลว่างไม่พัง', () => { expect(parseResponse('<x/>')).toEqual([]); });
-  it('สร้างคำขอ: เลข 13 หลักใส่ TIN, ชื่อใส่ Name (escape)', () => {
+  it('สร้างคำขอ: เลข 13 หลักใส่ TIN', () => {
     expect(buildRequest('0105536000001')).toContain('<vat:TIN>0105536000001</vat:TIN><vat:Name></vat:Name>');
-    expect(buildRequest('A&B')).toContain('<vat:Name>A&amp;B</vat:Name>');
   });
 });
