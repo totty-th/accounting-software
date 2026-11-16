@@ -1,4 +1,5 @@
-import { requirePage } from '@/lib/auth';
+import { requirePage, canViewSalesDoc } from '@/lib/auth';
+import { can } from '@/lib/permissions';
 import { notFound } from 'next/navigation';
 import { AdjustForm } from '@/components/AdjustForm';
 import { loadView } from '@/lib/doc-view';
@@ -12,11 +13,12 @@ import { money, dateTh, partyName } from '@/lib/format';
 export const dynamic = 'force-dynamic';
 
 export default async function Adjust({ searchParams }: { searchParams: { type?: string; ref?: string; contact?: string } }) {
-  await requirePage('sales.write');
+  const user = await requirePage(['sales.write', 'sales.own']);
+  const own = !can(user.role, 'sales.write');                     // sales.own: ออกใบลด/เพิ่มหนี้ได้เฉพาะใบแจ้งหนี้ของตัวเอง
   const type = searchParams.type === 'DN' ? 'DN' : 'CN';
-  if (!searchParams.ref) return <Pick type={type} contact={searchParams.contact} />;
+  if (!searchParams.ref) return <Pick type={type} contact={searchParams.contact} ownerId={own ? user.id : null} />;
   const v = await loadView(searchParams.ref);
-  if (!v || v.doc.doc_type !== 'INV' || v.doc.status === 'cancelled') return notFound();
+  if (!v || v.doc.doc_type !== 'INV' || v.doc.status === 'cancelled' || !(await canViewSalesDoc(user, v.doc.id))) return notFound();
   const meta = await (await getDb()).q<{ line_no: number; product_id: string | null; is_stock: boolean }>(
     `select l.line_no, l.product_id, coalesce(p.kind = 'goods_stock', false) as is_stock
        from sales_doc_lines l left join products p on p.id = l.product_id where l.doc_id = $1 order by l.line_no`, [v.doc.id]);
@@ -33,7 +35,7 @@ export default async function Adjust({ searchParams }: { searchParams: { type?: 
 }
 
 // ขั้นที่ 1 (เหมือนต้นแบบ): เลือกลูกค้า → เลือกใบแจ้งหนี้ที่จะอ้างอิง → ขั้นที่ 2 เลือกรายการ/สาเหตุ
-async function Pick({ type, contact }: { type: 'CN' | 'DN'; contact?: string }) {
+async function Pick({ type, contact, ownerId }: { type: 'CN' | 'DN'; contact?: string; ownerId: string | null }) {
   const db = await getDb();
   const name = DOC_TYPE[type];
   const contacts = await db.q(`select distinct c.id, c.business_name, c.contact_name from contacts c join sales_docs d on d.contact_id=c.id
@@ -41,7 +43,7 @@ async function Pick({ type, contact }: { type: 'CN' | 'DN'; contact?: string }) 
   const invs = contact ? await db.q(`select d.doc_no, d.doc_date, d.total, d.status, d.is_deposit, c.business_name, c.contact_name,
       coalesce((select sum(x.total) from sales_docs x where x.ref_doc_id=d.id and x.doc_type='CN' and x.status<>'cancelled'),0) cn_total, sales_doc_has_active_receipt(d.id) has_receipt,
       exists(select 1 from billing_note_items b join sales_docs bl on bl.id=b.billing_id and bl.status<>'cancelled' where b.invoice_id=d.id) in_bl
-    from sales_docs d join contacts c on c.id=d.contact_id where d.doc_type='INV' and d.contact_id=$1 order by d.doc_date desc, d.doc_no desc`, [contact]) : [];
+    from sales_docs d join contacts c on c.id=d.contact_id where d.doc_type='INV' and d.contact_id=$1 and ($2::uuid is null or d.created_by=$2::uuid) order by d.doc_date desc, d.doc_no desc`, [contact, ownerId]) : [];
   // เหตุที่เลือกไม่ได้ (ตรงกับเงื่อนไขในฟังก์ชันฐานข้อมูล ซึ่งตรวจซ้ำอีกชั้น)
   const why = (r: any) => r.status === 'cancelled' ? 'ใบแจ้งหนี้ถูกยกเลิก' : r.is_deposit ? 'ใบแจ้งหนี้มัดจำ' : r.in_bl ? 'อยู่ในใบวางบิลแล้ว' : type === 'CN' && r.has_receipt ? 'มีใบเสร็จแล้ว ออกใบลดหนี้ไม่ได้ (ยกเลิกใบเสร็จก่อน)'
     : type === 'DN' && r.status !== 'awaiting_payment' ? 'ต้องเป็นใบแจ้งหนี้ที่รอเก็บเงิน' : type === 'CN' && Number(r.cn_total) >= Number(r.total) ? 'ลดหนี้ครบยอดใบแจ้งหนี้แล้ว' : '';

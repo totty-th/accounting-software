@@ -12,6 +12,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const PERMS = [
   'dash.view',
   'sales.read', 'sales.write', 'sales.approve',      // เอกสารขายทุกประเภท
+  'sales.own',                                       // เอกสารขายทุกประเภทที่ตัวเองสร้าง (M14.4 ตาม FA "เห็นเฉพาะเอกสารของตัวเอง")
   'quote.own',                                       // ใบเสนอราคาของตัวเองเท่านั้น (สร้าง/ดู/พิมพ์/แชร์/ยกเลิก)
   'receipts.read', 'receipts.write',
   'expenses.read', 'expenses.write', 'expenses.approve',
@@ -47,11 +48,11 @@ const MATRIX: Record<Role, readonly Perm[]> = {
   // FA: ผู้จัดการฝ่ายขาย เมนูขาย+ใบลดหนี้/เพิ่มหนี้เต็ม, ดูได้แค่แดชบอร์ด, สินค้า/ลูกค้าไม่เห็นราคาซื้อ ไม่ลบ
   sales_manager: ['dash.view', 'sales.read', 'sales.write', 'receipts.read', 'receipts.write', 'master.read', 'contact.create'],
   // FA: พนักงานขายอาวุโส/ธุรการฝ่ายขาย/แคชเชียร์/เจ้าหน้าที่ขายและจัดซื้อ เห็นเฉพาะเอกสารของตัวเอง
-  // ระบบเรารองรับ "เอกสารของตัวเอง" เฉพาะใบเสนอราคา (quote.own) จึงให้สิทธิ์เท่าฝ่ายขายไปก่อน (เข้มกว่า FA) — ขยายไปเอกสารขาย/ซื้ออื่นต้องรอเจ้าของระบบยืนยัน
-  senior_sales: ['quote.own', 'master.read', 'contact.create'],
+  // sales.own = เอกสารขายทุกประเภทของตัวเอง (M14.4) · ธุรการฝ่ายขายเห็นเฉพาะใบเสนอราคา (ตาม FA) · ฝั่งซื้อ/หัก ณ ที่จ่ายของตัวเอง ยังไม่รองรับ
+  senior_sales: ['sales.own', 'quote.own', 'master.read', 'contact.create'],
   sales_admin: ['quote.own', 'master.read', 'contact.create'],
-  cashier: ['quote.own', 'master.read', 'contact.create'],
-  sales_purchasing: ['quote.own', 'master.read', 'contact.create'],
+  cashier: ['sales.own', 'quote.own', 'master.read', 'contact.create'],
+  sales_purchasing: ['sales.own', 'quote.own', 'master.read', 'contact.create'],
 };
 
 export const isRole = (r: unknown): r is Role => ROLES.includes(r as Role);
@@ -60,5 +61,5 @@ export const permsOf = (role: Role): readonly Perm[] => MATRIX[role];
 /** หน้าแรกหลังล็อกอิน: คนที่เปิดภาพรวมไม่ได้ (ฝ่ายขาย) ไปหน้าเอกสารขาย */
 export const homeOf = (role: Role) => (can(role, 'dash.view') ? '/' : can(role, 'quote.own') ? '/sales' : '/forbidden');
 /** ดูเอกสารขายได้ทุกใบหรือเฉพาะใบเสนอราคาของตัวเอง */
-export const salesScope = (role: Role): 'all' | 'own-quotes' | 'none' =>
-  can(role, 'sales.read') ? 'all' : can(role, 'quote.own') ? 'own-quotes' : 'none';
+export const salesScope = (role: Role): 'all' | 'own-all' | 'own-quotes' | 'none' =>
+  can(role, 'sales.read') ? 'all' : can(role, 'sales.own') ? 'own-all' : can(role, 'quote.own') ? 'own-quotes' : 'none';

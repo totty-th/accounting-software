@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 // GET /sales/envelope?ids=a,b,c → จ่าหน้าซองหลายใบในไฟล์เดียว (หนึ่งหน้าต่อเอกสาร)
 export async function GET(req: Request) {
-  const au = await apiUser(['sales.read', 'quote.own']); if (au instanceof Response) return au;
+  const au = await apiUser(['sales.read', 'sales.own', 'quote.own']); if (au instanceof Response) return au;
   const ids = (new URL(req.url).searchParams.get('ids') ?? '').split(',').filter(Boolean).slice(0, 100);
   if (!ids.length) return Response.json({ error: 'ยังไม่ได้เลือกเอกสาร' }, { status: 400 });
   const views = [];

@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 
 // GET /sales/batch-pdf?ids=a,b,c[&download=1] → รวมเอกสารที่เลือกเป็น PDF ไฟล์เดียว (ต้นฉบับ) เพื่อพิมพ์หรือดาวน์โหลดทีเดียว
 export async function GET(req: Request) {
-  const au = await apiUser(['sales.read', 'quote.own']); if (au instanceof Response) return au;
+  const au = await apiUser(['sales.read', 'sales.own', 'quote.own']); if (au instanceof Response) return au;
   const q = new URL(req.url).searchParams;
   const ids = (q.get('ids') ?? '').split(',').filter(Boolean).slice(0, 50);
   if (!ids.length) return Response.json({ error: 'ยังไม่ได้เลือกเอกสาร' }, { status: 400 });

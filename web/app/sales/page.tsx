@@ -22,9 +22,9 @@ const href = (sp: Sp, over: Partial<Sp>) => {
 };
 
 export default async function Sales({ searchParams }: { searchParams: Sp }) {
-  const user = await requirePage(['sales.read', 'quote.own']);
-  const own = salesScope(user.role) === 'own-quotes';           // ฝ่ายขาย: เห็นเฉพาะใบเสนอราคาของตัวเอง
-  const type = typeOf(searchParams, own);
+  const user = await requirePage(['sales.read', 'sales.own', 'quote.own']);
+  const scope = salesScope(user.role), own = scope !== 'all';    // ฝ่ายขาย: เห็นเฉพาะเอกสารของตัวเอง (ธุรการ/ฝ่ายขาย = เฉพาะใบเสนอราคา)
+  const type = typeOf(searchParams, scope === 'own-quotes');
   if (!type) redirect('/sales?type=INV');                        // เมนูย่อยแยกตามประเภท ไม่มีหน้ารวม
   const db = await getDb();
   const statuses = (await db.q(`select distinct status from sales_docs where doc_type=$1 and (not $2 or created_by=$3)`, [type, own, user.id])).map((r: any) => r.status as string);
@@ -84,7 +84,7 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
         </form>
       </details>
       {rows.length === 0 ? <div className="panel empty">ไม่พบ{name}ตามเงื่อนไขที่เลือก</div> : type === 'QT' ?
-        <QtTable rows={qtRows} canWrite={can(user.role, 'sales.write')} canApprove={can(user.role, 'sales.approve')} canOwn={can(user.role, 'quote.own')} exportHref={exportHref} /> : (
+        <QtTable rows={qtRows} canWrite={can(user.role, 'sales.write') || can(user.role, 'sales.own')} canApprove={can(user.role, 'sales.approve')} canOwn={can(user.role, 'quote.own')} exportHref={exportHref} /> : (
         <div className="panel" style={{ padding: 0, overflowX: 'auto' }}>
           <table><thead><tr><th>วันที่</th><th>เลขที่เอกสาร</th><th>ชื่อลูกค้า</th>{!noDue && <th>ครบกำหนด</th>}<th className="num">ยอดรวมสุทธิ</th><th>สถานะ</th><th /></tr></thead>
             <tbody>{rows.map(r => (

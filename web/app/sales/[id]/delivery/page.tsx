@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 // หน้าพิมพ์ใบส่งของ (เฉพาะ QT ที่อนุมัติแล้ว/แปลงแล้ว และ INV)
 export default async function DeliveryPrint({ params, searchParams }: { params: { id: string }; searchParams: { c?: string } }) {
-  const user = await requirePage(['sales.read', 'quote.own']);
+  const user = await requirePage(['sales.read', 'sales.own', 'quote.own']);
   const v = await loadView(params.id);
   if (!v || !(await canViewSalesDoc(user, v.doc.id)) || !['QT', 'INV'].includes(v.doc.doc_type)) notFound();
   const ok = v.doc.doc_type === 'INV' || ['approved', 'converted'].includes(v.doc.status);

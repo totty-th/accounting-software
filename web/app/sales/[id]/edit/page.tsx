@@ -8,12 +8,12 @@ import { InfoEditForm } from '@/components/InfoEditForm';
 
 const d10 = (x: unknown) => (x ? new Date(x as any).toISOString().slice(0, 10) : '');
 export default async function EditQt({ params }: { params: { id: string } }) {
-  const user = await requirePage(['sales.write', 'quote.own']);
+  const user = await requirePage(['sales.write', 'sales.own', 'quote.own']);
   const db = await getDb();
   const o = (await db.q(`select * from sales_docs where (id::text=$1 or doc_no=$1) and doc_type in ('QT','INV')`, [decodeURIComponent(params.id)]))[0];
   if (!o || !(await canViewSalesDoc(user, o.id))) notFound();
   if (o.doc_type === 'INV') {
-    if (!can(user.role, 'sales.write')) notFound();
+    if (!can(user.role, 'sales.write') && !can(user.role, 'sales.own')) notFound();
     if (o.status === 'cancelled') return <div className="panel empty">เอกสารที่ยกเลิกแล้วแก้ไขไม่ได้ (ใช้ปุ่มสร้างซ้ำ)</div>;
     const full = (await db.q<any>('select sales_doc_fully_editable($1) f', [o.id]))[0].f;
     if (!full && !o.is_deposit) return (<>

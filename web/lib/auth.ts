@@ -36,6 +36,7 @@ export async function apiUser(perm: Perm | Perm[]): Promise<AuthUser | Response>
 /** ดูเอกสารขายใบนี้ได้ไหม: ผู้ที่มี sales.read ดูได้ทุกใบ · ฝ่ายขายดูได้เฉพาะใบเสนอราคาที่ตัวเองสร้าง */
 export async function canViewSalesDoc(u: AuthUser, docId: string): Promise<boolean> {
   if (can(u.role, 'sales.read')) return true;
+  if (can(u.role, 'sales.own')) return (await (await getDb()).q(`select 1 from sales_docs where id=$1 and created_by=$2`, [docId, u.id])).length > 0;
   if (!can(u.role, 'quote.own')) return false;
   return (await (await getDb()).q(`select 1 from sales_docs where id=$1 and doc_type='QT' and created_by=$2`, [docId, u.id])).length > 0;
 }

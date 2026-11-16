@@ -11,8 +11,8 @@ import { can } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 
 export default async function NewDoc({ searchParams }: { searchParams: { type?: string } }) {
-  const user = await requirePage(['sales.write', 'quote.own']);
-  const ownOnly = !can(user.role, 'sales.write');                // ฝ่ายขายสร้างได้เฉพาะใบเสนอราคา
+  const user = await requirePage(['sales.write', 'sales.own', 'quote.own']);
+  const ownOnly = !can(user.role, 'sales.write') && !can(user.role, 'sales.own');                // ฝ่ายขายสร้างได้เฉพาะใบเสนอราคา
   const type = ownOnly ? 'QT' : ['QT', 'INV', 'CA'].includes(searchParams.type ?? '') ? searchParams.type! : 'INV';
   if (ownOnly && searchParams.type && searchParams.type !== 'QT') redirect('/sales/new?type=QT');
   if (type === 'QT' || type === 'INV') {

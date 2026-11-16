@@ -19,4 +19,4 @@ export function listFilter(sp: Sp, type: string, own: boolean, userId: string) {
     and (cardinality($8::uuid[])=0 or d.id = any($8::uuid[]))`;
   return { q, period, range, where, args: [type, own, userId, sp.status ?? '', range?.[0] ?? null, range?.[1] ?? null, q, ids] as any[] };
 }
-export const typeOf = (sp: Sp, own: boolean) => (own ? 'QT' : DOC_TYPE[sp.type ?? ''] ? sp.type! : '');
+export const typeOf = (sp: Sp, quotesOnly: boolean) => (quotesOnly ? 'QT' : DOC_TYPE[sp.type ?? ''] ? sp.type! : '');

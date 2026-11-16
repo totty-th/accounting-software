@@ -26,3 +26,14 @@ describe('M14 ตารางสิทธิ์', () => {
     expect(can(null, 'dash.view')).toBe(false); expect(isRole('hacker')).toBe(false); expect(ROLES).toHaveLength(11);
   });
 });
+
+describe('M14.4 เอกสารของตัวเอง (sales.own) ตาม FA', () => {
+  it('พนักงานขายอาวุโส/แคชเชียร์/เจ้าหน้าที่ขายและจัดซื้อ = เอกสารขายทุกประเภทของตัวเอง · ธุรการฝ่ายขาย/ฝ่ายขาย = ใบเสนอราคาเท่านั้น', () => {
+    for (const r of ['senior_sales', 'cashier', 'sales_purchasing'] as const) {
+      expect(salesScope(r)).toBe('own-all'); expect(can(r, 'sales.own')).toBe(true);
+      expect(can(r, 'sales.write')).toBe(false); expect(can(r, 'cost.view')).toBe(false); expect(can(r, 'users.manage')).toBe(false);
+    }
+    for (const r of ['sales_admin', 'sales'] as const) { expect(salesScope(r)).toBe('own-quotes'); expect(can(r, 'sales.own')).toBe(false); }
+    expect(salesScope('sales_manager')).toBe('all'); expect(salesScope('accountant')).toBe('all');
+  });
+});

@@ -4,7 +4,7 @@ import { getDb } from '@/lib/db';
 import { SplitForm } from '@/components/SplitForm';
 
 export default async function Split({ params }: { params: { id: string } }) {
-  const user = await requirePage(['sales.write']);
+  const user = await requirePage(['sales.write', 'sales.own']);
   const db = await getDb();
   const o = (await db.q<any>(`select id, doc_no, status, total from sales_docs where (id::text=$1 or doc_no=$1) and doc_type='QT'`, [decodeURIComponent(params.id)]))[0];
   if (!o || !(await canViewSalesDoc(user, o.id))) notFound();

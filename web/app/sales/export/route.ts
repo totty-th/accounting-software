@@ -11,10 +11,10 @@ export const runtime = 'nodejs';
 
 // GET /sales/export?type=QT&q=&period=&from=&to=&status=&ids=a,b → Excel ตามเงื่อนไขเดียวกับหน้ารายการ (ทุกหน้า)
 export async function GET(req: Request) {
-  const au = await apiUser(['sales.read', 'quote.own']); if (au instanceof Response) return au;
+  const au = await apiUser(['sales.read', 'sales.own', 'quote.own']); if (au instanceof Response) return au;
   const sp = Object.fromEntries(new URL(req.url).searchParams) as Sp;
-  const own = salesScope(au.role) === 'own-quotes';
-  const type = typeOf(sp, own);
+  const scope = salesScope(au.role), own = scope !== 'all';
+  const type = typeOf(sp, scope === 'own-quotes');
   if (!type) return Response.json({ error: 'ประเภทเอกสารไม่ถูกต้อง' }, { status: 400 });
   const { where, args, range } = listFilter(sp, type, own, au.id);
   const db = await getDb();

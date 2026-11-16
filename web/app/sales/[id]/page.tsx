@@ -23,10 +23,10 @@ const EV: Record<string, string> = { delivery: 'แก้ข้อมูลจ�
 export const dynamic = 'force-dynamic';
 
 export default async function SalesDetail({ params }: { params: { id: string } }) {
-  const user = await requirePage(['sales.read', 'quote.own']);
+  const user = await requirePage(['sales.read', 'sales.own', 'quote.own']);
   const v = await loadView(params.id);
   if (!v || !(await canViewSalesDoc(user, v.doc.id))) notFound();
-  const canWrite = can(user.role, 'sales.write') || can(user.role, 'quote.own');
+  const canWrite = can(user.role, 'sales.write') || can(user.role, 'sales.own') || can(user.role, 'quote.own');
   const db = await getDb();
   const tok = (await db.q<{ t: string | null }>('select share_token as t from sales_docs where id=$1', [v.doc.id]))[0]?.t;
   const h = headers(), host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
@@ -70,7 +70,7 @@ export default async function SalesDetail({ params }: { params: { id: string } }
       <div className="detail">
         <PdfPreview src={`/sales/${v.doc.doc_no}/pdf`} />
         <aside className="side-panels noprint">
-          {can(user.role, 'sales.write') && v.doc.doc_type === 'CA' && v.doc.status === 'pending_collect' && <CashCollectForm id={v.doc.id} total={+v.doc.total} banks={banks} />}
+          {(can(user.role, 'sales.write') || can(user.role, 'sales.own')) && v.doc.doc_type === 'CA' && v.doc.status === 'pending_collect' && <CashCollectForm id={v.doc.id} total={+v.doc.total} banks={banks} />}
           <section className="panel">
             <h3>ลิงก์แชร์</h3>
             {link ? (

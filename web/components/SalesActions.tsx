@@ -5,7 +5,7 @@ import { can, type Role } from '@/lib/permissions';
 
 // ปุ่มต่อยอด/เปลี่ยนสถานะของเอกสารขาย (ใช้ทั้งหน้ารายการและหน้ารายละเอียด)
 export function SalesActions({ d, role, detail = false }: { d: any; role: Role; detail?: boolean }) {
-  const W = can(role, 'sales.write');
+  const W = can(role, 'sales.write') || can(role, 'sales.own');   // sales.own: หน้ารายการ/รายละเอียดแสดงเฉพาะเอกสารของตัวเอง
   const b = (label: string, fn: () => Promise<any>, v: '' | 'ghost' | 'danger' = 'ghost', confirmText?: string) =>
     <ActionButton key={label} label={label} variant={v} confirmText={confirmText} action={fn} />;
   const cancel = b('ยกเลิก', A.cancelSalesDoc.bind(null, d.id), 'danger', 'c');

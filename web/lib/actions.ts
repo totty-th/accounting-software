@@ -53,13 +53,18 @@ const call = (sql: string, ...p: unknown[]) => async () => {
 /** ฝ่ายขาย (quote.own) ทำได้เฉพาะใบเสนอราคาที่ตัวเองสร้าง */
 const ownQuote = async (u: AuthUser, id: string) =>
   (await (await getDb()).q(`select 1 from sales_docs where id=$1 and doc_type='QT' and created_by=$2`, [id, u.id])).length > 0;
-const salesDocGate = (id: string): Gate => async u => can(u.role, 'sales.write') || (can(u.role, 'quote.own') && (await ownQuote(u, id)));
+/** sales.own: เอกสารขายทุกประเภทที่ตัวเองสร้าง */
+const ownAny = async (u: AuthUser, id: string) =>
+  (await (await getDb()).q(`select 1 from sales_docs where id=$1 and created_by=$2`, [id, u.id])).length > 0;
+/** ทำรายการกับเอกสารขาย: sales.write หรือ (sales.own และเป็นเอกสารของตัวเอง) */
+const ownWriteGate = (id: string): Gate => async u => can(u.role, 'sales.write') || (can(u.role, 'sales.own') && (await ownAny(u, id)));
+const salesDocGate = (id: string): Gate => async u => can(u.role, 'sales.write') || (can(u.role, 'sales.own') && (await ownAny(u, id))) || (can(u.role, 'quote.own') && (await ownQuote(u, id)));
 
 export async function createSalesDoc(p: { type: string; date: string; contact: string | null; mode: string; lines: any[]; reason?: string; ref?: string }) {
   // set_config(..., true) อยู่ใน FROM ของคำสั่งเดียวกัน → trigger บันทึกผู้สร้างเอกสาร และค่าไม่รั่วไปคำสั่งอื่น
   return run(u => call(`select create_sales_doc($2,$3::date,$4,$5::jsonb,$6,7,$7,$8) from (select set_config('app.user_id',$1,true)) s`,
     u.id, p.type, p.date, p.contact || null, JSON.stringify(p.lines), p.mode, p.ref || null, p.reason || null)(), ALL,
-    u => can(u.role, 'sales.write') || (can(u.role, 'quote.own') && p.type === 'QT'));
+    async u => can(u.role, 'sales.write') || (can(u.role, 'sales.own') && (!p.ref || (await ownAny(u, p.ref)))) || (can(u.role, 'quote.own') && p.type === 'QT'));
 }
 /** เรียกฟังก์ชันพร้อมตั้งผู้ทำรายการ (app.user_id) ในคำสั่งเดียวกัน เพื่อให้ประวัติเอกสารรู้ว่าใครทำ */
 const callAs = (uid: string, fn: string, ...p: unknown[]) =>
@@ -97,7 +102,7 @@ export async function saveQuotation(id: string | null, header: Record<string, un
     const old = id ? (await (await getDb()).q<any>('select salesperson from sales_docs where id=$1', [id]))[0]?.salesperson : null;
     out = (await (await getDb()).q<any>(`select save_quotation($2,$3::jsonb,$4::jsonb) as id from (select set_config('app.user_id',$1,true)) s`,
       [u.id, id, JSON.stringify(await forceSalesperson(u, header, old)), JSON.stringify(lines)]))[0].id;
-  }, id ? [...ALL, `/sales/${id}`] : ALL, async u => can(u.role, 'sales.write') || (can(u.role, 'quote.own') && (!id || (await ownQuote(u, id)))));
+  }, id ? [...ALL, `/sales/${id}`] : ALL, async u => can(u.role, 'sales.write') || (can(u.role, 'sales.own') && (!id || (await ownAny(u, id)))) || (can(u.role, 'quote.own') && (!id || (await ownQuote(u, id)))));
   return { ...r, id: out };
 }
 /** สร้างใบแจ้งหนี้เต็มรูปแบบ (ส่วนลด/ภาษี/หัก ณ ที่จ่ายต่อบรรทัด) */
@@ -106,7 +111,7 @@ export async function saveInvoice(header: Record<string, unknown>, lines: any[])
   const r = await run(async u => {
     out = (await (await getDb()).q<any>(`select create_invoice_full($2::jsonb,$3::jsonb) as id from (select set_config('app.user_id',$1,true)) s`,
       [u.id, JSON.stringify(await forceSalesperson(u, header)), JSON.stringify(lines)]))[0].id;
-  }, ALL, 'sales.write');
+  }, ALL, u => can(u.role, 'sales.write') || can(u.role, 'sales.own'));
   return { ...r, id: out };
 }
 /** แก้ไขใบแจ้งหนี้ที่บันทึกแล้ว (M23): ยังไม่มีเอกสารผูก = แก้ได้ทุกช่อง แก้ทับใบสำคัญเดิม · มีเอกสารผูก = แก้ได้เฉพาะข้อมูลทั่วไป */
@@ -115,9 +120,9 @@ export async function updateSalesDoc(id: string, header: Record<string, unknown>
     const old = (await (await getDb()).q<any>('select salesperson from sales_docs where id=$1', [id]))[0]?.salesperson;
     await (await getDb()).q(`select update_sales_doc($2,$3::jsonb,$4::jsonb) from (select set_config('app.user_id',$1,true)) s`,
       [u.id, id, JSON.stringify(await forceSalesperson(u, header, old)), JSON.stringify(lines)]);
-  }, [...ALL, `/sales/${id}`], 'sales.write');
+  }, [...ALL, `/sales/${id}`], ownWriteGate(id));
 }
-export const duplicateInvoice = async (id: string) => run(u => callAs(u.id, 'duplicate_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
+export const duplicateInvoice = async (id: string) => run(u => callAs(u.id, 'duplicate_invoice($1,$2::date)', id, today()), ALL, ownWriteGate(id));
 /** เรียกเก็บเงินจากใบเสนอราคา: kind INV|CA|BL · mode all|percent|amount|qty */
 export async function billQuotation(id: string, kind: 'INV' | 'CA' | 'BL', mode: 'all' | 'percent' | 'amount' | 'qty' = 'all',
   value: number | null = null, qtys: Record<string, number> | null = null): Promise<Result & { id?: string }> {
@@ -125,17 +130,17 @@ export async function billQuotation(id: string, kind: 'INV' | 'CA' | 'BL', mode:
   const r = await run(async u => {
     out = (await (await getDb()).q<any>(`select quotation_bill($2,$3,$4::date,$5,$6::numeric,$7::jsonb) as id from (select set_config('app.user_id',$1,true)) s`,
       [u.id, id, kind, today(), mode, value, qtys ? JSON.stringify(qtys) : null]))[0].id;
-  }, [...ALL, `/sales/${id}`], 'sales.write');
+  }, [...ALL, `/sales/${id}`], ownWriteGate(id));
   return { ...r, id: out };
 }
-export const closeQuotation = async (id: string) => run(u => callAs(u.id, 'close_quotation($1)', id), [...ALL, `/sales/${id}`], 'sales.write');
-export const reopenQuotation = async (id: string) => run(u => callAs(u.id, 'reopen_quotation($1)', id), [...ALL, `/sales/${id}`], 'sales.write');
-export const quoteToInvoice = async (id: string) => run(call('select quotation_to_invoice($1,$2::date)', id, today()), ALL, 'sales.write');
-export const createDeposit = async (id: string, net: number, kind: 'INV' | 'CA' | 'BL' = 'INV') => run(u => callAs(u.id, 'create_deposit_doc($1,$2,$3::date,$4::numeric)', id, kind, today(), net), ALL, 'sales.write');
-export const createFinalInvoice = async (id: string, kind: 'INV' | 'CA' | 'BL' = 'INV') => run(u => callAs(u.id, 'create_final_invoice($1,$2::date,$3)', id, today(), kind), ALL, 'sales.write');
-export const convertDepositBl = async (id: string) => run(u => callAs(u.id, 'convert_deposit_bl($1,$2::date)', id, today()), ALL, 'sales.write');
-export const collectCash = async (id: string, bankAccountId?: string) => run(call('select collect_cash_sale($1,$2::date,$3::uuid)', id, today(), bankAccountId ?? null), ALL, 'sales.write');
-export const resetCash = async (id: string) => run(call('select reset_cash_sale($1)', id), ALL, 'sales.write');
+export const closeQuotation = async (id: string) => run(u => callAs(u.id, 'close_quotation($1)', id), [...ALL, `/sales/${id}`], ownWriteGate(id));
+export const reopenQuotation = async (id: string) => run(u => callAs(u.id, 'reopen_quotation($1)', id), [...ALL, `/sales/${id}`], ownWriteGate(id));
+export const quoteToInvoice = async (id: string) => run(call('select quotation_to_invoice($1,$2::date)', id, today()), ALL, ownWriteGate(id));
+export const createDeposit = async (id: string, net: number, kind: 'INV' | 'CA' | 'BL' = 'INV') => run(u => callAs(u.id, 'create_deposit_doc($1,$2,$3::date,$4::numeric)', id, kind, today(), net), ALL, ownWriteGate(id));
+export const createFinalInvoice = async (id: string, kind: 'INV' | 'CA' | 'BL' = 'INV') => run(u => callAs(u.id, 'create_final_invoice($1,$2::date,$3)', id, today(), kind), ALL, ownWriteGate(id));
+export const convertDepositBl = async (id: string) => run(u => callAs(u.id, 'convert_deposit_bl($1,$2::date)', id, today()), ALL, ownWriteGate(id));
+export const collectCash = async (id: string, bankAccountId?: string) => run(call('select collect_cash_sale($1,$2::date,$3::uuid)', id, today(), bankAccountId ?? null), ALL, ownWriteGate(id));
+export const resetCash = async (id: string) => run(call('select reset_cash_sale($1)', id), ALL, ownWriteGate(id));
 
 export const createReceipt = async (inv: string) => run(call('select create_receipt_from_invoice($1,$2::date)', inv, today()), ALL, 'receipts.write');
 export const collectReceipt = async (id: string, payments?: { method: string; bank_account_id?: string; amount: number }[]) =>

@@ -20,12 +20,12 @@ const GROUPS: Group[] = [
     { href: '/finance/credit-card', label: 'บัตรเครดิตจ่าย', perms: ['bank.read'] }] },
   { key: 'sales', label: 'เอกสารขาย', c: 'var(--green)', items: [
     { href: '/sales?type=QT', label: 'ใบเสนอราคา', perms: ['sales.read', 'quote.own'] },
-    { href: '/sales?type=BL', label: 'ใบวางบิล', perms: ['sales.read'] },
-    { href: '/sales?type=INV', label: 'ใบแจ้งหนี้/ใบกำกับภาษี', perms: ['sales.read'] },
+    { href: '/sales?type=BL', label: 'ใบวางบิล', perms: ['sales.read', 'sales.own'] },
+    { href: '/sales?type=INV', label: 'ใบแจ้งหนี้/ใบกำกับภาษี', perms: ['sales.read', 'sales.own'] },
     { href: '/receipts', label: 'ใบเสร็จรับเงิน', perms: ['receipts.read'] },
-    { href: '/sales?type=CA', label: 'ขายเงินสด', perms: ['sales.read'], gap: true },
-    { href: '/sales?type=CN', label: 'ใบลดหนี้', perms: ['sales.read'], gap: true },
-    { href: '/sales?type=DN', label: 'ใบเพิ่มหนี้', perms: ['sales.read'] }] },
+    { href: '/sales?type=CA', label: 'ขายเงินสด', perms: ['sales.read', 'sales.own'], gap: true },
+    { href: '/sales?type=CN', label: 'ใบลดหนี้', perms: ['sales.read', 'sales.own'], gap: true },
+    { href: '/sales?type=DN', label: 'ใบเพิ่มหนี้', perms: ['sales.read', 'sales.own'] }] },
   { key: 'buy', label: 'เอกสารซื้อ', c: 'var(--purple)', items: [
     { href: '/purchases/orders', label: 'ใบสั่งซื้อ', perms: ['expenses.read'] },
     { href: '/purchases', label: 'ใบรับสินค้า', perms: ['expenses.read'] }] },
