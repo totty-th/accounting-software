@@ -2,7 +2,7 @@
 // - พิมพ์หลายคำ ลำดับใดก็ได้ ต้องเจอครบทุกคำ เช่น "304 กลม หนา 1.5 รู 5" เจอ "ตะแกรงแสตนเลสรูกลม SS304 หนา 1.5 มม. รู 5 มม."
 // - ตัวเลขเทียบเป็นค่า: "1" = "1.0" แต่ไม่ตรงกับ "1.5" หรือ "12" · ไม่สนเครื่องหมาย ' (4x8 = 4'x8') · สะกด สแตนเลส/แสตนเลส ได้ทั้งคู่
 
-const SYN: [RegExp, string][] = [[/ส[แเ]ตน[เล]ล?ส|แสตนเลส|สเตนเลส|stainless/g, 'แสตนเลส'], [/อลูมิเนียม|อะลูมิเนียม|aluminium|aluminum/g, 'อลูมิเนียม'], [/[×*]/g, 'x']];
+const SYN: [RegExp, string][] = [[/เเ/g, 'แ'], [/ส[แเ]ตน[เล]ล?ส|แสตนเลส|สเตนเลส|stainless/g, 'แสตนเลส'], [/อลูมิเนียม|อะลูมิเนียม|aluminium|aluminum/g, 'อลูมิเนียม'], [/[×*]/g, 'x']];
 
 /** ทำข้อความให้อยู่ในรูปเดียวกัน: ตัวเล็ก · ตัด ' " · คำพ้อง · ตัวเลขตัดศูนย์ท้ายทศนิยม (1.0 → 1, 1.50 → 1.5) */
 export function norm(s: string): string {
@@ -15,7 +15,9 @@ const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** แปลงคำค้นเป็นตัวทดสอบต่อคำ (สร้างครั้งเดียว ใช้กับหลายสินค้า) */
 export function matcher(q: string): (hay: string) => boolean {
-  const raw = norm(q).replace(/(หนา|รู|เบอร์)(\d)/g, '$1 $2').split(' ').filter(Boolean);
+  // คำไทยพิมพ์ติดกันได้ เช่น "ตะแกรงแสตนเลสรูกลม" → แยกเป็นคำหลัก · ตัด "ตะแกรง" ทิ้งเมื่อมีคำอื่น (สินค้าแทบทุกตัวเป็นตะแกรง)
+  let raw = norm(q).replace(KW, ' $1 ').replace(/(หนา|รู|เบอร์)(\d)/g, '$1 $2').split(' ').filter(Boolean);
+  if (raw.length > 1) raw = raw.filter(t => t !== 'ตะแกรง');
   if (!raw.length) return () => true;
   const isNum = (t: string) => /^\d+(\.\d+)?$/.test(t);
   const re = (src: string) => { const r = new RegExp(src); return (h: string) => r.test(h); };
@@ -28,8 +30,13 @@ export function matcher(q: string): (hay: string) => boolean {
   }
   return (hay: string) => tests.every(f => f(hay));
 }
-export const hayOf = (p: { code?: string | null; name: string; category?: string | null; barcode?: string | null }) =>
-  norm(`${p.code ?? ''} ${p.name} ${p.category ?? ''} ${p.barcode ?? ''}`);
+const KW = new RegExp(`(${['รูสี่เหลี่ยม', 'รูหกเหลี่ยม', 'รูสามเหลี่ยม', 'อลูมิเนียม', 'แสตนเลส', 'ตะแกรง', 'เจาะรู', 'สั่งทำ', 'รูกลม', 'รูยาว', 'เหล็ก', 'ฉีก', 'ยืด'].join('|')})`, 'g');
+const MAT_WORDS: Record<string, string> = { SS304: 'แสตนเลส ss304', SS316: 'แสตนเลส ss316', SS430: 'แสตนเลส ss430', 'แสตนเลส': 'แสตนเลส', 'เหล็ก': 'เหล็ก', 'อลูมิเนียม': 'อลูมิเนียม' };
+/** ข้อความที่ใช้ค้น: รหัส ชื่อ หมวด บาร์โค้ด + คุณสมบัติที่แยกได้ (ชื่อเขียน "SS304" ก็ค้นด้วย "แสตนเลส" เจอ) */
+export const hayOf = (p: { code?: string | null; name: string; category?: string | null; barcode?: string | null }) => {
+  const a = attrsOf(p.name);
+  return norm(`${p.code ?? ''} ${p.name} ${p.category ?? ''} ${p.barcode ?? ''} ${MAT_WORDS[a.material] ?? ''} ${a.hole}`);
+};
 
 export type Attrs = { material: string; hole: string; thick: string; sheet: string };
 export const ATTR_LABEL: Record<keyof Attrs, string> = { material: 'วัสดุ', hole: 'ชนิดรู', thick: 'ความหนา (มม.)', sheet: 'ขนาดแผ่น' };
