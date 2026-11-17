@@ -107,7 +107,7 @@ export async function buildBrandedPdf(v: DocView, mode: 'original' | 'copy' | 'b
   for (const label of labels) {
     let { page, y } = sheet(label); y = head(page, y);
     for (const l of v.lines) {
-      const desc = wrap(l.description + (l.detail ? `\n${l.detail}` : ''), 10, 235);
+      const desc = wrap(l.description + (l.detail ? `\n${l.detail}` : ''), 10, Math.min(235, X.qty - 8 - width(qtyFmt(l.qty), 10) - X.desc));   // ไม่ทับคอลัมน์จำนวน
       const h = Math.max(1, desc.length) * 14 + 10;
       if (y - h < 200) { ({ page, y } = sheet(label)); y = head(page, y); }
       draw(page, String(l.line_no), X.no, y - 4, 10, { center: true });

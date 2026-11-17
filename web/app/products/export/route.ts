@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const u = new URL(req.url), g = (k: string) => u.searchParams.get(k) ?? '';
   const ids = g('ids').split(',').filter(x => /^[0-9a-f-]{36}$/.test(x));
   const db = await getDb();
-  const rows = await productQuery(db, { kind: g('kind'), q: g('q'), wh: g('wh'), sort: g('sort'), dir: g('dir'), ids });
+  const rows = await productQuery(db, { kind: g('kind'), q: g('q'), wh: g('wh'), sort: g('sort'), dir: g('dir'), ids, cat: g('cat'), attr: { material: g('mat'), hole: g('hole'), thick: g('thick'), sheet: g('sheet') } });
   const cost = can(au.role, 'cost.view');
   const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Products');
   ws.addRow(['ประเภทสินค้า', 'รหัสสินค้า', 'ชื่อสินค้า', 'หน่วยสินค้าหลัก', 'หมวดสินค้า', 'เลขบาร์โค้ด', 'รายละเอียดสินค้า', 'ราคาขาย', ...(cost ? ['ราคาซื้อ'] : []), 'จำนวนคงคลัง']).font = { bold: true };

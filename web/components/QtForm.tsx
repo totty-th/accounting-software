@@ -1,10 +1,12 @@
 'use client';
+import { matcher, hayOf } from '@/lib/product-match';
+import { ProductFilterChips, chipOk, NO_CHIP, type ChipF } from './ProductFilterChips';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveQuotation, saveInvoice, updateSalesDoc, quickCreateCustomer, quickCreateSaleProduct } from '@/lib/actions';
 
 export interface Cust { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
-export interface QProd { id: string; code: string; name: string; unit: string; price: number; kind: 'service' | 'goods_nostock' | 'goods_stock'; onhand: number; description: string; vat?: string; units?: { unit: string; factor: number; price: number }[] }
+export interface QProd { id: string; code: string; name: string; category?: string | null; unit: string; price: number; kind: 'service' | 'goods_nostock' | 'goods_stock'; onhand: number; description: string; vat?: string; units?: { unit: string; factor: number; price: number }[] }
 interface Wh { id: string; label: string }
 interface Line { product_id: string; name: string; detail: string; unit: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
 const blank = (): Line => ({ product_id: '', name: '', detail: '', unit: '', qty: '1', unit_price: '', dtype: 'percent', dval: '', vat: '7', wht: '0' });
@@ -32,7 +34,7 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
   const [np, setNp] = useState<{ row: number; kind: string; name: string; code: string; unit: string; price: string; description: string } | null>(null);
   const h0 = init?.header ?? {};
   const [h, setH] = useState({ date: today, contact: '', term_mode: 'credit', credit_days: '0', due_date: today, salesperson, project: '', ref_no: '', description: '',
-    price_mode: ds?.price_mode ?? 'exclusive', warehouse_id: '', show_signature: true, note: id ? '' : ds?.remarks?.[docType] ?? ds?.remarks?.ALL ?? '', internal_note: '', ...h0 });
+    price_mode: ds?.price_mode ?? 'exclusive', warehouse_id: '', show_signature: true, note: id ? '' : ds?.remarks?.[docType] ?? ds?.remarks?.ALL ?? '', internal_note: '', ontop_type: 'percent', ontop_value: '', ...h0 });
   const [lines, setLines] = useState<Line[]>(init?.lines?.length ? init.lines : [blank(), blank(), blank()]);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -63,21 +65,31 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
 
   const calc = useMemo(() => {
     let net = 0, vat = 0, disc = 0, ex = 0, wht = 0, noTax = 0;
-    const per = lines.map(l => {
-      if (!hasContent(l)) return { total: 0 };
+    // รอบแรก: มูลค่าหลังส่วนลดรายบรรทัด (ฐานปันส่วนลด On Top · ตรงกับ sales_ontop_alloc ในฐานข้อมูล)
+    const base = lines.map(l => {
+      if (!hasContent(l)) return null;
       const gross = r2((Number(l.qty) || 0) * (Number(l.unit_price) || 0));
       const d = l.dtype === 'amount' ? Number(l.dval) || 0 : r2(gross * (Number(l.dval) || 0) / 100);
-      const after = gross - d; const exempt = l.vat === 'exempt'; const vr = exempt ? 0 : Number(l.vat);
+      return { l, d, after: gross - d };
+    });
+    const sum = r2(base.reduce((a, b) => a + (b?.after ?? 0), 0)), ov = Number(h.ontop_value) || 0;
+    const onTotal = ov <= 0 || sum <= 0 ? 0 : h.ontop_type === 'percent' ? r2(sum * ov / 100) : ov;
+    const alloc = base.map(b => (b && onTotal ? r2(onTotal * b.after / sum) : 0));
+    if (onTotal) { let big = -1; base.forEach((b, i) => { if (b && (big < 0 || b.after > base[big]!.after)) big = i; });
+      alloc[big] = r2(alloc[big] + onTotal - alloc.reduce((a, b) => a + b, 0)); }
+    const per = base.map((b, i) => {
+      if (!b) return { total: 0 };
+      const { l } = b, after = b.after - alloc[i]; const exempt = l.vat === 'exempt'; const vr = exempt ? 0 : Number(l.vat);
       let n: number, v: number;
       if (exempt || vr === 0) { n = after; v = 0; } else if (h.price_mode === 'exclusive') { n = after; v = r2(n * vr / 100); } else { n = r2(after * 100 / (100 + vr)); v = r2(after - n); }
-      net += n; vat += v; disc += d; wht += r2(n * (Number(l.wht) || 0) / 100); if (exempt) ex += n; if (exempt || vr === 0) noTax += n;
-      return { total: h.price_mode === 'exclusive' || exempt || vr === 0 ? n : after };
+      net += n; vat += v; disc += b.d; wht += r2(n * (Number(l.wht) || 0) / 100); if (exempt) ex += n; if (exempt || vr === 0) noTax += n;
+      return { total: b.after };   // มูลค่าบรรทัดที่แสดง = หลังส่วนลดบรรทัด (On Top แสดงท้ายเอกสาร)
     });
-    return { per, net, vat, disc, ex, noTax, wht, total: r2(net + vat) };
+    return { per, net, vat, disc, ex, noTax, wht, on: onTotal, onOver: onTotal > sum || (h.ontop_type === 'percent' && ov > 100), total: r2(net + vat) };
   }, [lines, h.price_mode]);
 
   const needWh = !id && ds?.show_warehouse !== false && ds?.default_main_warehouse === false;
-  const ok = (!needWh || !!h.warehouse_id) && h.contact && lines.some(hasContent) && lines.filter(hasContent).every(l => Number(l.qty) > 0 && l.unit_price !== '');
+  const ok = !calc.onOver && (!needWh || !!h.warehouse_id) && h.contact && lines.some(hasContent) && lines.filter(hasContent).every(l => Number(l.qty) > 0 && l.unit_price !== '');
   const submit = () => start(async () => {
     setErr(null);
     // ขายเป็นหน่วยเพิ่ม → แปลงเป็นหน่วยหลักก่อนบันทึก (ตัดสต็อกถูกหน่วย) และจดหน่วยที่ขายไว้ในรายละเอียด
@@ -94,7 +106,7 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
     }
     const payload = lines.filter(hasContent).map(l => { const c = conv(l); return ({ product_id: l.product_id || undefined, description: l.name, detail: c.detail, unit: c.unit, qty: c.qty, unit_price: c.price,
         discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 }); });
-    const head = { ...h, credit_days: Number(h.credit_days) || 0 };
+    const head = { ...h, credit_days: Number(h.credit_days) || 0, ontop_type: Number(h.ontop_value) > 0 ? h.ontop_type : '', ontop_value: Number(h.ontop_value) || 0 };
     const r = isInv && id ? await updateSalesDoc(id, { ...head, due_date: h.term_mode === 'credit' ? h.due_date : undefined }, payload).then(x => ({ ...x, id })) : isInv ? await saveInvoice({ ...head, due_date: h.term_mode === 'credit' ? h.due_date : undefined }, payload) : await saveQuotation(id, head, payload);
     if (r.error) return setErr(r.error);
     router.push(r.id ? `/sales/${r.id}` : back); router.refresh();
@@ -186,8 +198,13 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
             {lvl('wht_level') === 'footer' && lbl('หัก ณ ที่จ่าย', <select aria-label="หัก ณ ที่จ่ายท้ายเอกสาร" value={lines[0]?.wht ?? '0'} onChange={e => setAll({ wht: e.target.value })}>{WHT.map(w => <option key={w} value={w}>{w === '0' ? 'ไม่หัก' : `${w}%`}</option>)}</select>)}
           </div>}
           <table><tbody>
-            <tr><td>รวมเป็นเงิน</td><td className="num">{fmt(calc.net + calc.disc)}</td></tr>
-            <tr><td>ส่วนลดรวม</td><td className="num">{fmt(calc.disc)}</td></tr>
+            <tr><td>รวมเป็นเงิน</td><td className="num">{fmt(calc.net + calc.disc + calc.on)}</td></tr>
+            <tr><td>ส่วนลดรายการ</td><td className="num">{fmt(calc.disc)}</td></tr>
+            <tr><td>ส่วนลด On Top <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
+              <select aria-label="ชนิดส่วนลด On Top" style={{ width: 64, padding: '2px 4px' }} value={h.ontop_type} onChange={e => set({ ontop_type: e.target.value })}><option value="percent">%</option><option value="amount">บาท</option></select>
+              <input aria-label="ส่วนลด On Top" inputMode="decimal" style={{ width: 90 }} placeholder="0" value={h.ontop_value} onChange={e => set({ ontop_value: e.target.value })} /></span>
+              {calc.onOver && <div className="sub" role="alert" style={{ color: 'var(--red)' }}>ส่วนลด On Top เกินมูลค่าหลังส่วนลดรายการ</div>}</td>
+              <td className="num">{fmt(calc.on)}</td></tr>
             <tr><td>ราคาหลังหักส่วนลด</td><td className="num">{fmt(calc.net)}</td></tr>
             <tr><td>มูลค่าที่ไม่มี/ยกเว้นภาษี</td><td className="num">{fmt(calc.noTax)}</td></tr>
             <tr><td>มูลค่าที่คำนวณภาษี</td><td className="num">{fmt(calc.net - calc.noTax)}</td></tr>
@@ -231,8 +248,11 @@ function ProductPicker({ label, products, value, productId, canCreate, onText, o
   onText: (t: string) => void; onPick: (id: string) => void; onCreate: (name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [cf, setCf] = useState<ChipF>(NO_CHIP);
   const q = value.trim().toLowerCase();
-  const list = products.filter(p => !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)).slice(0, 50);
+  // M63: ค้นหาหลายคำ ลำดับใดก็ได้ + ชิปกรองหมวด/วัสดุ/ขนาด (สินค้าหลักพันรายการ)
+  const hit = useMemo(() => { const m = matcher(q); return products.filter(p => m(hayOf(p))); }, [products, q]);
+  const list = hit.filter(p => chipOk(p, cf)).slice(0, 50);
   const exact = products.some(p => p.name.toLowerCase() === q);
   return (
     <div style={{ position: 'relative' }}>
@@ -242,7 +262,9 @@ function ProductPicker({ label, products, value, productId, canCreate, onText, o
         {value.trim() && !productId && <span className="sub" style={{ position: 'absolute', right: 8, top: 6, color: 'var(--blue, #1f6fb5)', fontSize: 12 }}>New</span>}
       </div>
       {open && (
-        <div role="listbox" style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: 'var(--panel, #fff)', border: '1px solid var(--line, #ccc)', borderRadius: 6, boxShadow: '0 6px 18px rgba(0,0,0,.15)', maxHeight: 320, overflow: 'auto' }}>
+        <div role="listbox" style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, minWidth: 'min(560px, 90vw)', background: 'var(--panel, #fff)', border: '1px solid var(--line, #ccc)', borderRadius: 6, boxShadow: '0 6px 18px rgba(0,0,0,.15)', maxHeight: 380, overflow: 'auto' }}>
+          <ProductFilterChips products={hit} f={cf} onChange={setCf} />
+          {hit.length > 50 && <div className="sub" style={{ padding: '4px 10px' }}>พบ {hit.filter(p => chipOk(p, cf)).length} รายการ แสดง 50 รายการแรก — พิมพ์เพิ่ม เช่น "304 หนา 1.5 รู 5" หรือกดชิปเพื่อกรอง</div>}
           {q && !exact && list.length === 0 && canCreate && (
             <div role="option" style={{ padding: '8px 10px', cursor: 'pointer' }} onMouseDown={e => { e.preventDefault(); onCreate(value.trim()); setOpen(false); }}>
               ＋ เพิ่ม "<b>{value.trim()}</b>" เป็นสินค้าใหม่</div>)}

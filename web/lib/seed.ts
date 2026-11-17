@@ -34,6 +34,9 @@ export async function seed(db: Db) {
   await db.q(`insert into company_profile(name,address,tax_id) values ('บริษัท ผลิตภัณฑ์ตะแกรงเหล็กแผ่นไทย จำกัด (สำนักงานใหญ่)','100/12 ถนนช่องนนทรี แขวงบางโพงพาง เขตยานนาวา กรุงเทพฯ 10120','0105522005334')`);
   const p1 = (await db.q(`insert into products(code,name,kind,base_unit,sale_price,purchase_price) values ('MESH-01','ตะแกรงเหล็กสำเร็จรูป 1x2 ม.','goods_stock','แผ่น',1000,600) returning id`))[0].id;
   await db.q(`insert into products(code,name,kind,base_unit,sale_price) values ('SVC-01','ค่าติดตั้ง','service','งาน',2000)`);
+  // M63: สินค้าจริงของเจ้าของระบบ 1,475 รายการ (ไฟล์ 17-11-2026) สำหรับทดลองค้นหา/กรอง · [รหัส, ชื่อ, หมวดย่อย, หน่วย] ยังไม่มีราคา
+  const { default: demo } = await import('./demo-products.json');
+  await db.q(`insert into products(code, name, category, base_unit, kind) select x->>0, x->>1, x->>2, x->>3, 'goods_stock' from jsonb_array_elements($1::jsonb) x on conflict (code) do nothing`, [JSON.stringify(demo)]);
   await db.q(`select create_goods_receipt($1::date,$2,$3::jsonb)`, [d, v1, JSON.stringify([{ product_id: p1, qty: 50, unit_price: 600 }])]);
   await db.q(`select create_sales_doc('INV',$1::date,$2,$3::jsonb)`, [d, c1, JSON.stringify([
     { description: 'ตะแกรงเหล็กสำเร็จรูป 1x2 ม.', product_id: p1, qty: 10, unit_price: 1000 },

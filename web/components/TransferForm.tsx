@@ -1,4 +1,5 @@
 'use client';
+import { ProductSelect } from './ProductSelect';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createTransfer } from '@/lib/actions';
@@ -30,7 +31,7 @@ export function TransferForm({ today, whs, products }: { today: string; whs: { i
         <table><thead><tr><th>ลำดับ</th><th>ชื่อสินค้า / รายละเอียด</th><th className="num">คงเหลือต้นทาง</th><th className="num">จำนวน</th><th>หน่วย</th><th className="num">ราคาต้นทุนต่อหน่วย</th><th className="num">ราคารวม</th><th></th></tr></thead>
           <tbody>{rows.map((x, i) => { const p = pm.get(x.pid); const q = Number(x.qty) || 0; return (
             <tr key={i}><td>{i + 1}</td>
-              <td><select value={x.pid} onChange={e => setRows(rows.map((y, j) => j === i ? { ...y, pid: e.target.value } : y))}><option value="">เลือกสินค้า</option>{products.map(o => <option key={o.id} value={o.id}>{o.code} {o.name}</option>)}</select>
+              <td><ProductSelect label={`สินค้า ${i + 1}`} products={products} value={x.pid} onPick={pid => setRows(rows.map((y, j) => j === i ? { ...y, pid } : y))} />
                 {warn[i] && <div className="sub" style={{ color: 'var(--red)' }}>โอนเกินคงเหลือต้นทาง{warn[i]!.block ? ' — สินค้านี้ห้ามติดลบ จะรับสินค้าไม่ได้' : ' (สต็อกจะติดลบ)'}</div>}</td>
               <td className="num">{p && from ? (p.byWh[from] ?? 0).toLocaleString('th-TH') : '-'}</td>
               <td className="num"><input type="number" min="0" step="0.0001" style={{ width: 90 }} value={x.qty} onChange={e => setRows(rows.map((y, j) => j === i ? { ...y, qty: e.target.value } : y))} /></td>

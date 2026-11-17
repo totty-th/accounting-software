@@ -5,14 +5,14 @@ export interface DocView {
     vat_rate: string | number; subtotal: string | number; vat: string | number; total: string | number; reason: string | null;
     is_deposit: boolean; deposit_net: string | number; deposit_vat: string | number; wht_rate?: string | number; salesperson?: string | null;
     term_mode?: string; credit_days?: number; salesperson_name?: string | null; project?: string | null; ref_no?: string | null; description?: string | null;
-    show_signature?: boolean; note?: string | null; discount_total?: string | number; exempt_base?: string | number; wht_total?: string | number;
+    show_signature?: boolean; note?: string | null; discount_total?: string | number; exempt_base?: string | number; ontop_type?: string | null; ontop_value?: number; ontop_total?: number; wht_total?: string | number;
     delivery_mode?: 'pickup' | 'ship' | null; ship_name?: string | null; ship_address?: string | null; ship_phone?: string | null; carrier?: string | null; delivery_note?: string | null };
   contact: { id: string; name: string; address: string | null; tax_id: string | null; credit_days: number; person?: string | null; phone?: string | null };
   company: { name: string; address: string | null; tax_id: string | null; name_en?: string | null; address_en?: string | null; phone?: string | null; email?: string | null; website?: string | null; signer_name?: string | null } | null;
   payInfo?: { kind: string; bank: string | null; account_no: string | null; account_name: string | null; branch: string | null; cheque_payee: string | null; remark: string | null; qr_img: string | null }[];
   design?: import('./doc-design').DocDesign; images?: { logo: string | null; stamp: string | null; signature?: string | null };
   lines: { line_no: number; description: string; item_kind: string; qty: string | number; unit_price: string | number; amount: string | number;
-    unit?: string | null; detail?: string | null; discount?: string | number; discount_type?: string; discount_value?: string | number; vat_rate?: string | number | null; vat_exempt?: boolean; wht_rate?: string | number; wht?: string | number }[];
+    unit?: string | null; detail?: string | null; discount?: string | number; discount_type?: string; discount_value?: string | number; vat_rate?: string | number | null; vat_exempt?: boolean; wht_rate?: string | number; wht?: string | number; ontop?: number }[];
   ref: { id: string; doc_no: string; doc_type: string; doc_date: string; subtotal: string | number; total: string | number } | null;
   children: { id: string; doc_no: string; doc_type: string; status: string }[];
   receipts: { id: string; receipt_no: string; status: string; receipt_date: string; collected_date: string | null; amount: string | number }[];
@@ -31,6 +31,13 @@ export async function loadView(key: string): Promise<DocView | null> {
   try {
     const db = await getDb();
     const v = (await db.q<{ v: DocView }>('select sales_doc_view($1) as v', [id]))[0].v;
+    // M62 ส่วนลด On Top: มูลค่าบรรทัดที่แสดง = หลังส่วนลดบรรทัด (ก่อน On Top) · On Top แสดงท้ายเอกสาร
+    const ot = (await db.q<any>('select ontop_type, ontop_value, ontop_total from sales_docs where id=$1', [id]))[0];
+    if (ot && Number(ot.ontop_total) > 0) {
+      Object.assign(v.doc, { ontop_type: ot.ontop_type, ontop_value: Number(ot.ontop_value), ontop_total: Number(ot.ontop_total) });
+      const on = new Map((await db.q<any>('select line_no, ontop from sales_doc_lines where doc_id=$1', [id])).map(r => [Number(r.line_no), Number(r.ontop)]));
+      v.lines = v.lines.map((l: any) => { const o = on.get(Number(l.line_no)) ?? 0; return { ...l, ontop: o, amount: Math.round((Number(l.amount) + o) * 100) / 100 }; });
+    }
     // พนักงานขาย = ผู้ใช้ที่ล็อกอินสร้างเอกสาร (sales_docs.created_by) ไม่ให้เลือกเอง
     v.doc.salesperson = v.doc.salesperson_name || ((await db.q<{ n: string | null }>(
       'select u.display_name as n from sales_docs d left join app_users u on u.id = d.created_by where d.id = $1', [id]))[0]?.n ?? null);

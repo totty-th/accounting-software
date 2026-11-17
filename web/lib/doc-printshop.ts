@@ -36,7 +36,8 @@ export async function buildPrintshopPdf(opts: { v?: DocView; docType: string; co
     if (!s) return; let cx = o.right ? x - width(s, size, o.bold) : o.center ? x - width(s, size, o.bold) / 2 : x;
     for (const [x2, th] of runs(s)) { page.drawText(x2, { x: cx, y, size, font: font(th, !!o.bold), color: ink }); cx += font(th, !!o.bold).widthOfTextAtSize(x2, size); }
   };
-  const wrap = (s: string, size: number, maxW: number) => { const out: string[] = []; for (const para of String(s ?? '').split('\n')) { let line = ''; for (const ch of para) { if (width(line + ch, size) > maxW && line) { out.push(line); line = ch; } else line += ch; } out.push(line); } return out; };
+  const wrap = (s: string, size: number, maxW: number) => { const out: string[] = []; for (const para of String(s ?? '').split('\n')) { let line = ''; for (const ch of para) { if (width(line + ch, size) > maxW && line) { const sp = line.lastIndexOf(' ');   // ตัดที่ช่องว่างก่อน (ไม่ตัดกลางคำ เช่น มม.)
+        if (sp > 0) { out.push(line.slice(0, sp)); line = line.slice(sp + 1) + ch; } else { out.push(line); line = ch; } } else line += ch; } out.push(line); } return out; };
   const S = (page: PDFPage, s: string, x: number, y: number, size = 10, o: { bold?: boolean; right?: boolean; center?: boolean } = {}) => { if (blank) put(page, s, x, y, size, o); };   // ส่วนคงที่: พิมพ์เฉพาะแม่แบบ
   const D = (page: PDFPage, s: string, x: number, y: number, size = 10, o: { bold?: boolean; right?: boolean; center?: boolean } = {}) => { if (!blank) put(page, s, x, y, size, o); };   // ข้อมูล
   const box = (page: PDFPage, x: number, y: number, w: number, h: number) => { if (blank) page.drawRectangle({ x, y, width: w, height: h, borderColor: ink, borderWidth: 0.8 }); };

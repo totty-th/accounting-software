@@ -147,6 +147,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:-1px}
 .sh-lines td{padding:6px 8px;border-bottom:1px solid #e6e6ec}
 .sh-lines .num{text-align:right}
 .sh-lines .desc{white-space:pre-line}
+.sh-lines td.num{white-space:nowrap}   /* ชื่อสินค้ายาว (ตะแกรง) ห้ามตัวเลข/หน่วยล้นทับคอลัมน์รายละเอียด */
 .sheet{position:relative}
 .sh-mark{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:96px;font-weight:700;color:rgba(200,40,40,.16);transform:rotate(-24deg);pointer-events:none}
 .sh-sum dl .gap{margin-top:8px}
@@ -365,3 +366,6 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
 .taxbox{border:1px solid var(--line,#e5e7eb);border-radius:8px;padding:10px 12px;font-size:13px;max-width:420px}.taxbox div{display:flex;justify-content:space-between;gap:12px}.taxbox b{font-variant-numeric:tabular-nums}
 .slip{max-width:760px;margin:0 auto;background:#fff;color:#111;padding:28px;border:1px solid #ddd}.slip table{width:100%}.slip h2{margin:0}
 @media print{.slip{border:none;padding:0}}
+/* M63 ชิปกรองสินค้า */
+.chip { border: 1px solid var(--line, #ccc); background: transparent; color: inherit; border-radius: 999px; padding: 1px 9px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.chip.on { background: var(--blue, #1f6fb5); border-color: var(--blue, #1f6fb5); color: #fff; }

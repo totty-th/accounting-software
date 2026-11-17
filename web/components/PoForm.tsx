@@ -1,10 +1,11 @@
 'use client';
+import { ProductSelect } from './ProductSelect';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { savePurchaseOrder, saveGoodsReceiptFull, updateGoodsReceiptFull, quickCreateVendor, quickCreateProduct } from '@/lib/actions';
 
 export interface Vendor { id: string; label: string; address: string; postal: string; tax_id: string; branch: string; credit_days: number }
-export interface Prod { id: string; code: string; name: string; unit: string; price: number; onhand: number }
+export interface Prod { id: string; code: string; name: string; category?: string | null; unit: string; price: number; onhand: number }
 interface Wh { id: string; label: string }
 interface Line { line_no?: number; product_id: string; description: string; unit: string; stock?: string; qty: string; unit_price: string; dtype: 'percent' | 'amount'; dval: string; vat: string; wht: string }
 // ซื้อคนละหน่วยกับหน่วยสต็อกของสินค้า → ต้องกรอกจำนวนที่ได้รับจริง (แบบ B)
@@ -124,8 +125,7 @@ export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses,
           <tbody>{lines.map((l, i) => { const p = products.find(x => x.id === l.product_id); return (
             <tr key={i} style={{ verticalAlign: 'top' }}><td>{i + 1}</td>
               <td>
-                <select aria-label={`สินค้า ${i + 1}`} disabled={lockLines} value={l.product_id} onChange={e => pickProduct(i, e.target.value)}>
-                  <option value="">เลือกสินค้า</option>{products.map(x => <option key={x.id} value={x.id}>{x.code} {x.name} (คงเหลือ {x.onhand})</option>)}</select>
+                <ProductSelect label={`สินค้า ${i + 1}`} disabled={lockLines} products={products} value={l.product_id} onPick={pid => pickProduct(i, pid)} />
                 {p && <div className="sub">คงเหลือ {p.onhand} {p.unit} · {p.code}</div>}
                 <textarea aria-label={`รายละเอียด ${i + 1}`} rows={1} placeholder="รายละเอียด (Shift+Enter ขึ้นบรรทัดใหม่)" value={l.description} onChange={e => setL(i, { description: e.target.value })} style={{ width: '100%' }} />
                 {canCreateProduct && <button type="button" className="btn sm ghost" onClick={() => setNp({ row: i, code: '', name: '', unit: 'ชิ้น', buy: '' })}>+ เพิ่มสินค้าใหม่</button>}

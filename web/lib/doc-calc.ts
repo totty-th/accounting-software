@@ -35,10 +35,13 @@ export function docSummary(v: DocView): { rows: SumRow[]; wht: SumRow[]; total: 
   const sub = c(d.subtotal), vat = c(d.vat), total = c(d.total);
   const rows: SumRow[] = [];
   if (isFull(v)) {   // ใบเสนอราคา/ใบแจ้งหนี้เต็มรูปแบบ: ส่วนลด / ไม่มี-ยกเว้นภาษี / หัก ณ ที่จ่ายต่อบรรทัด
-    const disc = c(d.discount_total);
-    const noTax = v.lines.reduce((s, l) => s + (l.vat_exempt || Number(l.vat_rate ?? 7) === 0 ? c(l.amount) : 0), 0);
+    const disc = c(d.discount_total), on = c(d.ontop_total);
+    const noTax = v.lines.reduce((s, l) => s + (l.vat_exempt || Number(l.vat_rate ?? 7) === 0 ? c(l.amount) - c(l.ontop) : 0), 0);
     rows.push({ label: 'รวมเป็นเงิน', value: m(sub + disc) });
-    if (disc > 0) rows.push({ label: 'ส่วนลดรวม', value: m(disc) }, { label: 'ราคาหลังหักส่วนลด', value: m(sub) });
+    if (on > 0) {   // M62: แยกส่วนลดรายการ กับส่วนลด On Top ท้ายเอกสาร
+      if (disc - on > 0) rows.push({ label: 'ส่วนลดรายการ', value: m(disc - on) });
+      rows.push({ label: `ส่วนลด On Top${d.ontop_type === 'percent' ? ` ${Number(d.ontop_value)}%` : ''}`, value: m(on) }, { label: 'ราคาหลังหักส่วนลด', value: m(sub) });
+    } else if (disc > 0) rows.push({ label: 'ส่วนลดรวม', value: m(disc) }, { label: 'ราคาหลังหักส่วนลด', value: m(sub) });
     rows.push({ label: 'มูลค่าที่ไม่มี/ยกเว้นภาษี', value: m(noTax), gap: true }, { label: 'มูลค่าที่คำนวณภาษี', value: m(sub - noTax) },
       { label: `ภาษีมูลค่าเพิ่ม ${Number(d.vat_rate)}%`, value: m(vat) }, { label: 'จำนวนเงินรวมทั้งสิ้น', value: m(total), strong: true });
     const w = c(d.wht_total);

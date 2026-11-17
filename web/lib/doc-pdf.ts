@@ -52,7 +52,8 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     const out: string[] = [];
     for (const para of String(s ?? '').split('\n')) {
       let line = '';
-      for (const ch of para) { if (width(line + ch, size) > maxW && line) { out.push(line); line = ch; } else line += ch; }
+      for (const ch of para) { if (width(line + ch, size) > maxW && line) { const sp = line.lastIndexOf(' ');   // ตัดที่ช่องว่างก่อน (ไม่ตัดกลางคำ เช่น มม.)
+        if (sp > 0) { out.push(line.slice(0, sp)); line = line.slice(sp + 1) + ch; } else { out.push(line); line = ch; } } else line += ch; }
       out.push(line);
     }
     return out;
@@ -139,7 +140,9 @@ export async function buildDocPdf(v: DocView, mode: PdfMode = 'original', kind: 
     let { page, y } = sheet(label);
     y = tableHead(page, y);
     for (const l of v.lines) {
-      const desc = wrap(l.description + (l.detail ? `\n${l.detail}` : ''), 10, dlv ? 400 : 230);
+      // ไม่ให้รายละเอียดทับคอลัมน์จำนวน (ชื่อสินค้ายาว เช่น ตะแกรง): กว้างสุดถึงหน้าข้อความจำนวน-หน่วย
+      const qs = qtyFmt(l.qty) + (l.unit ? ` ${l.unit}` : '');
+      const desc = wrap(l.description + (l.detail ? `\n${l.detail}` : ''), 10, dlv ? 400 : Math.min(230, 300 - 10 - width(qs, 10) - (L + 28)));
       const h = Math.max(1, desc.length) * 16 + 12;
       if (y - h < 210) { ({ page, y } = sheet(label)); y = tableHead(page, y); }
       draw(page, String(l.line_no), L + 6, y, 10);
