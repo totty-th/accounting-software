@@ -328,7 +328,8 @@ export async function saveGoodsReceiptFull(header: Record<string, unknown>, line
   return { ...r, id: out };
 }
 export async function updateGoodsReceiptFull(id: string, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
-  const r = await run(async () => { await (await getDb()).q('select update_goods_receipt($1,$2::jsonb,$3::jsonb)', [id, JSON.stringify(header), JSON.stringify(lines)]); },
+  // M69: ผ่าน call() เพื่อบันทึกผู้แก้ในประวัติเอกสาร (เดิมขึ้นว่า "ระบบ")
+  const r = await run(call('select update_goods_receipt($1,$2::jsonb,$3::jsonb)', id, JSON.stringify(header), JSON.stringify(lines)),
     [...ALL, '/purchases', `/purchases/ri/${id}`], buyGate('RI', id));
   return { ...r, id };
 }

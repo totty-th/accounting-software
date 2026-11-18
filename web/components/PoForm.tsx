@@ -1,6 +1,6 @@
 'use client';
 import { ProductSelect } from './ProductSelect';
-import { useMemo, useState, useTransition } from 'react';
+import { useRef, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { savePurchaseOrder, saveGoodsReceiptFull, updateGoodsReceiptFull, quickCreateVendor, quickCreateProduct } from '@/lib/actions';
 
@@ -61,15 +61,17 @@ export function PoForm({ kind = 'PO', id, vendors: v0, products: p0, warehouses,
 
   const needWh = !id && !!wh?.show && wh.defMain === false;
   const ok = (!needWh || !!h.warehouse_id) && h.contact && lines.some(l => l.product_id) && lines.filter(l => l.product_id).every(l => Number(l.qty) > 0 && l.unit_price !== '' && (!diffUnit(l.unit, products.find(x => x.id === l.product_id)?.unit) || Number(l.stock) > 0));
-  const submit = () => start(async () => {
+  // M69: กันกดบันทึกซ้ำ (ดับเบิลคลิกก่อนปุ่มถูกปิด) → ไม่ให้เกิดใบรับสินค้า/ใบสั่งซื้อซ้ำ
+  const busy = useRef(false);
+  const submit = () => { if (busy.current) return; busy.current = true; start(async () => {
     setErr(null);
     const save = kind === 'RI' ? (id0: string | null, a: any, b: any[]) => (id0 ? updateGoodsReceiptFull(id0, a, b) : saveGoodsReceiptFull(a, b)) : savePurchaseOrder;
     const r = await save(id, { ...h, credit_days: Number(h.credit_days) || 0 },
       lines.filter(l => l.product_id).map(l => ({ line_no: l.line_no, product_id: l.product_id, description: l.description, unit: l.unit, qty: Number(l.qty), stock_qty: diffUnit(l.unit, products.find(x => x.id === l.product_id)?.unit) ? Number(l.stock) : undefined, unit_price: Number(l.unit_price),
         discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 })));
-    if (r.error) return setErr(r.error);
+    if (r.error) { busy.current = false; return setErr(r.error); }
     router.push(back); router.refresh();
-  });
+  }); };
   const makeVendor = () => start(async () => {
     if (!nv?.name.trim()) return setErr('ต้องระบุชื่อผู้จำหน่าย');
     const r = await quickCreateVendor(nv); if (r.error) return setErr(r.error);

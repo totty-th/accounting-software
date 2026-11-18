@@ -52,7 +52,9 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
   const cards = (await db.q(`select id, card_name, last4 from credit_cards where is_active order by card_name`)).map(c => ({ id: c.id as string, label: `${c.card_name} ****${c.last4}` }));
   const petties = (await db.q(`select id, fund_name from petty_funds where is_active order by fund_name`)).map(f => ({ id: f.id as string, label: f.fund_name as string }));
   const po = kind === 'RI' && h.po_id ? (await db.q<any>('select id, po_no from purchase_orders where id=$1', [h.po_id]))[0] : null;
-  const ri = kind === 'PO' && h.ri_id ? (await db.q<any>('select id, ri_no from goods_receipts where id=$1', [h.ri_id]))[0] : null;
+  // M69: แสดงใบรับสินค้าทุกใบของ PO (รวมแบ่งรับหลายงวดและใบที่ยกเลิก) — เดิมแสดงแค่ ri_id ใบเดียว ใบแบ่งรับไม่ปรากฏ
+  const ris = kind === 'PO' ? await db.q<any>(`select id, ri_no, status from goods_receipts where po_id=$1 or id=$2 order by ri_no`, [id, h.ri_id ?? null]) : [];
+  const ri = ris[0] ?? null;
   const [back, backName] = BACK[kind];
   const payable = kind === 'EXP' ? ['pending', 'approved'] : ['unpaid', 'approved'];
   const net = Number(h.total) - Number(h.wht_total);
@@ -106,7 +108,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
               : <p className="sub">ยังไม่มีประวัติ (เอกสารสร้างก่อนเริ่มเก็บประวัติ 16-11-2026)</p>}</section>
           <section className="panel"><h3>เอกสารที่เกี่ยวข้อง</h3><ul className="rel">
             {po && <li>มาจากใบสั่งซื้อ <Link href={`/purchases/orders/${po.id}`}>{po.po_no}</Link></li>}
-            {ri && <li>สร้างต่อเป็นใบรับสินค้า <Link href={`/purchases/ri/${ri.id}`}>{ri.ri_no}</Link></li>}
+            {ris.length > 0 && <li>สร้างต่อเป็นใบรับสินค้า {ris.map((x: any, i: number) => <span key={x.id}>{i > 0 && ', '}<Link href={`/purchases/ri/${x.id}`}>{x.ri_no}</Link>{x.status === 'cancelled' && <span className="sub"> (ยกเลิก)</span>}{x.status === 'rejected' && <span className="sub"> (ไม่อนุมัติ)</span>}</span>)}</li>}
             {vouchers.length > 0 && <li>ลงบัญชีที่ใบสำคัญ {vouchers.map((x: any) => x.voucher_no).join(', ')}</li>}
             {!po && !ri && !vouchers.length && <li className="sub">ยังไม่มี</li>}</ul></section>
         </aside>

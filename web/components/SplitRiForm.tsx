@@ -47,7 +47,7 @@ export function SplitRiForm({ poId, total, billed, today, lines = [], status = '
         </div>
       ) : <p className="sub">ใบนี้ {fmt(amt)} บาท</p>}
       {armed && <p role="alert" style={{ color: 'var(--danger, #c00)' }}>จะส่งผลให้สถานะการเรียกเก็บเงินเกิน 100% — กดอีกครั้งเพื่อยืนยัน</p>}
-      <button className="btn sm" disabled={pending || (mode === 'qty' ? qtyRows.length === 0 : v <= 0)} onClick={submit}>{pending ? '...' : armed ? 'ยืนยัน' : 'สร้างใบรับสินค้า'}</button>
+      <button className="btn sm" disabled={pending || (mode === 'qty' ? qtyRows.length === 0 : v <= 0)} onClick={submit}>{pending ? '...' : armed ? 'ยืนยัน' : 'บันทึกใบรับสินค้างวดนี้'}</button>
       {msg && <div className="toast" role="alert" onClick={() => setMsg(null)}>{msg}</div>}
     </div>
   );
