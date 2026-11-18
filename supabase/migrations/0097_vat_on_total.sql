@@ -206,3 +206,6 @@ begin
   if p_edit is not null and v_old.ref_doc_id is not null then perform quotation_refresh(v_old.ref_doc_id); end if;
   return v_id;
 end $$;
+-- create or replace ล้าง search_path ที่ 0096 ตั้งไว้ → ตั้งใหม่
+alter function save_quotation(uuid, jsonb, jsonb) set search_path = public, pg_temp;
+alter function create_invoice_full(jsonb, jsonb, uuid, text, uuid) set search_path = public, pg_temp;
