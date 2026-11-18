@@ -4,8 +4,8 @@ import { authMode } from '@/lib/session';
 import { LoginForm } from '@/components/LoginForm';
 
 export default async function Login() {
-  const u = await currentUser();
-  if (u) redirect(homeOf(u.role));
+  const u = await currentUser({ allowMustChange: true });
+  if (u) redirect(u.mustChange ? '/change-password' : homeOf(u.role));
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16 }}>
       <div className="panel" style={{ width: 'min(380px, 100%)', maxWidth: 'none' }}>

@@ -5,21 +5,24 @@ import { getDb } from './db';
 import { COOKIE, verifySession } from './session';
 import { can, isRole, homeOf, buyScope, type BuyKind, type Perm, type Role } from './permissions';
 
-export type AuthUser = { id: string; username: string; displayName: string; role: Role };
+export type AuthUser = { id: string; username: string; displayName: string; role: Role; mustChange: boolean };
 
-/** ผู้ใช้ที่ล็อกอินอยู่ (โหลดจากฐานข้อมูลทุกครั้ง: ปิดใช้งาน/เปลี่ยนตำแหน่งมีผลทันที) */
-export async function currentUser(): Promise<AuthUser | null> {
-  const username = await verifySession(cookies().get(COOKIE)?.value);   // คุกกี้เก็บชื่อผู้ใช้ (คงที่ทุก instance)
-  if (!username) return null;
-  const r = (await (await getDb()).q('select id, username, display_name, role from app_users where username=$1 and is_active', [username]))[0];
-  if (!r || !isRole(r.role)) return null;
-  return { id: r.id, username: r.username, displayName: r.display_name, role: r.role };
+/** ผู้ใช้ที่ล็อกอินอยู่ (โหลดจากฐานข้อมูลทุกครั้ง: ปิดใช้งาน/เปลี่ยนตำแหน่ง/เปลี่ยนรหัสมีผลทันที)
+ *  M68: ผู้ใช้ที่ต้องเปลี่ยนรหัสก่อน (รหัสที่ผู้ดูแลตั้งให้) จะถือว่ายังไม่ล็อกอิน ยกเว้นหน้าที่ขอ allowMustChange */
+export async function currentUser(o: { allowMustChange?: boolean } = {}): Promise<AuthUser | null> {
+  const s = await verifySession(cookies().get(COOKIE)?.value);   // คุกกี้เก็บชื่อผู้ใช้ (คงที่ทุก instance) + เวอร์ชันเซสชัน
+  if (!s) return null;
+  const r = (await (await getDb()).q('select id, username, display_name, role, session_version, must_change_password from app_users where username=$1 and is_active', [s.u]))[0];
+  if (!r || !isRole(r.role) || r.session_version !== s.v) return null;
+  if (r.must_change_password && !o.allowMustChange) return null;
+  return { id: r.id, username: r.username, displayName: r.display_name, role: r.role, mustChange: !!r.must_change_password };
 }
 
 /** ใช้ต้นหน้า server component: ไม่ล็อกอิน → /login · ไม่มีสิทธิ์ → /forbidden (ผ่านถ้ามีสิทธิ์อย่างน้อยหนึ่งอย่างใน perm) */
 export async function requirePage(perm: Perm | Perm[]): Promise<AuthUser> {
-  const u = await currentUser();
+  const u = await currentUser({ allowMustChange: true });
   if (!u) redirect('/login');
+  if (u.mustChange) redirect('/change-password');
   if (!([] as Perm[]).concat(perm).some(p => can(u.role, p))) redirect(can(u.role, 'quote.own') ? '/sales' : '/forbidden');
   return u;
 }

@@ -3,70 +3,69 @@ import { revalidatePath } from 'next/cache';
 import { getDb } from './db';
 import { currentUser } from './auth';
 import { can, isRole } from './permissions';
-import { authMode } from './session';
+import { adminSetPassword } from './login';
+import { passwordProblem } from './password';
 
 export type Result = { error?: string; ok?: true };
-const clean = (e: any) => String(e?.message ?? e).replace(/^error:\s*/i, '');
+const clean = (e: any) => {
+  const m = String(e?.message ?? e).replace(/^error:\s*/i, '');
+  return m.includes('app_users_email_uq') ? 'อีเมลนี้มีผู้ใช้อื่นใช้แล้ว' : m;
+};
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 async function admin() {
   const u = await currentUser();
   return u && can(u.role, 'users.manage') ? u : null;
 }
 
-// เรียก Supabase Admin API (ยังไม่ทดสอบ — รอเชื่อม Supabase จริง) ต้องมี SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (เก็บฝั่งเซิร์ฟเวอร์เท่านั้น)
-async function supa(method: string, path: string, body: unknown) {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) throw new Error('ยังไม่ได้ตั้ง SUPABASE_SERVICE_ROLE_KEY');
-  const r = await fetch(`${process.env.SUPABASE_URL}/auth/v1/admin${path}`, {
-    method, cache: 'no-store', headers: { apikey: key, authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j?.msg ?? j?.message ?? `Supabase ตอบ ${r.status}`);
-  return j;
-}
-const emailOf = (username: string) => `${username}@${process.env.AUTH_EMAIL_DOMAIN ?? 'accounting.local'}`;
-const pwOk = (p: string) => p.length >= 8;
-
-export async function createUser(p: { username: string; display: string; role: string; password?: string; first?: string; last?: string; phone?: string; email?: string }): Promise<Result> {
+// M68: ผู้ดูแลกำหนดอีเมล (ใช้ล็อกอิน) + รหัสผ่านเริ่มต้น → ผู้ใช้ต้องเปลี่ยนรหัสเองตอนเข้าครั้งแรก
+export async function createUser(p: { username: string; display: string; role: string; password: string; first?: string; last?: string; phone?: string; email: string }): Promise<Result> {
   if (!(await admin())) return { error: 'ไม่มีสิทธิ์ทำรายการนี้' };
   if (!isRole(p.role)) return { error: 'ตำแหน่งไม่ถูกต้อง' };
+  const email = (p.email ?? '').trim().toLowerCase();
+  if (!EMAIL.test(email)) return { error: 'กรุณากรอกอีเมลให้ถูกต้อง (ใช้ล็อกอิน)' };
+  const pp = passwordProblem(p.password ?? ''); if (pp) return { error: pp };
   const username = p.username.trim().toLowerCase();
   try {
-    let authId: string | null = null;
-    if (authMode() === 'supabase') {
-      if (!pwOk(p.password ?? '')) return { error: 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร' };
-      authId = (await supa('POST', '/users', { email: emailOf(username), password: p.password, email_confirm: true })).id;
-    }
     const db = await getDb();
-    const id = (await db.q<any>('select app_user_create($1,$2,$3,$4) as id', [username, p.display, p.role, authId]))[0].id;
-    if (p.first || p.last || p.phone || p.email)
-      await db.q('select app_user_set_profile($1,$2,$3,$4,$5,true)', [id, p.first ?? '', p.last ?? '', p.phone ?? '', p.email ?? '']);
+    if ((await db.q('select 1 from app_users where lower(email)=$1', [email])).length) return { error: 'อีเมลนี้มีผู้ใช้อื่นใช้แล้ว' };
+    const id = (await db.q<any>('select app_user_create($1,$2,$3,null) as id', [username, p.display, p.role]))[0].id;
+    await db.q('select app_user_set_profile($1,$2,$3,$4,$5,true)', [id, p.first ?? '', p.last ?? '', p.phone ?? '', email]);
+    const e = await adminSetPassword(db, id, p.password);
+    if (e) return { error: e };
   } catch (e) { return { error: clean(e) }; }
   revalidatePath('/settings/users');
   return { ok: true };
 }
 
-export async function updateUser(p: { id: string; display?: string; role?: string; active?: boolean }): Promise<Result> {
+export async function updateUser(p: { id: string; display?: string; role?: string; active?: boolean; email?: string }): Promise<Result> {
   const me = await admin();
   if (!me) return { error: 'ไม่มีสิทธิ์ทำรายการนี้' };
   if (p.id === me.id && (p.role !== undefined || p.active === false)) return { error: 'เปลี่ยนตำแหน่งหรือปิดใช้งานบัญชีของตัวเองไม่ได้ (กันล็อกตัวเองออก)' };
   if (p.role !== undefined && !isRole(p.role)) return { error: 'ตำแหน่งไม่ถูกต้อง' };
+  const email = p.email === undefined ? null : p.email.trim().toLowerCase();
+  if (email !== null && !EMAIL.test(email)) return { error: 'อีเมลไม่ถูกต้อง' };
   try {
     await (await getDb()).q(`update app_users set display_name = coalesce($2, display_name), role = coalesce($3, role),
-      is_active = coalesce($4, is_active) where id = $1`, [p.id, p.display?.trim() || null, p.role ?? null, p.active ?? null]);
+      is_active = coalesce($4, is_active), email = coalesce($5, email),
+      session_version = session_version + case when $4 = false or $5 is not null then 1 else 0 end where id = $1`,
+      [p.id, p.display?.trim() || null, p.role ?? null, p.active ?? null, email]);
   } catch (e) { return { error: clean(e) }; }
   revalidatePath('/settings/users');
   return { ok: true };
 }
 
 export async function resetPassword(p: { id: string; password: string }): Promise<Result> {
-  if (!(await admin())) return { error: 'ไม่มีสิทธิ์ทำรายการนี้' };
-  if (authMode() !== 'supabase') return { error: 'โหมดเดโมใช้รหัสผ่านเดโมร่วมกัน ไม่มีรหัสรายบุคคล — ตั้งรหัสได้เมื่อเชื่อม Supabase Auth' };
-  if (!pwOk(p.password)) return { error: 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร' };
+  const me = await admin();
+  if (!me) return { error: 'ไม่มีสิทธิ์ทำรายการนี้' };
+  if (p.id === me.id) return { error: 'เปลี่ยนรหัสของตัวเองที่เมนู "เปลี่ยนรหัสผ่าน"' };
   try {
-    const u = (await (await getDb()).q('select auth_user_id from app_users where id=$1', [p.id]))[0];
-    if (!u?.auth_user_id) return { error: 'บัญชีนี้ยังไม่ได้ผูกกับ Supabase Auth' };
-    await supa('PUT', `/users/${u.auth_user_id}`, { password: p.password });
+    const db = await getDb();
+    if (!(await db.q('select 1 from app_users where id=$1 and email is not null', [p.id])).length) return { error: 'ต้องกำหนดอีเมลให้ผู้ใช้นี้ก่อน (ใช้ล็อกอิน)' };
+    const e = await adminSetPassword(db, p.id, p.password);
+    if (e) return { error: e };
   } catch (e) { return { error: clean(e) }; }
+  revalidatePath('/settings/users');
   return { ok: true };
 }
 
