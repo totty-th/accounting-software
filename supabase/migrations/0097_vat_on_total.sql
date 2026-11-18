@@ -1,6 +1,8 @@
 -- M67 ภาษีขายคิดจากยอดรวมทั้งใบ (เจ้าของระบบอนุมัติ 18-11-2026 "ยอดรวมทั้งใบได้")
 -- เดิม: VAT = ผลรวม round(VAT รายบรรทัด) → ต่างจาก 7% ของยอดรวมได้ระดับสตางค์ (รายงานตรวจประเมิน B-15)
--- ใหม่: VAT = round(มูลค่าที่คำนวณภาษีทั้งใบ × 7%) · ราคารวม VAT: VAT = round(ยอดรวมที่เสียภาษี × 7/107) และมูลค่าก่อนภาษี = ยอดรวม − VAT
+-- ใหม่ (ทดสอบบน FA 18-11-2026 ด้วยฟอร์มที่ไม่บันทึก):
+--   ราคาไม่รวม VAT: VAT = round(มูลค่าที่คำนวณภาษีทั้งใบ × 7%)  (FA: 200.09 → 14.01)
+--   ราคารวม VAT: คงแบบเดิม มูลค่าก่อนภาษีปัดรายบรรทัด VAT = ยอดรวม − ผลรวมมูลค่าก่อนภาษี  (FA: 10 × 3 → 28.05 / 1.95)
 -- รายการยกเว้น/0% ไม่นำมาคิด · ฝั่งซื้อไม่เปลี่ยน (บันทึกตามใบกำกับของผู้ขาย)
 create or replace function save_quotation(p_id uuid, p_header jsonb, p_lines jsonb) returns uuid language plpgsql as $$
 declare v_id uuid := p_id; h jsonb := coalesce(p_header, '{}'); l jsonb; n int := 0; q sales_docs; pr products;
@@ -9,7 +11,7 @@ declare v_id uuid := p_id; h jsonb := coalesce(p_header, '{}'); l jsonb; n int :
         v_cd int := coalesce(nullif(h->>'credit_days','')::int, 0);
         v_dt text; v_dv numeric; v_wr numeric; v_wht numeric; v_qty numeric; v_price numeric; v_desc text; v_pid uuid; v_detail text; v_auto boolean;
         c record; c0 record; v_amt numeric; v_on numeric; t_on numeric := 0; v_alloc numeric[];
-        t_net numeric := 0; t_vat numeric := 0; t_tx numeric := 0; v_vt numeric; t_disc numeric := 0; t_ex numeric := 0; t_wht numeric := 0;
+        t_net numeric := 0; t_vat numeric := 0; t_tx numeric := 0; t_disc numeric := 0; t_ex numeric := 0; t_wht numeric := 0;
 begin
   if p_lines is null or jsonb_array_length(p_lines) = 0 then raise exception 'ต้องมีรายการอย่างน้อย 1 บรรทัด'; end if;
   if v_mode not in ('exclusive','inclusive') then raise exception 'ราคาสินค้า % ไม่ถูกต้อง', v_mode; end if;
@@ -70,13 +72,10 @@ begin
         v_pid, coalesce(nullif(l->>'unit',''), case when v_pid is not null and not v_auto then pr.base_unit end), v_dt, v_dv, c0.v_disc,
         c.v_rate, c.v_exempt, v_wr, v_wht, v_on);
     pr := null;
-    t_net := t_net + c.v_net; t_vat := t_vat + c.v_vat; if not c.v_exempt and c.v_rate > 0 then t_tx := t_tx + c.v_net + case when v_mode = 'exclusive' then 0 else c.v_vat end; end if; t_disc := t_disc + c.v_disc; t_wht := t_wht + v_wht;
+    t_net := t_net + c.v_net; t_vat := t_vat + c.v_vat; if not c.v_exempt and c.v_rate > 0 then t_tx := t_tx + c.v_net; end if; t_disc := t_disc + c.v_disc; t_wht := t_wht + v_wht;
     if c.v_exempt then t_ex := t_ex + c.v_net; end if;
   end loop;
-  -- M67: ภาษีขายคิดจากยอดรวมทั้งใบ (มูลค่าที่คำนวณภาษี 7% รวมทุกบรรทัด) แทนผลรวมภาษีรายบรรทัด
-  v_vt := case when v_mode = 'exclusive' then round(t_tx * 7 / 100, 2) else round(t_tx * 7 / 107, 2) end;
-  if v_mode <> 'exclusive' then t_net := t_net + t_vat - v_vt; end if;
-  t_vat := v_vt;
+  if v_mode = 'exclusive' then t_vat := round(t_tx * 7 / 100, 2); end if;
   update sales_docs set doc_date = v_date, contact_id = (h->>'contact')::uuid, price_mode = v_mode, vat_rate = 7,
       term_mode = v_term, credit_days = v_cd, due_date = case when v_term = 'credit' then v_date + v_cd end,
       salesperson = nullif(h->>'salesperson',''), project = nullif(h->>'project',''), ref_no = nullif(h->>'ref_no',''),
@@ -99,7 +98,7 @@ declare v_id uuid := coalesce(p_edit, gen_random_uuid()); v_old sales_docs; v_ol
         v_dt text; v_dv numeric; v_wr numeric; v_wht numeric; v_qty numeric; v_price numeric; v_desc text; v_pid uuid; v_detail text; v_auto boolean;
         v_wh uuid := nullif(h->>'warehouse_id','')::uuid;
         c record; c0 record; v_amt numeric; v_on numeric; t_on numeric := 0; v_alloc numeric[];
-        t_net numeric := 0; t_vat numeric := 0; t_tx numeric := 0; v_vt numeric; t_disc numeric := 0; t_ex numeric := 0; t_wht numeric := 0; t_goods numeric := 0; t_serv numeric := 0;
+        t_net numeric := 0; t_vat numeric := 0; t_tx numeric := 0; t_disc numeric := 0; t_ex numeric := 0; t_wht numeric := 0; t_goods numeric := 0; t_serv numeric := 0;
         v_total numeric; v_rev jsonb := '[]'::jsonb; v_voucher uuid;
 begin
   if p_type not in ('INV','CA') then raise exception 'ประเภทเอกสาร % ไม่รองรับ', p_type; end if;
@@ -165,17 +164,10 @@ begin
         coalesce(nullif(l->>'unit',''), case when not v_auto then pr.base_unit end), v_dt, v_dv, c0.v_disc, c.v_rate, c.v_exempt, v_wr, v_wht, nullif(l->>'src_line_no','')::int, v_on);
     if pr.kind = 'service' then t_serv := t_serv + c.v_net; else t_goods := t_goods + c.v_net; end if;
     pr := null;
-    t_net := t_net + c.v_net; t_vat := t_vat + c.v_vat; if not c.v_exempt and c.v_rate > 0 then t_tx := t_tx + c.v_net + case when v_mode = 'exclusive' then 0 else c.v_vat end; end if; t_disc := t_disc + c.v_disc; t_wht := t_wht + v_wht;
+    t_net := t_net + c.v_net; t_vat := t_vat + c.v_vat; if not c.v_exempt and c.v_rate > 0 then t_tx := t_tx + c.v_net; end if; t_disc := t_disc + c.v_disc; t_wht := t_wht + v_wht;
     if c.v_exempt then t_ex := t_ex + c.v_net; end if;
   end loop;
-  -- M67: ภาษีขายคิดจากยอดรวมทั้งใบ (มูลค่าที่คำนวณภาษี 7% รวมทุกบรรทัด) แทนผลรวมภาษีรายบรรทัด
-  v_vt := case when v_mode = 'exclusive' then round(t_tx * 7 / 100, 2) else round(t_tx * 7 / 107, 2) end;
-  if v_mode <> 'exclusive' then
-    t_net := t_net + t_vat - v_vt;
-    -- ราคารวม VAT: เศษสตางค์ที่ย้ายระหว่างภาษีกับรายได้ ลงบัญชีรายได้ที่ยอดมากกว่า (ใบสำคัญยังสมดุล)
-    if t_goods >= t_serv then t_goods := t_goods + t_vat - v_vt; else t_serv := t_serv + t_vat - v_vt; end if;
-  end if;
-  t_vat := v_vt;
+  if v_mode = 'exclusive' then t_vat := round(t_tx * 7 / 100, 2); end if;
   v_total := t_net + t_vat;
   if v_total <= 0 then raise exception 'ยอดรวมต้องมากกว่า 0'; end if;   -- FA บันทึกยอด 0.00 ได้ แต่เราไม่ลงรายการบัญชีศูนย์บาท
 

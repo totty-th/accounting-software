@@ -54,9 +54,9 @@ describe('M67 ภาษีขายคิดจากยอดรวมทั้
     const id = await inv({}, [L({ qty: 1, unit_price: 0.05 }), L({ qty: 1, unit_price: 0.05 }), L({ qty: 1, unit_price: 0.05 })]);
     expect(await tot(id)).toEqual([0.15, 0.01, 0.16]);
   });
-  it('ราคารวม VAT: VAT = ยอดรวม × 7/107 · ยอดรวมเท่าเดิม · รายได้รับเศษ · สมดุล', async () => {
+  it('ราคารวม VAT: คงรายบรรทัดตาม FA (10 × 3 → 28.05 / 1.95) · สมดุล', async () => {
     const id = await inv({ price_mode: 'inclusive' }, [L({ qty: 1, unit_price: 10 }), L({ qty: 1, unit_price: 10 }), L({ qty: 1, unit_price: 10 })]);
-    expect(await tot(id)).toEqual([28.04, 1.96, 30]);   // 30 × 7/107 = 1.96 (เดิมรายบรรทัด 0.65 × 3 = 1.95)
+    expect(await tot(id)).toEqual([28.05, 1.95, 30]);
     const e = await entries((await get(id)).voucher_id);
     expect(e.reduce((a, x) => a + x[1] - x[2], 0)).toBeCloseTo(0, 6);
   });
