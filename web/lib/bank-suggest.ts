@@ -85,3 +85,21 @@ export function suggestMatches(lines: SLine[], items: SItem[], o: SuggestOpts = 
   const rank = { high: 0, medium: 1, low: 2 };
   return out.sort((a, b) => rank[a.confidence] - rank[b.confidence] || b.score - a.score);
 }
+
+// M13.4 (แบบ FA): เลือกรายการธนาคารแล้ว ยกรายการสมุดบัญชีที่ "ยอดตรง" ขึ้นบนสุด ที่เหลือเรียงตามวันที่ใกล้รายการธนาคาร
+// และค้นหาฝั่งสมุดบัญชีด้วยเลขที่เอกสารหลายเลขคั่นด้วยจุลภาค / คำในคำอธิบาย / จำนวนเงิน
+export type Ranked<T> = { item: T; exact: boolean };
+export function rankItems<T extends SItem>(items: T[], selLines: SLine[], query = ''): Ranked<T>[] {
+  const whole = query.trim();   // "1,200.50" ทั้งช่องเป็นตัวเลข = จำนวนเงินเดียว ไม่ใช่สองคำค้น
+  const terms = /^[\d,.\s฿-]+$/.test(whole) && /\d/.test(whole) ? [whole] : query.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const amtOf = (t: string) => { const n = Number(t.replace(/[,\s฿]/g, '')); return Number.isFinite(n) && /\d/.test(t) ? cents(Math.abs(n)) : null; };
+  const hit = (i: SItem) => !terms.length || terms.some(t =>
+    i.no.toLowerCase().includes(t) || i.memo.toLowerCase().includes(t) || (amtOf(t) !== null && cents(Math.abs(i.amount)) === amtOf(t)));
+  const list = items.filter(hit);
+  if (!selLines.length) return list.map(item => ({ item, exact: false }));
+  const target = cents(selLines.reduce((s, l) => s + l.amount, 0));
+  const ref = selLines.map(l => l.date).sort().pop()!;
+  const r = list.map(item => ({ item, exact: !item.matched && cents(item.amount) === target, g: gap(item.date, ref) }));
+  r.sort((a, b) => (+b.exact - +a.exact) || (+a.item.matched - +b.item.matched) || (a.g - b.g) || a.item.date.localeCompare(b.item.date));
+  return r.map(({ item, exact }) => ({ item, exact }));
+}

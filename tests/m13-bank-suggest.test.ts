@@ -51,3 +51,34 @@ describe('M13.2 แนะนำจับคู่อัตโนมัติ', (
     expect(s[1].confidence).toBe('low');
   });
 });
+
+import { rankItems } from '../web/lib/bank-suggest';
+describe('M13.4 ยกยอดตรงขึ้นบน + ค้นหา (แบบ FA)', () => {
+  const it2 = (id: string, date: string, no: string, memo: string, amount: number, matched = false): SItem => ({ id, date, no, memo, amount, matched });
+  const items = [
+    it2('a', '2026-10-01', 'RV001', 'รับเงิน ก', 500),
+    it2('b', '2026-10-20', 'RV002', 'รับเงิน ข', 1200),
+    it2('c', '2026-10-05', 'JV003', 'โอนเงิน', 1200),
+    it2('d', '2026-10-19', 'PV004', 'จ่ายค่าไฟ', -300),
+    it2('e', '2026-10-21', 'RV005', 'จับแล้ว', 1200, true),
+  ];
+  const line = (amount: number, date: string): SLine => ({ id: 'L', date, description: 'x', amount, matched: false });
+  it('ยอดตรงขึ้นบน (ใกล้วันก่อน) · ที่จับคู่แล้วไม่นับเป็นยอดตรงและอยู่ท้าย', () => {
+    const r = rankItems(items, [line(1200, '2026-10-21')]);
+    expect(r.map(x => x.item.id)).toEqual(['b', 'c', 'd', 'a', 'e']);
+    expect(r.filter(x => x.exact).map(x => x.item.id)).toEqual(['b', 'c']);
+  });
+  it('เลือกหลายรายการธนาคาร = เทียบผลรวม', () => {
+    const r = rankItems(items, [line(1000, '2026-10-02'), { ...line(200, '2026-10-03'), id: 'L2' }]);
+    expect(r.filter(x => x.exact).map(x => x.item.id)).toEqual(['c', 'b']);
+  });
+  it('ไม่เลือกรายการธนาคาร = ลำดับเดิม ไม่มียอดตรง', () => {
+    expect(rankItems(items, []).map(x => x.item.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+  it('ค้นหาเลขที่หลายเลขคั่นด้วยจุลภาค / คำอธิบาย / จำนวนเงิน', () => {
+    expect(rankItems(items, [], 'rv001, PV004').map(x => x.item.id)).toEqual(['a', 'd']);
+    expect(rankItems(items, [], 'ค่าไฟ').map(x => x.item.id)).toEqual(['d']);
+    expect(rankItems(items, [], '1,200').map(x => x.item.id)).toEqual(['b', 'c', 'e']);
+    expect(rankItems(items, [], '300.00').map(x => x.item.id)).toEqual(['d']);
+  });
+});

@@ -3,7 +3,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { bankMatch, bankMatchDiff, bankUnmatch } from '@/lib/actions';
 import { money, dateTh } from '@/lib/format';
-import { suggestMatches, type Suggestion } from '@/lib/bank-suggest';
+import { suggestMatches, rankItems, type Suggestion } from '@/lib/bank-suggest';
 
 type Line = { id: string; date: string; description: string; amount: number; matched: boolean; hasDiff: boolean };
 type Item = { id: string; date: string; no: string; memo: string; amount: number; matched: boolean };
@@ -24,6 +24,7 @@ export function ReconcileBoard({ lines, items, accounts, readOnly = false }: { l
   const [acc, setAcc] = useState(''); const [memo, setMemo] = useState(''); const [date, setDate] = useState('');
   const [askDiff, setAskDiff] = useState(false);
   const [sug, setSug] = useState<Suggestion[] | null>(null);
+  const [q, setQ] = useState('');
 
   const selLines = lines.filter(l => sl.has(l.id));
   const selItems = items.filter(i => si.has(i.id));
@@ -31,6 +32,8 @@ export function ReconcileBoard({ lines, items, accounts, readOnly = false }: { l
   const bankSum = r2(selLines.reduce((s, l) => s + l.amount, 0));
   const docSum = r2(selItems.reduce((s, i) => s + i.amount, 0));
   const diff = r2(bankSum - docSum);
+  const ranked = useMemo(() => rankItems(items, unmatchMode ? [] : selLines, q), [items, selLines, unmatchMode, q]);
+  const nExact = ranked.filter(r => r.exact).length;
   const defDate = useMemo(() => selLines.map(l => l.date).sort().pop() ?? '', [selLines]);
 
   const tog = (set: Set<string>, setter: (s: Set<string>) => void, id: string) => {
@@ -106,13 +109,17 @@ export function ReconcileBoard({ lines, items, accounts, readOnly = false }: { l
         </div>
         <div className="panel" style={{ maxWidth: 'none', minWidth: 0, overflowX: 'auto' }}>
           <h3 style={{ marginTop: 0 }}>รายการในสมุดบัญชี</h3>
-          {items.length === 0 ? <div className="empty">ยังไม่มีรายการของบัญชีนี้ในสมุดรายวัน</div> : (
+          <input type="search" value={q} onChange={e => setQ(e.target.value)} aria-label="ค้นหารายการสมุดบัญชี"
+            placeholder="ค้นหา: เลขที่เอกสาร (หลายเลขคั่นด้วย ,) / คำอธิบาย / จำนวนเงิน" style={{ width: '100%', marginBottom: 8 }} />
+          {selLines.length > 0 && !unmatchMode && <p className="sub" style={{ margin: '0 0 8px' }}>
+            {nExact ? `ยอดตรงกับรายการธนาคารที่เลือก ${nExact} รายการ (อยู่บนสุด)` : 'ไม่มีรายการยอดตรง — เรียงตามวันที่ใกล้รายการธนาคาร'}</p>}
+          {items.length === 0 ? <div className="empty">ยังไม่มีรายการของบัญชีนี้ในสมุดรายวัน</div> : ranked.length === 0 ? <div className="empty">ไม่พบรายการที่ค้นหา</div> : (
             <table style={{ minWidth: 0 }}><thead><tr><th /><th>วันที่</th><th>เลขที่</th><th>คำอธิบาย</th><th className="num">จำนวนเงิน</th></tr></thead>
-              <tbody>{items.map(i => (
-                <tr key={i.id} style={{ opacity: i.matched ? 0.6 : 1 }}>
+              <tbody>{ranked.map(({ item: i, exact }) => (
+                <tr key={i.id} style={{ opacity: i.matched ? 0.6 : 1, background: exact ? 'var(--green-bg, rgba(16,185,129,.08))' : undefined }}>
                   <td><input type="checkbox" aria-label="เลือกรายการสมุดบัญชี" checked={si.has(i.id)} disabled={readOnly || pending || i.matched || unmatchMode}
                     onChange={() => tog(si, setSi, i.id)} /></td>
-                  <td>{dateTh(i.date)}</td><td className="no">{i.no}</td><td>{i.memo}{i.matched && <span style={{ marginLeft: 6, color: 'var(--green)' }}>✓</span>}</td>
+                  <td>{dateTh(i.date)}</td><td className="no">{i.no}</td><td>{exact && <span style={{ marginRight: 6, color: 'var(--green)', fontSize: 12.5, fontWeight: 600 }}>ยอดตรง</span>}{i.memo}{i.matched && <span style={{ marginLeft: 6, color: 'var(--green)' }}>✓</span>}</td>
                   <td className="num" style={{ color: i.amount < 0 ? 'var(--red)' : undefined }}>{money(i.amount)}</td></tr>))}</tbody></table>)}
         </div>
       </div>
