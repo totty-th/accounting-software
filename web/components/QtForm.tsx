@@ -64,7 +64,7 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
   });
 
   const calc = useMemo(() => {
-    let net = 0, vat = 0, disc = 0, ex = 0, wht = 0, noTax = 0;
+    let net = 0, vat = 0, disc = 0, ex = 0, wht = 0, noTax = 0, tx = 0;
     // รอบแรก: มูลค่าหลังส่วนลดรายบรรทัด (ฐานปันส่วนลด On Top · ตรงกับ sales_ontop_alloc ในฐานข้อมูล)
     const base = lines.map(l => {
       if (!hasContent(l)) return null;
@@ -82,9 +82,13 @@ export function QtForm({ docType = 'QT', id, customers: c0, products, warehouses
       const { l } = b, after = b.after - alloc[i]; const exempt = l.vat === 'exempt'; const vr = exempt ? 0 : Number(l.vat);
       let n: number, v: number;
       if (exempt || vr === 0) { n = after; v = 0; } else if (h.price_mode === 'exclusive') { n = after; v = r2(n * vr / 100); } else { n = r2(after * 100 / (100 + vr)); v = r2(after - n); }
-      net += n; vat += v; disc += b.d; wht += r2(n * (Number(l.wht) || 0) / 100); if (exempt) ex += n; if (exempt || vr === 0) noTax += n;
+      net += n; vat += v; if (!exempt && vr > 0) tx += h.price_mode === 'exclusive' ? n : after; disc += b.d; wht += r2(n * (Number(l.wht) || 0) / 100); if (exempt) ex += n; if (exempt || vr === 0) noTax += n;
       return { total: b.after };   // มูลค่าบรรทัดที่แสดง = หลังส่วนลดบรรทัด (On Top แสดงท้ายเอกสาร)
     });
+    // M67: ภาษีคิดจากยอดรวมทั้งใบ (ตรงกับฐานข้อมูล)
+    const vt = h.price_mode === 'exclusive' ? r2(tx * 7 / 100) : r2(tx * 7 / 107);
+    if (h.price_mode !== 'exclusive') net = r2(net + vat - vt);
+    vat = vt;
     return { per, net, vat, disc, ex, noTax, wht, on: onTotal, onOver: onTotal > sum || (h.ontop_type === 'percent' && ov > 100), total: r2(net + vat) };
   }, [lines, h.price_mode]);
 

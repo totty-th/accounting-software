@@ -56,7 +56,7 @@ describe('M62 ส่วนลด On Top ท้ายเอกสาร', () => {
   it('บาท: เศษสตางค์ลงบรรทัดมูลค่ามากสุด · เกินมูลค่า/เกิน 100% ไม่ได้', async () => {
     const q = await mk([L({ qty: 1 }), L({ qty: 1 }), L({ qty: 1 })], { ontop_type: 'amount', ontop_value: 100 });
     expect((await ln(q)).map(x => x[1])).toEqual([33.34, 33.33, 33.33]);
-    expect(await tot(q)).toEqual([2900, 203.01, 3103.01, 100, 100, 0]);   // VAT ต่อบรรทัด (ระบบเดิม) ปัดรายบรรทัด
+    expect(await tot(q)).toEqual([2900, 203, 3103, 100, 100, 0]);   // M67: VAT จากยอดรวมทั้งใบ 2,900 × 7% = 203.00 (เดิมปัดรายบรรทัดได้ 203.01)
     expect(await err(mk([L()], { ontop_type: 'amount', ontop_value: 5000 }))).toContain('เกินมูลค่า');
     expect(await err(mk([L()], { ontop_type: 'percent', ontop_value: 101 }))).toContain('เกิน 100');
   });
