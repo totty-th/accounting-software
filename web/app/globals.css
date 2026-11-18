@@ -369,3 +369,12 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
 /* M63 ชิปกรองสินค้า */
 .chip { border: 1px solid var(--line, #ccc); background: transparent; color: inherit; border-radius: 999px; padding: 1px 9px; font-size: 12px; white-space: nowrap; cursor: pointer; }
 .chip.on { background: var(--blue, #1f6fb5); border-color: var(--blue, #1f6fb5); color: #fff; }
+
+/* M13.5 แถวคู่กระทบยอด: จอกว้าง 5 คอลัมน์ · จอแคบ ซ้อนเป็นแถว */
+.pairrow { grid-template-columns: auto minmax(0,1fr) auto minmax(0,1.3fr) auto; }
+@media (max-width: 760px) {
+  .pairrow { grid-template-columns: auto minmax(0,1fr); }
+  .pairrow > :nth-child(3) { display: none; }
+  .pairrow > :nth-child(4), .pairrow > :nth-child(5) { grid-column: 2; }
+  .pairrow > :nth-child(5) { justify-content: flex-start !important; }
+}

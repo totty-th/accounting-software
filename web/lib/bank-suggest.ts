@@ -6,6 +6,10 @@ export type Suggestion = {
   lineIds: string[]; itemIds: string[];
   confidence: 'high' | 'medium' | 'low';
   score: number; reason: string;
+  kind: '1:1' | '1:N' | 'N:1';
+  days: number;        // ห่างกันกี่วัน (กลุ่ม = มากที่สุด)
+  unique: boolean;     // ไม่มีตัวเลือกอื่นยอดเท่ากัน
+  text: boolean;       // ข้อความใกล้เคียง
 };
 export type SuggestOpts = { windowDays?: number; maxGroup?: number; maxCandidates?: number };
 
@@ -48,7 +52,7 @@ export function suggestMatches(lines: SLine[], items: SItem[], o: SuggestOpts = 
     usedL.add(p.l.id); usedI.add(p.i.id);
     const unique = candL.get(p.l.id) === 1 && candI.get(p.i.id) === 1;
     const confidence = unique && (p.text || p.d <= 3) ? 'high' : (unique && p.d <= 7) || p.text ? 'medium' : 'low';
-    out.push({ lineIds: [p.l.id], itemIds: [p.i.id], confidence, score: p.score,
+    out.push({ lineIds: [p.l.id], itemIds: [p.i.id], confidence, score: p.score, kind: '1:1', days: p.d, unique, text: p.text,
       reason: `ยอดเท่ากัน${p.d === 0 ? ' วันเดียวกัน' : ` ห่างกัน ${p.d} วัน`}${p.text ? ' · ข้อความใกล้เคียง' : ''}${unique ? '' : ' · มีตัวเลือกอื่นยอดเท่ากัน'}` });
   }
 
@@ -71,6 +75,7 @@ export function suggestMatches(lines: SLine[], items: SItem[], o: SuggestOpts = 
     if (hit.length === 0) continue;
     const g = hit[0]; g.forEach(i => usedI.add(i.id)); usedL.add(l.id);
     out.push({ lineIds: [l.id], itemIds: g.map(i => i.id), confidence: hit.length === 1 ? 'medium' : 'low', score: 50 - g.length,
+      kind: '1:N', days: Math.max(...g.map(i => gap(i.date, l.date))), unique: hit.length === 1, text: g.some(i => textHit(l.description, i.memo, i.no)),
       reason: `รายการธนาคารเดียว = ผลรวมเอกสาร ${g.length} รายการ${hit.length === 1 ? '' : ' · มีชุดอื่นที่ยอดรวมเท่ากัน'}` });
   }
   for (const i of I) {
@@ -80,6 +85,7 @@ export function suggestMatches(lines: SLine[], items: SItem[], o: SuggestOpts = 
     if (hit.length === 0) continue;
     const g = hit[0]; g.forEach(l => usedL.add(l.id)); usedI.add(i.id);
     out.push({ lineIds: g.map(l => l.id), itemIds: [i.id], confidence: hit.length === 1 ? 'medium' : 'low', score: 50 - g.length,
+      kind: 'N:1', days: Math.max(...g.map(l => gap(i.date, l.date))), unique: hit.length === 1, text: g.some(l => textHit(l.description, i.memo, i.no)),
       reason: `เอกสารเดียว = ผลรวมรายการธนาคาร ${g.length} รายการ${hit.length === 1 ? '' : ' · มีชุดอื่นที่ยอดรวมเท่ากัน'}` });
   }
   const rank = { high: 0, medium: 1, low: 2 };
@@ -102,4 +108,31 @@ export function rankItems<T extends SItem>(items: T[], selLines: SLine[], query 
   const r = list.map(item => ({ item, exact: !item.matched && cents(item.amount) === target, g: gap(item.date, ref) }));
   r.sort((a, b) => (+b.exact - +a.exact) || (+a.item.matched - +b.item.matched) || (a.g - b.g) || a.item.date.localeCompare(b.item.date));
   return r.map(({ item, exact }) => ({ item, exact }));
+}
+
+// M13.5 (แบบ FA "AI จับคู่ให้"): ทุกรายการธนาคารที่ยังไม่จับคู่ได้หนึ่งแถว = คู่ที่เสนอ + ป้ายเหตุผล + สถานะ
+// ok = ยอดและวันที่ตรง ไม่มีตัวเลือกอื่น · note = มีข้อสังเกต (วันต่าง/หลายฉบับ/เป็นกลุ่ม) · none = ไม่พบเอกสารยอดตรง
+export type Chip = { t: string; warn: boolean };
+export type Proposal = { key: string; lineIds: string[]; itemIds: string[]; status: 'ok' | 'note' | 'none'; chips: Chip[] };
+export function chipsOf(g: Suggestion): Chip[] {
+  const c: Chip[] = [];
+  if (g.kind === '1:1') c.push(g.days === 0 ? { t: 'ยอดและวันที่ตรงกัน', warn: false } : { t: `ยอดตรงกัน แต่วันที่ต่างกัน ${g.days} วัน`, warn: true });
+  else c.push({ t: g.kind === '1:N' ? `ผลรวมเอกสาร ${g.itemIds.length} ฉบับตรงกับยอดธนาคาร` : `ผลรวมรายการธนาคาร ${g.lineIds.length} รายการตรงกับเอกสาร`, warn: true });
+  if (g.kind !== '1:1' && g.days > 0) c.push({ t: `วันที่ห่างสุด ${g.days} วัน`, warn: true });
+  if (!g.unique) c.push({ t: g.kind === '1:1' ? 'มีเอกสารใกล้เคียงหลายฉบับ' : 'มีชุดอื่นที่ยอดรวมเท่ากัน', warn: true });
+  if (g.text) c.push({ t: 'ข้อความตรงกัน', warn: false });
+  return c;
+}
+export function proposePairs(lines: SLine[], items: SItem[], dismissed: Set<string> = new Set()): Proposal[] {
+  const sug = suggestMatches(lines.filter(l => !dismissed.has(l.id)), items);
+  const out: Proposal[] = []; const used = new Set<string>();
+  for (const g of sug) {
+    const chips = chipsOf(g);
+    out.push({ key: g.lineIds.join('+'), lineIds: g.lineIds, itemIds: g.itemIds, chips, status: chips.some(c => c.warn) ? 'note' : 'ok' });
+    g.lineIds.forEach(id => used.add(id));
+  }
+  for (const l of lines) if (!l.matched && !used.has(l.id))
+    out.push({ key: l.id, lineIds: [l.id], itemIds: [], status: 'none', chips: [{ t: dismissed.has(l.id) ? 'ไม่ใช้คู่ที่เสนอ — เลือกเอกสารเองหรือสร้าง JV' : 'ไม่พบเอกสารที่ยอดตรง', warn: true }] });
+  const date = (p: Proposal) => lines.find(l => l.id === p.lineIds[0])!.date;
+  return out.sort((a, b) => date(a).localeCompare(date(b)));
 }

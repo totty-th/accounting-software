@@ -26,8 +26,8 @@ export function Shell({ children, user, modules = [] }: { children: React.ReactN
             <div style={{ opacity: .85 }}>{user.name}</div>
             <div style={{ opacity: .6, fontSize: 12, marginBottom: 8 }}>{ROLE_LABEL[user.role]}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button className="btn sm ghost" type="submit">ออกจากระบบ</button>
-              <a className="btn sm ghost" href="/change-password">เปลี่ยนรหัสผ่าน</a></div>
+              <button className="btn sm ghost" type="submit" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.35)' }}>ออกจากระบบ</button>
+              <a className="btn sm ghost" href="/change-password" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.35)' }}>เปลี่ยนรหัสผ่าน</a></div>
           </form>
         </aside>
         <main className="main"><RowClick /><Shortcuts />{children}</main>
