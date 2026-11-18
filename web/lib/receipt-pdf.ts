@@ -15,7 +15,9 @@ const isThai = (c: string) => /[฀-๿]/.test(c);
 export const PAY_METHODS: [string, string][] = [['cash', 'เงินสด'], ['cheque', 'เช็ค'], ['transfer', 'โอนเงิน'], ['card', 'บัตรเครดิต'], ['other', 'อื่นๆ']];
 
 // ใบเสร็จรับเงิน PDF (A4) ตามแบบเดียวกับหน้าจอ: รายการเอกสาร สรุปยอด ช่องทางรับชำระ ลายเซ็น
-export async function buildReceiptPdf(v: ReceiptView, mode: PdfMode = 'original'): Promise<Uint8Array> {
+export type ReceiptPdfOpt = { title?: string; signers?: [string, string]; noPay?: boolean; extra?: [string, string][] };
+// M65: ใช้แบบเดียวกันพิมพ์ใบวางบิลรวม (title/ผู้ลงนาม/ไม่มีส่วนการชำระเงิน/ข้อมูลหัวเอกสารเพิ่ม เช่น ครบกำหนด)
+export async function buildReceiptPdf(v: ReceiptView, mode: PdfMode = 'original', opt: ReceiptPdfOpt = {}): Promise<Uint8Array> {
   const dir = ASSETS();
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
@@ -42,7 +44,7 @@ export async function buildReceiptPdf(v: ReceiptView, mode: PdfMode = 'original'
   };
   const L = 42, R = 553, W = 595, H = 842;
   const r = v.receipt, net = Math.round(Number(r.amount) * 100 - Number(r.wht) * 100) / 100, hasTax = r.vat_rate != null;
-  const [signL, signR] = SIGNERS.RE;
+  const [signL, signR] = opt.signers ?? SIGNERS.RE;
   const sheet = (label: string) => {
     const page = pdf.addPage([W, H]); let y = H - 48;
     page.drawRectangle({ x: 0, y: H - 14, width: W, height: 14, color: col });
@@ -50,7 +52,7 @@ export async function buildReceiptPdf(v: ReceiptView, mode: PdfMode = 'original'
     const addr = wrap(v.company?.address ?? '', 9.5, 280);
     addr.forEach((ln, i) => draw(page, ln, L, y - 15 - i * 12, 9.5, { color: grey }));
     if (v.company?.tax_id) draw(page, `เลขประจำตัวผู้เสียภาษี ${v.company.tax_id}`, L, y - 15 - addr.length * 12, 9.5, { color: grey });
-    draw(page, 'ใบเสร็จรับเงิน', R, y, 16, { bold: true, right: true, color: col });
+    draw(page, opt.title ?? 'ใบเสร็จรับเงิน', R, y, 16, { bold: true, right: true, color: col });
     draw(page, label, R, y - 18, 10.5, { right: true, color: grey });
     y -= 78;
     draw(page, 'ลูกค้า', L, y, 9, { color: grey });
@@ -58,7 +60,7 @@ export async function buildReceiptPdf(v: ReceiptView, mode: PdfMode = 'original'
     let cy = y - 27;
     for (const ln of wrap(v.contact.address ?? '', 9.5, 270)) { draw(page, ln, L, cy, 9.5); cy -= 12; }
     if (v.contact.tax_id) { draw(page, `เลขประจำตัวผู้เสียภาษี ${v.contact.tax_id}`, L, cy, 9.5); cy -= 12; }
-    [['เลขที่', r.receipt_no], ['วันที่', thDate(r.receipt_date)]].forEach(([k, val], i) => {
+    [['เลขที่', r.receipt_no], ['วันที่', thDate(r.receipt_date)], ...(opt.extra ?? [])].forEach(([k, val], i) => {
       draw(page, k, 400, y - i * 14, 10, { color: grey }); draw(page, val, R, y - i * 14, 10, { right: true }); });
     return { page, y: Math.min(cy, y - 28) - 14 };
   };
@@ -96,6 +98,7 @@ export async function buildReceiptPdf(v: ReceiptView, mode: PdfMode = 'original'
     }
     // ส่วนการชำระเงิน
     y -= 8;
+    if (!opt.noPay) {
     draw(page, 'การชำระเงินจะสมบูรณ์เมื่อบริษัทได้รับเงินเรียบร้อยแล้ว', L, y, 9.5, { color: grey });
     const used = new Set(v.payments.map(p => p.method));
     let bx = 300;
@@ -115,6 +118,7 @@ export async function buildReceiptPdf(v: ReceiptView, mode: PdfMode = 'original'
         draw(page, val, x + kw + 3, y, 9.5);
       }
       y -= 16;
+    }
     }
     const sy = 84;
     [[L, signL, v.contact.name], [312, signR, v.company?.name ?? '']].forEach(([x, cap, who]) => {

@@ -81,6 +81,25 @@ export const cancelSalesDoc = async (id: string) => run(u => callAs(u.id, 'cance
 export const invoiceSetBilled = async (id: string, billed: boolean) => run(u => callAs(u.id, 'invoice_set_billed($1,$2)', id, billed), ALL, salesDocGate(id));
 export const billingNoteSetStatus = async (id: string, to: string) => run(u => callAs(u.id, 'billing_note_set_status($1,$2)', id, to), ALL, salesDocGate(id));
 export const billingNoteToInvoice = async (id: string) => run(u => callAs(u.id, 'billing_note_to_invoice($1, today_th())', id), ALL, 'sales.write');
+// M65 ใบวางบิลรวม
+export async function combinedCandidates(contact: string, except: string | null): Promise<{ id: string; doc_no: string; doc_date: string; due_date: string | null; total: number; outstanding: number; status_view: string; adj: string | null }[]> {
+  const u = await currentUser();
+  if (!u || !(can(u.role, 'sales.write') || can(u.role, 'sales.own')) || !/^[0-9a-f-]{36}$/.test(contact)) return [];
+  const rows = await (await getDb()).q<any>(`select id, doc_no, to_char(doc_date,'YYYY-MM-DD') doc_date, to_char(due_date,'YYYY-MM-DD') due_date, total, outstanding, status_view, adj
+    from combined_bl_candidates($1::uuid, $2::uuid)`, [contact, except]);
+  return rows.map(r => ({ ...r, total: Number(r.total), outstanding: Number(r.outstanding) }));
+}
+export async function saveCombinedBilling(id: string | null, header: Record<string, unknown>, invoices: string[]): Promise<Result & { no?: string }> {
+  let no: string | undefined;
+  const r = await run(async u => {
+    const db = await getDb();
+    const v = (await db.q<any>(`select save_combined_billing($2::uuid,$3::jsonb,$4::uuid[]) as id from (select set_config('app.user_id',$1,true)) s`,
+      [u.id, id, JSON.stringify(header), invoices]))[0].id;
+    no = (await db.q<any>('select doc_no from sales_docs where id=$1', [v]))[0]?.doc_no;
+  }, ALL, id ? ownWriteGate(id) : (u => can(u.role, 'sales.write') || can(u.role, 'sales.own')));
+  return { ...r, no };
+}
+export const combinedBillingReceipt = async (id: string) => run(u => callAs(u.id, 'combined_billing_receipt($1, today_th())', id), ALL, async u => can(u.role, 'receipts.write') && (can(u.role, 'sales.write') || (can(u.role, 'sales.own') && (await ownAny(u, id)))));
 export const resetCancelledSalesDoc = async (id: string) => run(u => callAs(u.id, 'reset_cancelled_sales_doc($1)', id), ALL, 'sales.write');
 export const resetCancelledReceipt = async (id: string) => run(u => callAs(u.id, 'reset_cancelled_receipt($1)', id), ALL, 'receipts.write');
 export const restoreSalesDoc = async (id: string) => run(u => callAs(u.id, 'restore_sales_doc($1)', id), ALL, 'sales.write');

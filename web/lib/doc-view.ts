@@ -32,8 +32,8 @@ export async function loadView(key: string): Promise<DocView | null> {
     const db = await getDb();
     const v = (await db.q<{ v: DocView }>('select sales_doc_view($1) as v', [id]))[0].v;
     // M62 ส่วนลด On Top: มูลค่าบรรทัดที่แสดง = หลังส่วนลดบรรทัด (ก่อน On Top) · On Top แสดงท้ายเอกสาร
-    const ot = (await db.q<any>('select ontop_type, ontop_value, ontop_total, status_view from sales_docs where id=$1', [id]))[0];
-    if (ot) (v.doc as any).status_view = ot.status_view;   // M64 สถานะที่แสดงแบบ FA
+    const ot = (await db.q<any>(`select ontop_type, ontop_value, ontop_total, status_view, is_combined, case when doc_type in ('INV','CN','DN') then combined_bl_holding(id) end cbl from sales_docs where id=$1`, [id]))[0];
+    if (ot) Object.assign(v.doc, { status_view: ot.status_view, is_combined: ot.is_combined, cbl: ot.cbl });   // M64 สถานะที่แสดงแบบ FA · M65 ใบวางบิลรวม
     if (ot && Number(ot.ontop_total) > 0) {
       Object.assign(v.doc, { ontop_type: ot.ontop_type, ontop_value: Number(ot.ontop_value), ontop_total: Number(ot.ontop_total) });
       const on = new Map((await db.q<any>('select line_no, ontop from sales_doc_lines where doc_id=$1', [id])).map(r => [Number(r.line_no), Number(r.ontop)]));

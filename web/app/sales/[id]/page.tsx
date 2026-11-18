@@ -17,6 +17,7 @@ import { can } from '@/lib/permissions';
 import { NoteBox, FileUpload, FileRemove, WhtPick, DeliveryForm } from '@/components/DocExtras';
 import { STATUS } from '@/lib/status';
 import { CashCollectForm } from '@/components/CashCollectForm';
+import { combinedItems } from '@/lib/combined-bl';
 
 const EV: Record<string, string> = { delivery: 'แก้ข้อมูลจัดส่ง', created: 'สร้างเอกสาร', status: 'เปลี่ยนสถานะ', note: 'แก้ไขโน้ตภายใน', file_added: 'แนบไฟล์', file_removed: 'ลบไฟล์แนบ', wht: 'เปลี่ยนอัตราหัก ณ ที่จ่าย' };
 
@@ -50,6 +51,8 @@ export default async function SalesDetail({ params }: { params: { id: string } }
     : e.event === 'wht' ? `${EV.wht}: ${String(e.detail).replace('>', '% → ')}%` : e.detail && e.event.startsWith('file') ? `${EV[e.event]}: ${e.detail}` : EV[e.event] ?? e.event;
   const dlvOk = (v.doc.doc_type === 'QT' && ['approved', 'converted'].includes(v.doc.status)) || (v.doc.doc_type === 'INV' && v.doc.status !== 'cancelled');
   const bill = v.doc.doc_type === 'QT' ? (await db.q<any>('select quotation_billing_summary($1) as s', [v.doc.id]))[0].s : null;
+  const cItems = (v.doc as any).is_combined ? await combinedItems(v.doc.id) : [];
+  const cbl = (v.doc as any).cbl as string | null;
   const title = DOC_TITLE[v.doc.doc_type].title;
   const subject = `เอกสารเลขที่ ${v.doc.doc_no} จาก ${v.company?.name ?? ''}`;
   const body = `เรียน ${v.contact.name}\n\n${v.company?.name ?? ''} ขอส่ง${title} เลขที่ ${v.doc.doc_no} ยอดรวม ${money(v.doc.total)} บาท` +
@@ -145,6 +148,16 @@ export default async function SalesDetail({ params }: { params: { id: string } }
               {events.map((e: any, i: number) => <li key={i}>{evText(e)} <span className="sub">{new Date(e.at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' })} · {e.display_name ?? 'ระบบ'}</span></li>)}
             </ul>
           </section>
+          {(v.doc as any).is_combined && <section className="panel">
+            <h3>เอกสารในใบวางบิลรวม</h3>
+            <div style={{ overflowX: 'auto' }}><table><thead><tr><th>เลขที่</th><th>ครบกำหนด</th><th className="num">ยอดตามเอกสาร</th><th className="num">หัก ณ ที่จ่าย</th><th className="num">ยอดชำระ</th></tr></thead>
+              <tbody>{cItems.map(i => <tr key={i.doc_no}><td><Link href={`/sales/${i.doc_no}`}>{i.doc_no}</Link></td><td>{dateTh(i.due_date)}</td>
+                <td className="num">{money(i.doc_total)}</td><td className="num">{money(i.wht)}</td><td className="num">{money(i.amount)}</td></tr>)}</tbody>
+              <tfoot><tr><th colSpan={2}>รวม {cItems.length} รายการ</th><th className="num">{money(cItems.reduce((a, i) => a + i.doc_total, 0))}</th>
+                <th className="num">{money(cItems.reduce((a, i) => a + i.wht, 0))}</th><th className="num">{money(cItems.reduce((a, i) => a + i.amount, 0))}</th></tr></tfoot></table></div>
+            {v.doc.status === 'pending_billing' && <p className="sub">แก้ไขได้ขณะรอวางบิล · ใบแจ้งหนี้ในใบนี้ถูกล็อกสถานะจนกว่าจะยกเลิกใบวางบิลหรือเปิดใบเสร็จ</p>}
+          </section>}
+          {cbl && <section className="panel"><h3>ใบวางบิลรวม</h3><p>อยู่ในใบวางบิลรวม <Link href={`/sales/${cbl}`}>{cbl}</Link> — เปลี่ยนสถานะ/ยกเลิกไม่ได้จนกว่าจะยกเลิกใบวางบิลรวม</p></section>}
           <section className="panel">
             <h3>เอกสารที่เกี่ยวข้อง</h3>
             <ul className="rel">

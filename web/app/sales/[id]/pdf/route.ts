@@ -1,6 +1,9 @@
 import { apiUser, canViewSalesDoc } from '@/lib/auth';
 import { loadView } from '@/lib/doc-view';
 import { buildDocPdf } from '@/lib/doc-pdf';
+import { buildReceiptPdf } from '@/lib/receipt-pdf';
+import { combinedPdfView } from '@/lib/combined-bl';
+import { SIGNERS } from '@/lib/doc-calc';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -13,7 +16,12 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const q = new URL(req.url).searchParams;
   const dlv = q.get('kind') === 'delivery';
   if (dlv && !['QT', 'INV'].includes(v.doc.doc_type)) return Response.json({ error: 'ใบส่งของออกได้เฉพาะใบเสนอราคาและใบแจ้งหนี้' }, { status: 400 });
-  const pdf = await buildDocPdf(v, q.get('both') === '1' ? 'both' : q.get('copy') === '1' ? 'copy' : 'original', dlv ? 'delivery' : 'doc');
+  const mode = q.get('both') === '1' ? 'both' : q.get('copy') === '1' ? 'copy' : 'original';
+  const due = v.doc.due_date ? String(v.doc.due_date).slice(0, 10).split('-') : null;
+  const pdf = (v.doc as any).is_combined && !dlv   // M65 ใบวางบิลรวม: ตารางเอกสาร (แบบใบเสร็จรวม)
+    ? await buildReceiptPdf(await combinedPdfView(v), mode, { title: 'ใบวางบิล', signers: SIGNERS.BL as [string, string], noPay: true,
+        extra: due ? [['ครบกำหนด', `${due[2]}/${due[1]}/${+due[0] + 543}`]] : [] })
+    : await buildDocPdf(v, q.get('both') === '1' ? 'both' : q.get('copy') === '1' ? 'copy' : 'original', dlv ? 'delivery' : 'doc');
   return new Response(pdf, { headers: { 'content-type': 'application/pdf',
     'content-disposition': `${q.get('download') === '1' ? 'attachment' : 'inline'}; filename="${dlv ? 'DN-' : ''}${v.doc.doc_no}.pdf"`, 'cache-control': 'no-store' } });
 }

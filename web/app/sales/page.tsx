@@ -34,7 +34,8 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
   const page = Math.max(1, Number(searchParams.page) || 1);
   const [{ n, sum }] = await db.q(`select count(*)::int n, coalesce(sum(d.total) filter (where d.status not in ('cancelled','rejected')),0) sum
     from sales_docs d join contacts c on c.id=d.contact_id where ${where}`, args);
-  const rows = await db.q(`select d.id, d.doc_type, d.doc_no, d.doc_date, d.due_date, d.status, d.status_view, d.deposit_net, d.total, d.is_deposit, d.project, d.vat_rate, d.subtotal, c.business_name, c.contact_name
+  const rows = await db.q(`select d.id, d.doc_type, d.doc_no, d.doc_date, d.due_date, d.status, d.status_view, d.deposit_net, d.total, d.is_deposit, d.project, d.vat_rate, d.subtotal, c.business_name, c.contact_name,
+      d.is_combined, case when d.doc_type in ('INV','CN','DN') then combined_bl_holding(d.id) end cbl
     from sales_docs d join contacts c on c.id=d.contact_id where ${where}
     order by d.doc_date desc, d.doc_no desc limit ${pp} offset ${(page - 1) * pp}`, args);
   const pages = Math.max(1, Math.ceil(n / pp));
@@ -63,13 +64,16 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
   const canNew = can(user.role, 'sales.write') || own;
   const noDue = type === 'QT';
   const name = DOC_TYPE[type];
-  const sp: Sp = { type, q, period: period === 'all' ? '' : period, from: searchParams.from, to: searchParams.to, status, pp: String(pp) };
+  const sp: Sp = { kind: type === 'BL' ? searchParams.kind : undefined, type, q, period: period === 'all' ? '' : period, from: searchParams.from, to: searchParams.to, status, pp: String(pp) };
   const exportHref = `/sales/export?${new URLSearchParams(Object.entries({ type, q, period: sp.period, from: sp.from, status }).filter(([, v]) => v) as [string, string][])}${sp.to ? `&to=${sp.to}` : ''}`;
   return (
     <>
       <div className="top"><div><h1>{name}</h1><p className="sub">เอกสารขาย › {name} › {PERIODS.find(p => p[0] === period)![1]}</p></div>
-        {!canNew || type === 'BL' ? null : <Link className="btn" href={type === 'CN' || type === 'DN' ? `/sales/adjust?type=${type}` : `/sales/new?type=${type}`}>+ สร้าง{name}ใหม่</Link>}</div>
-      {type === 'BL' ? <div className="notice">ใบวางบิลสร้างจากใบแจ้งหนี้ (กำลังเพิ่มปุ่มในหน้านี้)</div> : null}
+        {!canNew ? null : type === 'BL' ? <Link className="btn" href="/sales/combined">+ สร้างใบวางบิลรวม</Link> : <Link className="btn" href={type === 'CN' || type === 'DN' ? `/sales/adjust?type=${type}` : `/sales/new?type=${type}`}>+ สร้าง{name}ใหม่</Link>}</div>
+      {type === 'BL' ? <div className="tabs" style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        {([['', 'แสดงทั้งหมด'], ['single', 'ใบวางบิล'], ['combined', 'ใบวางบิลรวม']] as const).map(([k, l]) =>
+          <Link key={k} className={`btn sm ${(searchParams.kind ?? '') === k ? '' : 'ghost'}`} href={href({ ...sp, kind: k } as Sp, { page: '' })}>{l}</Link>)}
+        <span className="sub" style={{ alignSelf: 'center' }}>ใบวางบิลเดี่ยวสร้างจากใบเสนอราคา · ใบวางบิลรวมสร้างจากใบแจ้งหนี้ค้างของลูกค้า</span></div> : null}
       <details className="panel" open={!!(q || status || period !== 'all')} style={{ marginBottom: 8 }}>
         <summary style={{ cursor: 'pointer' }}>🔍 ค้นหา{q || status || period !== 'all' ? ' (กำลังกรองอยู่)' : ''}</summary>
         <form className="row-inline" method="get" style={{ marginTop: 8 }}>
@@ -90,7 +94,7 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
             <tbody>{rows.map(r => (
               <ClickRow key={r.id} href={`/sales/${r.doc_no}`} style={r.status === 'cancelled' ? { opacity: .55 } : undefined}>
                 <td>{dateTh(r.doc_date)}</td>
-                <td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link>{r.is_deposit ? ' (มัดจำ)' : ''}<RelPop rel={relMap.get(r.id) ?? []} /></td>
+                <td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link>{r.is_deposit ? ' (มัดจำ)' : ''}{r.is_combined ? ' (รวม)' : ''}<RelPop rel={relMap.get(r.id) ?? []} /></td>
                 <td>{partyName(r)}</td>{!noDue && <td>{dateTh(r.due_date)}</td>}
                 <td className="num">{money(r.total)}</td><td><Pill s={r.status_view ?? r.status} /></td><td><SalesActions d={r} role={user.role} /></td></ClickRow>))}</tbody></table>
         </div>)}

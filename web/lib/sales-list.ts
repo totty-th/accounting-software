@@ -3,7 +3,7 @@ import { PERIODS, periodRange } from '@/lib/period';
 import { DOC_TYPE } from '@/lib/status';
 
 export const PER_PAGE = [10, 20, 50, 100];
-export type Sp = { type?: string; q?: string; period?: string; from?: string; to?: string; status?: string; page?: string; pp?: string; ids?: string };
+export type Sp = { type?: string; q?: string; period?: string; from?: string; to?: string; status?: string; page?: string; pp?: string; ids?: string; kind?: string };
 
 /** เงื่อนไขกรองรายการเอกสารขาย (ใช้ร่วมกันระหว่างหน้ารายการกับไฟล์ Excel) */
 export function listFilter(sp: Sp, type: string, own: boolean, userId: string) {
@@ -16,7 +16,8 @@ export function listFilter(sp: Sp, type: string, own: boolean, userId: string) {
     and ($7='' or d.doc_no ilike '%'||$7||'%' or c.business_name ilike '%'||$7||'%' or c.contact_name ilike '%'||$7||'%'
       or d.project ilike '%'||$7||'%' or d.ref_no ilike '%'||$7||'%' or d.description ilike '%'||$7||'%'
       or exists (select 1 from sales_doc_lines l where l.doc_id=d.id and (l.description ilike '%'||$7||'%' or l.detail ilike '%'||$7||'%')))
-    and (cardinality($8::uuid[])=0 or d.id = any($8::uuid[]))`;
-  return { q, period, range, where, args: [type, own, userId, sp.status ?? '', range?.[0] ?? null, range?.[1] ?? null, q, ids] as any[] };
+    and (cardinality($8::uuid[])=0 or d.id = any($8::uuid[]))
+    and ($9='' or ($9='combined') = d.is_combined)`;
+  return { q, period, range, where, args: [type, own, userId, sp.status ?? '', range?.[0] ?? null, range?.[1] ?? null, q, ids, ['combined', 'single'].includes(sp.kind ?? '') ? sp.kind : ''] as any[] };
 }
 export const typeOf = (sp: Sp, quotesOnly: boolean) => (quotesOnly ? 'QT' : DOC_TYPE[sp.type ?? ''] ? sp.type! : '');
