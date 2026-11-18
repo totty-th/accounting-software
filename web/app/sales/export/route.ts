@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   if (!type) return Response.json({ error: 'ประเภทเอกสารไม่ถูกต้อง' }, { status: 400 });
   const { where, args, range } = listFilter(sp, type, own, au.id);
   const db = await getDb();
-  const rows = await db.q(`select d.id, d.doc_no, d.doc_date, d.status, d.subtotal, d.vat, d.total, d.ref_no, d.project,
+  const rows = await db.q(`select d.id, d.doc_no, d.doc_date, d.status, d.status_view, d.subtotal, d.vat, d.total, d.ref_no, d.project,
       c.business_name, c.contact_name, c.tax_id, c.branch_code, c.branch_name
     from sales_docs d join contacts c on c.id=d.contact_id where ${where} order by d.doc_date, d.doc_no`, args);
   const rel = rows.length ? await db.q(`select ref_doc_id, doc_no from sales_docs where ref_doc_id = any($1::uuid[]) and status<>'cancelled' order by doc_no`, [rows.map((r: any) => r.id)]) : [];
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
   const skip = new Set(['cancelled', 'rejected']);
   let sub = 0, vat = 0, tot = 0;
   rows.forEach((r: any, i: number) => {
-    const st = STATUS[r.status]?.[0] ?? r.status;
+    const st = STATUS[r.status_view ?? r.status]?.[0] ?? r.status;
     ws.addRow([i + 1, r.doc_no, dateTh(r.doc_date), partyName(r), r.project ?? '', r.tax_id ?? '',
       r.branch_code ? `สาขา ${r.branch_code}${r.branch_name ? ' ' + r.branch_name : ''}` : 'สำนักงานใหญ่',
       Number(r.subtotal), Number(r.vat), Number(r.total), rel.filter((x: any) => x.ref_doc_id === r.id).map((x: any) => x.doc_no).join(', '), r.ref_no ?? '', st]);

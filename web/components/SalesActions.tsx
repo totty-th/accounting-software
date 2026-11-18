@@ -37,6 +37,21 @@ export function SalesActions({ d, role, detail = false }: { d: any; role: Role; 
   if (W && d.doc_type === 'CA' && s === 'collected') out.push(b('รีเซ็ต', A.resetCash.bind(null, d.id)));
   if (W && d.doc_type === 'BL' && d.is_deposit && s === 'billed') out.push(b('สร้างใบแจ้งหนี้มัดจำ (ลงบัญชี)', A.convertDepositBl.bind(null, d.id), ''));
   if (W && (d.doc_type === 'CN' || d.doc_type === 'DN') && s === 'cancelled') out.push(b('รีเซ็ต', A.restoreSalesDoc.bind(null, d.id), '', 'c'));
+  // M64 สถานะแบบ FA: ใบแจ้งหนี้ รอดำเนินการ ⇄ รอเก็บเงิน · ใบวางบิล รอวางบิล/วางบิลแล้ว/เปิดบิลแล้ว · ยกเลิก → รีเซ็ต
+  const sv = (d.status_view ?? s) as string;
+  if (W && d.doc_type === 'INV' && sv === 'inv_pending') out.push(b('วางบิลแล้ว', A.invoiceSetBilled.bind(null, d.id, true), ''));
+  if (W && d.doc_type === 'INV' && s === 'awaiting_payment' && sv === 'awaiting_payment') out.push(b('รีเซ็ต', A.invoiceSetBilled.bind(null, d.id, false)));
+  if (W && d.doc_type === 'BL' && !d.is_deposit) {
+    if (s === 'pending_billing') out.push(b('วางบิลแล้ว', A.billingNoteSetStatus.bind(null, d.id, 'billed'), ''));
+    if (s === 'pending_billing' || s === 'billed') {
+      out.push(b('เปิดบิลแล้ว', A.billingNoteSetStatus.bind(null, d.id, 'invoice_opened')));
+      if (!Number(d.deposit_net)) out.push(b('สร้างใบแจ้งหนี้', A.billingNoteToInvoice.bind(null, d.id), 'ghost', 'สร้างใบแจ้งหนี้จากใบวางบิลนี้? (ลงบัญชีลูกหนี้ทันที)'));
+    }
+    if (s === 'billed' || s === 'invoice_opened') out.push(b('รีเซ็ต', A.billingNoteSetStatus.bind(null, d.id, 'pending_billing')));
+  }
+  if (W && ['INV', 'CA', 'BL'].includes(d.doc_type) && s === 'cancelled' && !d.is_deposit && !Number(d.deposit_net))
+    out.push(b('รีเซ็ต', A.resetCancelledSalesDoc.bind(null, d.id), '', 'รีเซ็ตเอกสารที่ยกเลิก? (ลงบัญชีใหม่และตัดสต็อกใหม่)'));
+  if (W && d.doc_type === 'CA' && s === 'collected' && detail) out.push(b('แก้ไขข้อมูลการเก็บเงิน', A.resetCash.bind(null, d.id), 'ghost', 'แก้ไขข้อมูลการเก็บเงิน? ระบบจะกลับรายการเก็บเงินเดิม แล้วให้บันทึกการเก็บเงินใหม่'));
   if ((W || (can(role, 'quote.own') && d.doc_type === 'QT')) && s !== 'cancelled' && s !== 'converted' && s !== 'rejected') out.push(cancel);
   return detail ? <>{out}</> : <ActsMenu float>{out}</ActsMenu>;
 }

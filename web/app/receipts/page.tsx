@@ -35,6 +35,7 @@ export default async function Receipts() {
                     {W && r.status === 'pending' && <ActionButton label="เก็บเงิน" action={A.collectReceipt.bind(null, r.id)} />}
                     {W && r.status === 'collected' && <ActionButton label="รีเซ็ต" variant="ghost" action={A.resetReceipt.bind(null, r.id)} />}
                     {W && r.status !== 'cancelled' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={A.cancelReceipt.bind(null, r.id)} />}
+                    {W && r.status === 'cancelled' && <ActionButton label="รีเซ็ต" variant="ghost" confirmText="รีเซ็ตใบเสร็จที่ยกเลิก? (กลับเป็นรอดำเนินการ)" action={A.resetCancelledReceipt.bind(null, r.id)} />}
                   </div></td></ClickRow>))}</tbody></table>
           </Group>);
       })}

@@ -27,14 +27,14 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
   const type = typeOf(searchParams, scope === 'own-quotes');
   if (!type) redirect('/sales?type=INV');                        // เมนูย่อยแยกตามประเภท ไม่มีหน้ารวม
   const db = await getDb();
-  const statuses = (await db.q(`select distinct status from sales_docs where doc_type=$1 and (not $2 or created_by=$3)`, [type, own, user.id])).map((r: any) => r.status as string);
+  const statuses = (await db.q(`select distinct status_view status from sales_docs where doc_type=$1 and (not $2 or created_by=$3)`, [type, own, user.id])).map((r: any) => r.status as string);
   const status = statuses.includes(searchParams.status ?? '') ? searchParams.status! : '';
   const { q, period, where, args } = listFilter({ ...searchParams, status, ids: '' }, type, own, user.id);
   const pp = PER_PAGE.includes(Number(searchParams.pp)) ? Number(searchParams.pp) : 20;
   const page = Math.max(1, Number(searchParams.page) || 1);
   const [{ n, sum }] = await db.q(`select count(*)::int n, coalesce(sum(d.total) filter (where d.status not in ('cancelled','rejected')),0) sum
     from sales_docs d join contacts c on c.id=d.contact_id where ${where}`, args);
-  const rows = await db.q(`select d.id, d.doc_type, d.doc_no, d.doc_date, d.due_date, d.status, d.total, d.is_deposit, d.project, d.vat_rate, d.subtotal, c.business_name, c.contact_name
+  const rows = await db.q(`select d.id, d.doc_type, d.doc_no, d.doc_date, d.due_date, d.status, d.status_view, d.deposit_net, d.total, d.is_deposit, d.project, d.vat_rate, d.subtotal, c.business_name, c.contact_name
     from sales_docs d join contacts c on c.id=d.contact_id where ${where}
     order by d.doc_date desc, d.doc_no desc limit ${pp} offset ${(page - 1) * pp}`, args);
   const pages = Math.max(1, Math.ceil(n / pp));
@@ -92,7 +92,7 @@ export default async function Sales({ searchParams }: { searchParams: Sp }) {
                 <td>{dateTh(r.doc_date)}</td>
                 <td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link>{r.is_deposit ? ' (มัดจำ)' : ''}<RelPop rel={relMap.get(r.id) ?? []} /></td>
                 <td>{partyName(r)}</td>{!noDue && <td>{dateTh(r.due_date)}</td>}
-                <td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td><td><SalesActions d={r} role={user.role} /></td></ClickRow>))}</tbody></table>
+                <td className="num">{money(r.total)}</td><td><Pill s={r.status_view ?? r.status} /></td><td><SalesActions d={r} role={user.role} /></td></ClickRow>))}</tbody></table>
         </div>)}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
         <span className="sub">{n} รายการ · หน้า {page}/{pages} · รายการต่อหน้า {PER_PAGE.map(x => x === pp ? <b key={x}> {x}</b> : <Link key={x} href={href(sp, { pp: String(x), page: '' })}> {x}</Link>)}</span>

@@ -131,7 +131,7 @@ describe('M18.11 เรียกเก็บเงินจากใบเสน
     const q = await mk(); await approve(q);
     const b = await bill(q, 'BL');
     const d = await get(b);
-    expect([d.doc_type, d.status, +d.total, d.voucher_id, d.ref_doc_id]).toEqual(['BL', 'billed', 2140, null, q]);
+    expect([d.doc_type, d.status, +d.total, d.voucher_id, d.ref_doc_id]).toEqual(['BL', 'pending_billing', 2140, null, q]);   // M64: ใบวางบิลเริ่มที่รอวางบิล (FA)
     expect(+(await one<any>('select count(*) c from sales_doc_lines where doc_id=$1', [b])).c).toBe(1);
     expect(await st(q)).toBe('converted');
     expect(+(await sum(q)).billed).toBe(0);   // ใบวางบิลไม่นับเป็นยอดเรียกเก็บ
@@ -139,7 +139,7 @@ describe('M18.11 เรียกเก็บเงินจากใบเสน
     expect(await st(q)).toBe('approved');
     const b2 = await bill(q, 'BL');
     await db.query('select reset_quotation($1)', [q]);
-    expect([await st(q), await st(b2)]).toEqual(['pending_approval', 'billed']);
+    expect([await st(q), await st(b2)]).toEqual(['pending_approval', 'pending_billing']);
   });
   it('ข้อมูลจัดส่งตามไปกับใบแจ้งหนี้ที่แบ่งจ่าย', async () => {
     const q = await mk(); await approve(q);

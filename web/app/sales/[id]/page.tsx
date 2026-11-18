@@ -57,7 +57,7 @@ export default async function SalesDetail({ params }: { params: { id: string } }
   return (
     <>
       <div className="top noprint">
-        <div><h1>{v.doc.doc_no} <Pill s={v.doc.status} /></h1>
+        <div><h1>{v.doc.doc_no} <Pill s={(v.doc as any).status_view ?? v.doc.status} /></h1>
           <p className="sub"><Link href={`/sales?type=${v.doc.doc_type}`}>← {DOC_TYPE[v.doc.doc_type]}</Link></p></div>
         <div className="acts"><PrintButton />
         <a className="btn ghost" href={`/sales/${v.doc.doc_no}/pdf`}>ดาวน์โหลด PDF</a>

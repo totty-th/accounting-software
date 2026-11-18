@@ -13,7 +13,7 @@ import { ReportTools } from '@/components/ReportTools';
 export const dynamic = 'force-dynamic';
 type Sp = { period?: string; from?: string; to?: string; st?: string | string[] };
 // รายงานใบวางบิล (ตามต้นแบบ): แสดงใบวางบิลทุกสถานะที่เลือก แต่ยอดรวมไม่นับใบที่ยกเลิก · ใบวางบิลไม่ลงบัญชี (เป็นเอกสารเรียกเก็บ ไม่ใช่รายได้)
-const STATUSES = ['billed', 'receipt_opened', 'collected', 'cancelled'];
+const STATUSES = ['pending_billing', 'billed', 'invoice_opened', 'receipt_opened', 'collected', 'cancelled'];   // M64: สถานะใบวางบิลแบบ FA
 
 export default async function BillingReport({ searchParams }: { searchParams: Sp }) {
   await requirePage('reports.read');

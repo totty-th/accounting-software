@@ -111,7 +111,7 @@ export default async function Home({ searchParams }: { searchParams: { p?: strin
            (select count(*) from expenses where status in ('pending','approved')) ex,
            (select count(*) from sales_docs where doc_type='QT' and status='pending_approval') qt,
            (select count(*) from stock_alerts) alerts`))[0];
-  const recent = await db.q(`select d.id, d.doc_type, d.doc_no, d.doc_date, d.status, d.total, c.business_name, c.contact_name
+  const recent = await db.q(`select d.id, d.doc_type, d.doc_no, d.doc_date, d.status_view status, d.total, c.business_name, c.contact_name
      from sales_docs d join contacts c on c.id=d.contact_id order by d.created_at desc limit 6`);
 
   type Alert = { lv: 'bad' | 'warn' | 'ok'; text: string; href?: string };

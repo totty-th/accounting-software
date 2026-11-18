@@ -77,6 +77,12 @@ export async function createSalesDoc(p: { type: string; date: string; contact: s
 const callAs = (uid: string, fn: string, ...p: unknown[]) =>
   call(`select ${fn.replace(/\$(\d+)/g, (_, n) => '$' + (Number(n) + 1))} from (select set_config('app.user_id',$1,true)) s`, uid, ...p)();
 export const cancelSalesDoc = async (id: string) => run(u => callAs(u.id, 'cancel_sales_doc($1)', id), ALL, salesDocGate(id));
+// M64 สถานะแบบ FA
+export const invoiceSetBilled = async (id: string, billed: boolean) => run(u => callAs(u.id, 'invoice_set_billed($1,$2)', id, billed), ALL, salesDocGate(id));
+export const billingNoteSetStatus = async (id: string, to: string) => run(u => callAs(u.id, 'billing_note_set_status($1,$2)', id, to), ALL, salesDocGate(id));
+export const billingNoteToInvoice = async (id: string) => run(u => callAs(u.id, 'billing_note_to_invoice($1, today_th())', id), ALL, 'sales.write');
+export const resetCancelledSalesDoc = async (id: string) => run(u => callAs(u.id, 'reset_cancelled_sales_doc($1)', id), ALL, 'sales.write');
+export const resetCancelledReceipt = async (id: string) => run(u => callAs(u.id, 'reset_cancelled_receipt($1)', id), ALL, 'receipts.write');
 export const restoreSalesDoc = async (id: string) => run(u => callAs(u.id, 'restore_sales_doc($1)', id), ALL, 'sales.write');
 export const saveSalesNote = async (id: string, note: string) =>
   run(u => callAs(u.id, 'set_sales_doc_note($1,$2)', id, note), [`/sales/${id}`], salesDocGate(id));
