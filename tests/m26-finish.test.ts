@@ -25,7 +25,7 @@ describe('M26.2 ขายติดลบ 3 ระดับ', () => {
     await db.query("select set_stock_settings('allow', true)"); await sell(1);
     await db.query("select set_stock_settings('block', true)");
     expect(await err(sell(5))).toContain('สต็อกไม่พอ');
-    await db.exec("delete from stock_movements where doc_no='INV-X'; update product_stock set qty=10, value=13800");
+    await db.exec("update stock_movements set voided_at=now() where doc_no='INV-X'; update product_stock set qty=10, value=13800");   // M66: ลบตรง ๆ ไม่ได้แล้ว
     await sell(10);                                                    // พอดีคงเหลือ → ผ่าน
   });
   it('block ระดับบริษัทไม่ครอบคลุมปรับยอด (ใช้กฎของสินค้า)', async () => {
