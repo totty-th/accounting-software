@@ -65,6 +65,9 @@ describe('M18.3 ใบสั่งซื้อ (PO)', () => {
     expect(await err(call('select upgrade_po_to_ri($1)', [id]))).toContain('รออนุมัติหรืออนุมัติแล้ว');
     // M25.5: รีเซ็ต PO ที่ดำเนินการแล้วได้ (กลับรออนุมัติ ไม่แตะ RI) ตามที่ทดสอบบน FA
     await call('select reset_purchase_order($1)', [id]); expect(await st('purchase_orders', id)).toBe('pending'); expect(await st('goods_receipts', r)).toBe('unpaid');
+    // M69.1 (เจ้าของระบบ 18-11-2026): สร้าง RI ซ้ำขณะใบเดิมยังมีผลไม่ได้ ต้องยกเลิกใบเดิมก่อน
+    expect(await err(call('select upgrade_po_to_ri($1)', [id]))).toContain('ยังมีผลอยู่');
+    await call('select cancel_goods_receipt($1)', [r]);
     await call('select upgrade_po_to_ri($1)', [id]);
     expect(await err(call('select cancel_purchase_order($1)', [id]))).toContain('ยังไม่ดำเนินการ');
   });

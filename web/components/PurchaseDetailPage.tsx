@@ -84,7 +84,7 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
               <PayForm net={net} banks={banks} cards={cards} petties={petties} allowShort={kind === 'RI'}
                 onPay={(kind === 'EXP' ? A.payExpense : A.payGoodsReceipt).bind(null, id) as any} /></details>)}
           {AP && (st === pendingKey || st === 'approved') && <ActionButton label="ไม่อนุมัติ" variant="ghost" action={(A_.reject as any).bind(null, id)} />}
-          {W && (kind === 'PO' ? ['approved', 'rejected', 'converted', 'partial'] : ['approved', 'paid', 'rejected']).includes(st) && <ActionButton label="รีเซ็ต" variant="ghost" confirmText={kind === 'PO' && (st === 'partial' || st === 'converted') ? 'ยืนยันการรีเซ็ต: อาจทำให้เปิดบิลซ้ำหรือรับเข้าสต็อกซ้ำได้ หากมียอดแบ่งจ่ายเหลือต้องเริ่มแบ่งจ่ายใหม่' : undefined} action={(A_.reset as any).bind(null, id)} />}
+          {W && (kind === 'PO' ? ['approved', 'rejected', 'converted', 'partial'] : ['approved', 'paid', 'rejected']).includes(st) && <ActionButton label="รีเซ็ต" variant="ghost" confirmText={kind === 'PO' && (st === 'partial' || st === 'converted') ? 'ยืนยันการรีเซ็ต: PO กลับเป็นรออนุมัติ · ใบรับสินค้าเดิมไม่ถูกแตะ — จะสร้างใบรับใหม่ได้ต่อเมื่อยกเลิกหรือไม่อนุมัติใบเดิมก่อน (กันรับซ้ำ)' : undefined} action={(A_.reset as any).bind(null, id)} />}
           {W && st !== 'cancelled' && st !== 'converted' && st !== 'partial' && <ActionButton label="ยกเลิก" variant="danger" confirmText="c" action={(A_.cancel as any).bind(null, id)} />}
         </ActsMenu></div>
       </div>

@@ -159,3 +159,59 @@ describe('สถานการณ์ E: ข้อผิดพลาด', () => 
   });
 });
 
+
+describe('M69.1 กฎรับสินค้าจาก PO (เจ้าของระบบตัดสินใจ 18-11-2026)', () => {
+  const mkP = async (c: string) => (await one(`insert into products(code,name,kind,sale_price,base_unit) values ($1,$1,'goods_stock',0,'แผ่น') returning id`, [c])).id as string;
+  const mkPo = async (p: string, qty: number, approve = true) => {
+    const id = (await one('select save_purchase_order(null,$1::jsonb,$2::jsonb) id', [J({ date: '2026-11-20', contact: sup }), J([{ product_id: p, qty, unit_price: 850 }])])).id;
+    if (approve) await db.query('select approve_purchase_order($1)', [id]); return id as string;
+  };
+  const st = async (po: string) => (await one('select status from purchase_orders where id=$1', [po])).status;
+  it('ข้อ 1: รีเซ็ต PO แล้วสร้าง/แบ่งรับซ้ำไม่ได้ขณะใบเดิมยังมีผล · ยกเลิกใบเดิมแล้วสร้างใหม่ได้ (สต็อกไม่ซ้ำ)', async () => {
+    const p = await mkP('R1'); const po = await mkPo(p, 100);
+    const r1 = (await one(`select upgrade_po_to_ri($1) id`, [po])).id;
+    await db.query('select reset_purchase_order($1)', [po]);
+    expect(await err(one(`select upgrade_po_to_ri($1)`, [po]))).toContain('ยังมีผลอยู่');
+    await db.query('select approve_purchase_order($1)', [po]);
+    expect(await err(one(`select split_ri_from_po_qty($1,'2026-11-20'::date,'[{"line_no":1,"qty":100}]'::jsonb)`, [po]))).toContain('ยังมีผลอยู่');
+    expect(await oh(p)).toBe(100);
+    await db.query('select cancel_goods_receipt($1)', [r1]);
+    await one(`select upgrade_po_to_ri($1) id`, [po]);
+    expect(await oh(p)).toBe(100);
+  });
+  it('ข้อ 1: RI ที่ไม่อนุมัติแล้วมีใบใหม่ → รีเซ็ตใบเก่ากลับมามีผลไม่ได้', async () => {
+    const p = await mkP('R2'); const po = await mkPo(p, 10, false);
+    const r1 = (await one(`select upgrade_po_to_ri($1) id`, [po])).id;
+    await db.query('select reject_goods_receipt($1)', [r1]); await db.query('select reset_purchase_order($1)', [po]);
+    await one(`select upgrade_po_to_ri($1) id`, [po]);
+    expect(await err(db.query('select reset_goods_receipt($1)', [r1]))).toContain('ยังมีผลอยู่');
+    expect(await oh(p)).toBe(10);
+  });
+  it('ข้อ 2: แก้ RI เต็มใบเกิน PO ต้องยืนยัน · ยืนยันแล้วบันทึกได้', async () => {
+    const p = await mkP('R3'); const po = await mkPo(p, 100);
+    const r = (await one(`select upgrade_po_to_ri($1) id`, [po])).id;
+    expect(await err(edit(r, [{ product_id: p, qty: 120, unit_price: 850 }]))).toContain('OVER_PO');
+    expect(await oh(p)).toBe(100);
+    await edit(r, [{ product_id: p, qty: 120, unit_price: 850 }], { allow_over_po: true });
+    expect(await oh(p)).toBe(120); expect(await st(po)).toBe('converted');
+  });
+  it('ข้อ 2: แก้ลด 100 → 80 → PO แบ่งจ่าย รับ 20 ที่เหลือได้ เกิน 20 ไม่ได้ · ครบแล้ว PO ดำเนินการแล้ว', async () => {
+    const p = await mkP('R4'); const po = await mkPo(p, 100);
+    const r = (await one(`select upgrade_po_to_ri($1) id`, [po])).id;
+    await edit(r, [{ product_id: p, qty: 80, unit_price: 850 }]);
+    expect(await st(po)).toBe('partial');
+    expect(+(await one('select po_line_billed_qty($1,1) v', [po])).v).toBe(80);
+    expect(await err(one(`select split_ri_from_po_qty($1,'2026-11-21'::date,'[{"line_no":1,"qty":21}]'::jsonb)`, [po]))).toContain('เกินจำนวนคงเหลือ');
+    await one(`select split_ri_from_po_qty($1,'2026-11-21'::date,'[{"line_no":1,"qty":20}]'::jsonb)`, [po]);
+    expect(await st(po)).toBe('converted'); expect(await oh(p)).toBe(100);
+    // ใบแรกแก้กลับขึ้นได้ไม่เกินที่เหลือ
+    expect(await err(edit(r, [{ line_no: 1, qty: 81 }]))).toContain('เหลือจำนวนที่แบ่งได้ 80');
+  });
+  it('ข้อ 2: แก้ลดพร้อมแก้ราคา → คงเป็นรับเต็มใบ (ใบแบ่งรับล็อกราคาตาม PO)', async () => {
+    const p = await mkP('R5'); const po = await mkPo(p, 4);
+    const r = (await one(`select upgrade_po_to_ri($1) id`, [po])).id;
+    await edit(r, [{ product_id: p, qty: 3, unit_price: 900 }]);
+    expect((await one('select split_mode from goods_receipts where id=$1', [r])).split_mode).toBeNull();
+    expect(await st(po)).toBe('converted');
+  });
+});
