@@ -483,3 +483,32 @@ a.db-card{transition:transform .12s,box-shadow .12s}a.db-card:hover{transform:tr
 .dv-legend i.ln{width:16px;height:3px;border-radius:2px;vertical-align:middle}
 .db-recent table{min-width:640px}.db-recent{margin-bottom:16px}
 .db-recent td,.db-recent th{white-space:nowrap}
+
+/* M71 บันทึกจากรูปบิล/PDF */
+.scan-desk{display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px;align-items:start}
+.scan-desk .scan-form{grid-column:1/-1;min-width:0}
+@media (min-width:1500px){.scan-desk{grid-template-columns:230px minmax(0,0.9fr) minmax(0,1.3fr)}.scan-desk .scan-form{grid-column:auto}}
+@media (max-width:760px){.scan-desk{grid-template-columns:1fr}}
+.scan-files{padding:12px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+.scan-files.drag{outline:2px dashed var(--brand);outline-offset:-4px}
+.scan-files ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.scan-files li{display:flex;align-items:center;border-radius:8px;border:1px solid transparent}
+.scan-files li.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,transparent)}
+.scan-count{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px}
+.scan-item{flex:1;min-width:0;display:flex;gap:8px;align-items:center;background:none;border:0;padding:6px;text-align:left;cursor:pointer;color:inherit;font:inherit}
+.scan-ico{flex:none;font-size:10px;font-weight:700;letter-spacing:.04em;width:34px;height:40px;display:grid;place-items:center;border-radius:4px;background:var(--line);color:var(--muted)}
+.scan-meta{min-width:0;display:grid}
+.scan-meta b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scan-meta small{font-size:11px;color:var(--muted)}
+.scan-x{flex:none;background:none;border:0;font-size:18px;line-height:1;padding:4px 8px;cursor:pointer;color:var(--muted)}
+.scan-x:hover{color:var(--red)}
+.scan-view{padding:10px;position:sticky;top:12px;min-width:0}
+.scan-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.scan-name{flex:1;min-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.scan-canvas{height:calc(100vh - 140px);min-height:360px;overflow:auto;background:var(--line);border-radius:8px;display:grid;place-items:start center}
+.scan-canvas img{max-width:100%;transform-origin:top center;transition:transform .15s;display:block;margin:8px auto}
+.scan-canvas iframe{width:100%;height:100%;border:0;background:#fff}
+.scan-empty{height:240px;display:grid;place-items:center;text-align:center}
+.scan-msg{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;margin-bottom:10px;background:color-mix(in srgb,var(--green) 15%,transparent)}
+.scan-msg.err{background:color-mix(in srgb,var(--red) 15%,transparent)}
+.scan-msg .scan-x{margin-left:auto}

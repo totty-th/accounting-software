@@ -772,3 +772,32 @@ export const deletePayrollRun = async (id: string) =>
   run(u => callAs(u.id, 'delete_payroll_run($1)', id), PAYROLL, 'payroll.write');
 export const cancelPayrollRun = async (id: string) =>
   run(u => callAs(u.id, 'cancel_payroll_run($1)', id), PAYROLL.concat(`/payroll/${id}`), 'payroll.write');
+
+// ===== M71 บันทึกค่าใช้จ่ายจากรูปบิล/PDF (โมดูลเสริม) =====
+const SCAN = ['/expenses/scan', '/expenses/scan/history', '/settings/modules'];
+export const setModuleEnabled = async (key: 'scan', on: boolean) =>
+  run(u => call(`update app_modules set enabled=$1, updated_at=now(), updated_by=$2 where key=$3`, on, u.id, key)(), [...SCAN, '/', '/expenses'], ['settings.company', 'payroll.write']);
+/** อัปโหลดหลายไฟล์พร้อมกัน (รูป ≤ 4 MB / PDF ≤ 7.5 MB) → คืน id ที่สร้าง */
+export async function uploadScanFiles(f: FormData): Promise<Result & { ids?: string[] }> {
+  const files = f.getAll('file').filter((x): x is File => typeof x !== 'string' && x.size > 0);
+  if (!files.length) return { error: 'กรุณาเลือกไฟล์' };
+  const total = files.reduce((s, x) => s + x.size, 0);
+  if (total > 7.5 * 1024 * 1024) return { error: 'ไฟล์รวมกันใหญ่เกินไป กรุณาอัปโหลดทีละน้อยลง (รวมไม่เกิน 7.5 MB ต่อครั้ง)' };
+  const ids: string[] = [];
+  const r = await run(async u => {
+    for (const x of files) {
+      const b64 = Buffer.from(await x.arrayBuffer()).toString('base64');
+      const row = (await callAs(u.id, "doc_scan_add($1,$2,decode($3,'base64')) as id", x.name, x.type, b64)) as any[];
+      ids.push(row[0].id);
+    }
+  }, SCAN, 'expenses.write');
+  return { ...r, ids };
+}
+export const discardScan = async (id: string) => run(u => callAs(u.id, 'doc_scan_discard($1)', id), SCAN, 'expenses.write');
+export const restoreScan = async (id: string) => run(u => callAs(u.id, 'doc_scan_restore($1)', id), SCAN, 'expenses.write');
+export async function saveExpenseFromScan(scan: string, header: Record<string, unknown>, lines: any[]): Promise<Result & { id?: string }> {
+  let out: string | undefined;
+  const r = await run(async u => { out = ((await callAs(u.id, 'doc_scan_save_expense($1::uuid,$2::jsonb,$3::jsonb) as id', scan, JSON.stringify(header), JSON.stringify(lines))) as any[])[0].id; },
+    [...ALL, ...SCAN, '/expenses'], 'expenses.write');
+  return { ...r, id: out };
+}

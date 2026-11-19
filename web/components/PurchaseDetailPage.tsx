@@ -56,6 +56,8 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
   const ris = kind === 'PO' ? await db.q<any>(`select id, ri_no, status from goods_receipts where po_id=$1 or id=$2 order by ri_no`, [id, h.ri_id ?? null]) : [];
   const ri = ris[0] ?? null;
   const [back, backName] = BACK[kind];
+  // M71: ค่าใช้จ่ายที่บันทึกจากรูปบิล/PDF → ลิงก์ไปไฟล์ต้นฉบับ
+  const scan = kind === 'EXP' ? await db.q<any>(`select id, filename from doc_scans where expense_id=$1`, [id]).then(r => r[0], () => null) : null;
   const payable = kind === 'EXP' ? ['pending', 'approved'] : ['unpaid', 'approved'];
   const net = Number(h.total) - Number(h.wht_total);
   const A_ = kind === 'EXP' ? { approve: A.approveExpense, reject: A.rejectExpense, reset: A.resetExpense, cancel: A.cancelExpense }
@@ -66,7 +68,8 @@ export async function PurchaseDetailPage({ kind, id }: { kind: 'EXP' | 'RI' | 'P
   return (
     <>
       <div className="top noprint">
-        <div><h1>{v.no} <Pill s={pillKey} /></h1><p className="sub"><Link href={back}>← {backName}</Link></p></div>
+        <div><h1>{v.no} <Pill s={pillKey} /></h1><p className="sub"><Link href={back}>← {backName}</Link>
+          {scan && <> · <a href={`/expenses/scan/file/${scan.id}?inline=1`} target="_blank" rel="noreferrer">ไฟล์ต้นฉบับ: {scan.filename}</a></>}</p></div>
         <div className="acts"><PrintButton />
         <a className="btn ghost" href={`/purchases/${kind.toLowerCase()}/${id}/pdf`}>ดาวน์โหลด PDF</a>
         <ActsMenu dropdown>

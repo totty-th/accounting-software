@@ -1,9 +1,11 @@
-import { getDb } from './db';
-/** โมดูลเสริมที่เปิดใช้ (ซ่อนเมนูเมื่อปิด) — ถ้าตารางยังไม่มี (ฐานเก่า) ถือว่าปิด */
+import { getDb } from '@/lib/db';
+
+/** โมดูลเสริมที่เปิดอยู่ · payroll เก็บใน payroll_settings (เดิม) · โมดูลอื่นเก็บใน app_modules */
 export async function enabledModules(): Promise<string[]> {
-  try {
-    const r = await (await getDb()).q<{ enabled: boolean }>(`select enabled from payroll_settings limit 1`);
-    return r[0]?.enabled ? ['payroll'] : [];
-  } catch { return []; }
+  const db = await getDb(); const out: string[] = [];
+  try { const r = await db.q<{ enabled: boolean }>(`select enabled from payroll_settings limit 1`); if (r[0]?.enabled) out.push('payroll'); } catch {}
+  try { (await db.q<{ key: string }>(`select key from app_modules where enabled`)).forEach(r => out.push(r.key)); } catch {}
+  return out;
 }
 export const payrollEnabled = async () => (await enabledModules()).includes('payroll');
+export const scanEnabled = async () => (await enabledModules()).includes('scan');

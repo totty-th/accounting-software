@@ -7,7 +7,7 @@ import { can, type Perm } from '@/lib/permissions';
 
 // เมนูจัดกลุ่มแบบ FA (REA 29-10-2026): หมวดหลัก 1 ระดับ → รายการย่อย (บางหมวดมีหัวข้อย่อยคั่น) · เปิดได้ทีละหมวด หมวดที่อยู่ในหน้าปัจจุบันเปิดให้อัตโนมัติ
 // ไม่เปลี่ยนที่อยู่หน้าเดิม: เปลี่ยนเฉพาะการจัดเรียง/ชื่อกลุ่มเมนู
-type Item = { href: string; label: string; perms: Perm[]; gap?: boolean; head?: string };
+type Item = { href: string; label: string; perms: Perm[]; gap?: boolean; head?: string; module?: string };
 type Group = { key: string; label: string; c: string; href?: string; perms?: Perm[]; items?: Item[]; module?: string };
 
 const R: Perm[] = ['reports.read'];
@@ -31,6 +31,7 @@ const GROUPS: Group[] = [
     { href: '/purchases', label: 'ใบรับสินค้า', perms: ['expenses.read', 'buy.own'] }] },
   { key: 'exp', label: 'ค่าใช้จ่าย', c: 'var(--purple)', items: [
     { href: '/expenses', label: 'ค่าใช้จ่าย', perms: ['expenses.read', 'expenses.own', 'buy.own'] },
+    { href: '/expenses/scan', label: 'บันทึกจากรูปบิล/PDF', perms: ['expenses.write'], module: 'scan' },
     { href: '/wht', label: 'หัก ณ ที่จ่าย (50 ทวิ)', perms: ['wht.read', 'buy.own'] },
     { href: '/payments', label: 'ใบเตรียมจ่าย', perms: ['expenses.read'] },
     { href: '/assets', label: 'จัดการสินทรัพย์', perms: ['expenses.read'], gap: true },
@@ -94,7 +95,7 @@ const GROUPS: Group[] = [
     { href: '/settings/lock', label: 'ล็อกงวดบัญชี', perms: R },
     { href: '/settings/opening-balance', label: 'ยอดเริ่มต้น', perms: R },
     { href: '/stock/settings', label: 'ตั้งค่าสต็อก', perms: ['stock.read'] },
-    { href: '/settings/modules', label: 'โมดูลเสริม', perms: ['payroll.write'] },
+    { href: '/settings/modules', label: 'โมดูลเสริม', perms: ['payroll.write', 'settings.company'] },
     { href: '/settings/users', label: 'ผู้ใช้และสิทธิ์', perms: ['users.manage'] },
     { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', perms: R },
     { href: '/settings/preferences', label: 'ตั้งค่าส่วนตัว', perms: R },
@@ -135,7 +136,7 @@ export function Nav({ modules = [] }: { modules?: string[] }) {
           if (!g.perms!.some(p => can(role, p))) return null;
           return <Link key={g.key} href={g.href} className={`grp ${act === g.href ? 'on' : ''}`} style={{ ['--c' as any]: g.c }}><i className="dot" style={{ ['--c' as any]: g.c }} />{g.label}</Link>;
         }
-        const items = g.items!.filter(i => i.perms.some(p => can(role, p)));
+        const items = g.items!.filter(i => (!i.module || modules.includes(i.module)) && i.perms.some(p => can(role, p)));
         if (!items.length) return null;
         const open = openKey === g.key;
         return (

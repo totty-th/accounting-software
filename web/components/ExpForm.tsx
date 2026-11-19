@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveExpenseFull, saveExpenseFromPo, quickCreateVendor } from '@/lib/actions';
+import { saveExpenseFull, saveExpenseFromPo, saveExpenseFromScan, quickCreateVendor } from '@/lib/actions';
 import type { Vendor } from '@/components/PoForm';
 
 interface Acc { id: string; label: string }
@@ -13,7 +13,9 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2,
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 
 /** ค่าใช้จ่าย: ฟอร์มเต็มตามแบบ FlowAccount (REA 24-10-2026) */
-export function ExpForm({ vendors: v0, accounts, assetCats = [], today, purchaser, canCreateVendor, fromPo, remark = '', lv }: {
+export function ExpForm({ vendors: v0, accounts, assetCats = [], today, purchaser, canCreateVendor, fromPo, remark = '', lv, scanId, onSaved }: {
+  /** M71 บันทึกจากไฟล์เอกสาร: บันทึกแล้วผูกไฟล์ และเรียก onSaved แทนการเปลี่ยนหน้า */
+  scanId?: string; onSaved?: (expenseId: string) => void;
   remark?: string;
   lv?: { vat: string; discount: string; wht: string };
   vendors: Vendor[]; accounts: Acc[]; assetCats?: Acc[]; today: string; purchaser: string; canCreateVendor: boolean;
@@ -57,8 +59,9 @@ export function ExpForm({ vendors: v0, accounts, assetCats = [], today, purchase
     const body = act.map(l => ({ description: l.description, ...(l.account.startsWith('asset:') ? { asset_category: l.account.slice(6) } : { account: l.account }), unit: l.unit, qty: Number(l.qty), unit_price: Number(l.unit_price),
       discount_type: l.dtype, discount_value: Number(l.dval) || 0, vat: l.vat, wht_rate: Number(l.wht) || 0 }));
     const head = { ...h, credit_days: Number(h.credit_days) || 0 };
-    const r = fromPo ? await saveExpenseFromPo(fromPo.id, head, body) : await saveExpenseFull(head, body);
+    const r = scanId ? await saveExpenseFromScan(scanId, head, body) : fromPo ? await saveExpenseFromPo(fromPo.id, head, body) : await saveExpenseFull(head, body);
     if (r.error) return setErr(r.error);
+    if (scanId && onSaved && r.id) return onSaved(r.id);
     router.push(r.id ? `/expenses/${r.id}` : '/expenses'); router.refresh();
   });
   const makeVendor = () => start(async () => {

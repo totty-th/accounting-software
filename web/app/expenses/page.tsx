@@ -8,6 +8,7 @@ import { CardForm, PettyForm } from '@/components/CardForm';
 import { related } from '@/lib/related';
 import { DocList, type DocRow } from '@/components/DocList';
 import { STATUS } from '@/lib/status';
+import { scanEnabled } from '@/lib/modules';
 
 export default async function Expenses() {
   const user = await requirePage(['expenses.read', 'expenses.own', 'buy.own']);
@@ -26,7 +27,9 @@ export default async function Expenses() {
   return (
     <>
       <div className="top"><div><h1>ค่าใช้จ่าย</h1><p className="sub">บันทึกแล้วตั้งเจ้าหนี้ทันที จ่ายเงินแล้วออกหนังสือรับรองหัก ณ ที่จ่ายให้อัตโนมัติ · คลิกแถวเพื่อเปิดเอกสาร</p></div>
-        {W && <Link className="btn" href="/expenses/new">+ ค่าใช้จ่ายใหม่</Link>}</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {can(user.role, 'expenses.write') && (await scanEnabled()) && <Link className="btn ghost" href="/expenses/scan">บันทึกจากรูปบิล/PDF</Link>}
+          {W && <Link className="btn" href="/expenses/new">+ ค่าใช้จ่ายใหม่</Link>}</div></div>
       {MW && <><CardForm /><PettyForm /></>}
       <DocList rows={list} showDue empty="ยังไม่มีค่าใช้จ่าย" />
     </>
