@@ -43,8 +43,9 @@ const MATRIX: Record<Role, readonly Perm[]> = {
   accountant: [...READ_ALL, ...ACCOUNTING_WRITE, 'payroll.read', 'payroll.write'],
   // ฝ่ายขาย: ใบเสนอราคาของตัวเองอย่างเดียว + ดูรายชื่อลูกค้า/สินค้า (ไม่เห็นราคาซื้อ) + เพิ่มลูกค้าได้
   sales: ['quote.own', 'master.read', 'contact.create'],
-  // Super admin และ IT สิทธิ์เท่ากัน: จัดการผู้ใช้/สิทธิ์/ตั้งค่า + ดูข้อมูลทั้งหมดแบบอ่านอย่างเดียว (ร่าง รอยืนยัน)
-  super_admin: [...READ_ALL, 'settings.company', 'users.manage'],
+  // Super admin: ทำได้ทุกอย่าง = สิทธิ์เจ้าของ + จัดการผู้ใช้/ตั้งค่า (เจ้าของระบบตัดสินใจ 19-11-2026 "อยากให้ทำได้ทุกอย่าง")
+  super_admin: [...READ_ALL, ...ACCOUNTING_WRITE, 'sales.approve', 'expenses.approve', 'payroll.read', 'payroll.write', 'settings.company', 'users.manage'],
+  // IT: จัดการผู้ใช้/สิทธิ์/ตั้งค่า + ดูข้อมูลทั้งหมดแบบอ่านอย่างเดียว (ร่าง รอยืนยัน)
   it: [...READ_ALL, 'settings.company', 'users.manage'],
   // ตำแหน่งตาม FA (M14.3) — FA: สำนักงานบัญชี ≈ นักบัญชี (ปรับสิทธิ์รายคนได้ใน FA)
   accounting_firm: [...READ_ALL, ...ACCOUNTING_WRITE, 'payroll.read', 'payroll.write'],

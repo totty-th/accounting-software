@@ -16,11 +16,13 @@ describe('M14 ตารางสิทธิ์', () => {
     for (const p of ['sales.write', 'receipts.write', 'expenses.write', 'wht.write', 'bank.write', 'reports.read'] as const) expect(can('accountant', p), p).toBe(true);
     expect(can('accountant', 'sales.approve')).toBe(false); expect(can('accountant', 'users.manage')).toBe(false);
   });
-  it('IT เหมือน Super admin ทุกสิทธิ์; ทั้งคู่จัดการผู้ใช้ได้และไม่ลงบัญชี (อ่านอย่างเดียว)', () => {
-    expect([...permsOf('it')].sort()).toEqual([...permsOf('super_admin')].sort());
-    expect(can('super_admin', 'users.manage')).toBe(true);
-    for (const p of PERMS.filter(p => p.endsWith('.write') || p.endsWith('.approve'))) expect(can('super_admin', p), p).toBe(false);
-    expect(can('super_admin', 'reports.read')).toBe(true);
+  it('Super admin ทำได้ทุกอย่าง = สิทธิ์เจ้าของ + จัดการผู้ใช้/ตั้งค่า (เจ้าของระบบ 19-11-2026) · IT ยังอ่านอย่างเดียว', () => {
+    for (const p of permsOf('owner')) expect(can('super_admin', p), p).toBe(true);
+    for (const p of PERMS.filter(p => p.endsWith('.write') || p.endsWith('.approve'))) expect(can('super_admin', p), p).toBe(true);
+    expect(can('super_admin', 'users.manage')).toBe(true); expect(can('super_admin', 'settings.company')).toBe(true); expect(can('super_admin', 'contact.create')).toBe(true);
+    expect(can('it', 'users.manage')).toBe(true); expect(can('it', 'reports.read')).toBe(true);
+    for (const p of PERMS.filter(p => p.endsWith('.write') || p.endsWith('.approve'))) expect(can('it', p), p).toBe(false);
+    expect(can('it', 'contact.create')).toBe(false);
   });
   it('ไม่มีตำแหน่ง/ตำแหน่งแปลก = ไม่มีสิทธิ์อะไรเลย', () => {
     expect(can(null, 'dash.view')).toBe(false); expect(isRole('hacker')).toBe(false); expect(ROLES).toHaveLength(11);
