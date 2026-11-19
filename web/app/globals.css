@@ -378,3 +378,108 @@ main tbody tr:has(a[href^="/"]) td{user-select:text}
   .pairrow > :nth-child(4), .pairrow > :nth-child(5) { grid-column: 2; }
   .pairrow > :nth-child(5) { justify-content: flex-start !important; }
 }
+
+/* ===== แดชบอร์ดใหม่ (19-11-2026): จัดแบบการ์ด เน้นตัวเลขหลัก + ภาพประกอบข้อมูล ===== */
+.dash{--db-r:16px;max-width:1320px}
+.db-head{display:flex;gap:14px 24px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+.db-head h1{font-size:28px;margin:0;letter-spacing:-.01em}
+.db-seg{display:flex;flex-wrap:wrap;gap:2px;background:var(--surface);border-radius:12px;padding:4px;box-shadow:var(--shadow)}
+.db-seg a{padding:6px 12px;border-radius:9px;font-size:13.5px;color:var(--muted);white-space:nowrap}
+.db-seg a:hover{background:var(--hover);color:var(--fg)}
+.db-seg a.on{background:var(--brand);color:#fff;font-weight:600}
+.db-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.db-tabs a{padding:9px 14px;font-size:14.5px;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.db-tabs a:hover{color:var(--fg)}.db-tabs a.on{color:var(--fg);font-weight:700;border-bottom-color:var(--brand)}
+.db-row{display:grid;gap:16px;margin-bottom:16px}
+.db-row>*{min-width:0}
+.db-row.hero{grid-template-columns:minmax(0,1.75fr) minmax(0,1fr)}
+.db-row.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.db-row.two{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
+.db-row.wide{grid-template-columns:minmax(0,2.2fr) minmax(0,1fr)}
+.db-row.three{grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr))}
+.db-row.three:empty{display:none}
+@media (max-width:1180px){.db-row.four{grid-template-columns:repeat(2,minmax(0,1fr))}.db-row.hero,.db-row.two,.db-row.wide{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.db-row.four{grid-template-columns:minmax(0,1fr)}}
+.db-card{background:var(--surface);border-radius:var(--db-r);padding:18px 20px;box-shadow:var(--shadow);display:block}
+.db-card h2{font-size:15.5px;margin:0 0 14px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.db-card h2 small{color:var(--muted);font-weight:400;font-size:13px}.db-card h2 small a:hover{color:var(--fg)}
+a.db-card{transition:transform .12s,box-shadow .12s}a.db-card:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(41,47,76,.14)}
+.db-eyebrow{display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--muted);font-weight:600}
+.db-eyebrow i{width:9px;height:9px;border-radius:3px}
+.db-delta{font-size:13px;font-weight:600;display:block}.db-delta small{font-weight:400;color:var(--muted)}
+.db-delta.ok{color:var(--teal)}.db-delta.bad{color:var(--red)}.db-delta.flat{color:var(--muted);font-weight:400}
+/* การ์ดเด่น: ผลประกอบการ */
+.db-hero{border-radius:var(--db-r);padding:24px 26px;color:#fff;background:linear-gradient(135deg,#1f2347 0%,#34399a 100%);
+  box-shadow:0 8px 28px rgba(31,35,71,.28);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:22px 34px;align-items:center}
+.db-hero.loss{background:linear-gradient(135deg,#1f2347 0%,#6b2a4a 100%)}
+@media (prefers-color-scheme:dark){.db-hero{background:linear-gradient(135deg,#262b5a 0%,#4146b4 100%)}.db-hero.loss{background:linear-gradient(135deg,#262b5a 0%,#7c3155 100%)}}
+.db-hero-l{display:flex;flex-direction:column;gap:4px;min-width:0}
+.db-hero .db-eyebrow{color:#c9ccf0}
+.db-hero-v{font-size:clamp(30px,4.2vw,44px);line-height:1.1;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.db-hero-v small{font-size:.5em;opacity:.75}.db-hero-v em{font-style:normal;font-size:14px;font-weight:400;opacity:.75;margin-left:8px;letter-spacing:0}
+.db-hero .db-delta{color:#fff}.db-hero .db-delta small{color:#c9ccf0}
+.db-hero .db-delta.ok{color:#7ff0c0}.db-hero .db-delta.bad{color:#ffb3c0}
+.db-hero-m{font-size:13.5px;color:#c9ccf0}.db-hero-m b{color:#fff}
+.db-hero .db-spark{height:44px;margin-top:10px}.db-hero-cap{font-size:12px;color:#aeb2e0}
+.db-flow{display:flex;flex-direction:column;gap:14px;min-width:0}
+.db-flow-r{display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;align-items:center}
+.db-flow-r .op{font-size:20px;font-weight:700;color:#aeb2e0;text-align:center}
+.db-flow-r .lb{display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-bottom:5px}.db-flow-r .lb span{color:#dcdefa}
+.db-flow-r .lb b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.db-flow-r .tk{height:14px;border-radius:7px;background:rgba(255,255,255,.13);overflow:hidden}
+.db-flow-r .tk div{height:100%;border-radius:7px}
+.db-flow-r .rev{background:#6ea8ff}.db-flow-r .exp{background:#ff9a6b}.db-flow-r .ok{background:#3ddc97}.db-flow-r .bad{background:#ff7b93}
+@media (max-width:760px){.db-hero{grid-template-columns:minmax(0,1fr);padding:20px}}
+/* สภาพคล่อง */
+.db-liq{display:flex;flex-direction:column}
+.db-liq .r{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:9px 8px;margin:0 -8px;border-radius:8px;font-size:14.5px}
+.db-liq .r:hover{background:var(--hover)}
+.db-liq .r small,.db-liq .t small{color:var(--muted);font-size:12.5px;margin-left:4px}
+.db-liq b{font-variant-numeric:tabular-nums;white-space:nowrap}.db-liq .neg{color:var(--red)}.db-liq .pos{color:var(--teal)}
+.db-liq .op{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-style:normal;font-weight:700;font-size:14px;margin-right:8px;background:var(--hover)}
+.db-liq .op.plus{color:var(--teal)}.db-liq .op.minus{color:var(--red)}
+.db-liq .t{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;border-top:2px solid var(--line);margin-top:auto;padding-top:14px}
+.db-liq .t span{font-weight:600}.db-liq .t small{display:block;margin:0;font-weight:400}
+.db-liq .t b{font-size:26px;letter-spacing:-.01em}.db-liq .t b small{font-size:.55em;color:inherit;opacity:.75;display:inline;margin:0}
+/* ตัวเลขหลัก */
+.db-tile{display:flex;flex-direction:column;gap:3px}
+.db-tile .v{font-size:25px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.25;overflow-wrap:anywhere}
+.db-tile .v small{font-size:.55em;color:var(--muted)}
+.db-tile .cap{font-size:12.5px;color:var(--muted);margin-top:auto;padding-top:6px}
+.db-tile .db-spark{height:38px;margin-top:8px}.db-tile .db-stack{margin-top:14px;margin-bottom:12px}
+.db-spark{display:block;width:100%;height:36px}.db-spark.none{border-bottom:2px dashed var(--line);height:20px;margin:10px 0 8px}
+.db-stack{display:flex;gap:2px;height:14px;border-radius:7px;overflow:hidden;background:var(--hover)}
+.db-stack span{min-width:4px;flex-basis:0}
+.db-stack-empty{font-size:13.5px;color:var(--muted);min-height:14px}
+.db-stack-lg{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px}
+.db-stack-lg li{display:flex;align-items:center;gap:8px}.db-stack-lg i{width:10px;height:10px;border-radius:3px;flex:none}
+.db-stack-lg span{flex:1;min-width:0}.db-stack-lg b{font-variant-numeric:tabular-nums;font-weight:600}
+/* ประเด็นติดตาม + งานค้าง */
+.db-alerts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.db-alerts li>*{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--hover);font-size:14px}
+.db-alerts a:hover{filter:brightness(.97)}
+.db-alerts i{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:700;font-size:13px;color:#fff;background:var(--grey)}
+.db-alerts span{flex:1;min-width:0}.db-alerts span b{display:block;font-size:12px;letter-spacing:.02em}
+.db-alerts em{font-style:normal;color:var(--muted)}
+.db-alerts .bad i{background:var(--red)}.db-alerts .bad b{color:var(--red)}
+.db-alerts .warn i{background:#d98a00}.db-alerts .warn b{color:#b36b00}
+.db-alerts .ok i{background:var(--teal)}.db-alerts .ok b{color:var(--teal)}
+@media (prefers-color-scheme:dark){.db-alerts .warn b{color:#f0b24a}}
+.db-row.two>.db-card{display:flex;flex-direction:column}
+.db-todo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;flex:1}
+.db-todo a{justify-content:center}
+.db-todo a{border-radius:12px;padding:14px;background:var(--hover);border-left:4px solid var(--line);display:flex;flex-direction:column;gap:2px}
+.db-todo a:hover{filter:brightness(.97)}
+.db-todo a.has{border-left-color:var(--c)}
+.db-todo b{font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--muted)}.db-todo a.has b{color:var(--fg)}
+.db-todo span{font-size:13px;color:var(--muted)}
+/* การเก็บเงิน */
+.db-collect{display:flex;flex-direction:column}
+.db-ring{width:150px;max-width:60%;margin:2px auto 14px;display:block}
+.db-ring-v{font-size:26px;font-weight:700;fill:var(--fg)}.db-ring-c{font-size:12px;fill:var(--muted)}
+.db-kv{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;font-size:13.5px}
+.db-kv li{display:flex;justify-content:space-between;gap:10px}.db-kv span{display:flex;align-items:center;gap:8px;min-width:0}
+.db-kv i{width:10px;height:10px;border-radius:3px;flex:none}.db-kv b{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.dv-legend i.ln{width:16px;height:3px;border-radius:2px;vertical-align:middle}
+.db-recent table{min-width:640px}.db-recent{margin-bottom:16px}
+.db-recent td,.db-recent th{white-space:nowrap}

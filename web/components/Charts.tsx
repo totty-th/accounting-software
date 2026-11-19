@@ -17,10 +17,11 @@ function niceMax(v: number) {
 export interface Series { key: string; name: string; color: string; values: number[] }
 
 /** แท่งคู่รายเดือน (รายได้ vs ค่าใช้จ่าย) พร้อมเส้นฐาน กริดจาง และคำอธิบายสี */
-export function Columns({ labels, series, height = 240 }: { labels: string[]; series: Series[]; height?: number }) {
+export function Columns({ labels, series, height = 240, line }: { labels: string[]; series: Series[]; height?: number; line?: Series }) {
   const W = 680, H = height, L = 64, R = 10, T = 12, B = 30;
-  const max = niceMax(Math.max(0, ...series.flatMap(s => s.values)));
-  const min = Math.min(0, ...series.flatMap(s => s.values));
+  const all = [...series, ...(line ? [line] : [])];
+  const max = niceMax(Math.max(0, ...all.flatMap(s => s.values)));
+  const min = Math.min(0, ...all.flatMap(s => s.values));
   const lo = min < 0 ? -niceMax(-min) : 0;
   const y = (v: number) => T + (H - T - B) * (1 - (v - lo) / (max - lo));
   const gw = (W - L - R) / labels.length;
@@ -28,7 +29,8 @@ export function Columns({ labels, series, height = 240 }: { labels: string[]; se
   const ticks = [0, 1, 2, 3, 4].map(i => lo + ((max - lo) * i) / 4);
   return (
     <div className="dv-chart">
-      <div className="dv-legend">{series.map(s => <span key={s.key}><i style={{ background: s.color }} />{s.name}</span>)}</div>
+      <div className="dv-legend">{series.map(s => <span key={s.key}><i style={{ background: s.color }} />{s.name}</span>)}
+        {line && <span><i className="ln" style={{ background: line.color }} />{line.name}</span>}</div>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={series.map(s => s.name).join(' เทียบ ')} className="dv-svg">
         {ticks.map(t => (
           <g key={t}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} className={t === 0 ? 'dv-base' : 'dv-grid'} />
@@ -37,7 +39,7 @@ export function Columns({ labels, series, height = 240 }: { labels: string[]; se
           const cx = L + gw * i + gw / 2, x0 = cx - (bw * series.length + 2 * (series.length - 1)) / 2;
           return (
             <g key={lb}>
-              <rect x={L + gw * i} y={T} width={gw} height={H - T - B} fill="transparent"><title>{`${lb}\n${series.map(s => `${s.name}: ${nf2(s.values[i])}`).join('\n')}`}</title></rect>
+              <rect x={L + gw * i} y={T} width={gw} height={H - T - B} fill="transparent"><title>{`${lb}\n${all.map(s => `${s.name}: ${nf2(s.values[i])}`).join('\n')}`}</title></rect>
               {series.map((s, k) => {
                 const v = s.values[i], top = y(Math.max(v, 0)), h = Math.max(Math.abs(y(v) - y(0)), v !== 0 ? 2 : 0);
                 return <rect key={s.key} x={x0 + k * (bw + 2)} y={v >= 0 ? top : y(0)} width={bw} height={h} rx={3} fill={s.color} style={{ pointerEvents: 'none' }} />;
@@ -45,9 +47,51 @@ export function Columns({ labels, series, height = 240 }: { labels: string[]; se
               <text x={cx} y={H - 10} textAnchor="middle" className="dv-axis">{lb}</text>
             </g>);
         })}
+        {line && <g style={{ pointerEvents: 'none' }}>
+          <polyline fill="none" stroke={line.color} strokeWidth={2} strokeLinejoin="round" points={line.values.map((v, i) => `${L + gw * i + gw / 2},${y(v)}`).join(' ')} />
+          {line.values.map((v, i) => <circle key={i} cx={L + gw * i + gw / 2} cy={y(v)} r={4} fill={line.color} stroke="var(--surface)" strokeWidth={2} />)}</g>}
       </svg>
     </div>
   );
+}
+
+/** เส้นแนวโน้มย่อ (ไม่มีแกน) ใช้ประกอบตัวเลขหลัก */
+export function Spark({ values, color, label }: { values: number[]; color: string; label: string }) {
+  if (values.length < 2 || values.every(v => v === 0)) return <div className="db-spark none" aria-hidden />;
+  const W = 100, H = 30, lo = Math.min(0, ...values), hi = Math.max(0, ...values), span = hi - lo || 1;
+  const x = (i: number) => (i / (values.length - 1)) * W, y = (v: number) => 2 + (H - 4) * (1 - (v - lo) / span);
+  const pts = values.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(' ');
+  return (
+    <svg className="db-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={label}>
+      <polygon points={`0,${y(0)} ${pts} ${W},${y(0)}`} fill={color} opacity={0.16} />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={2} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>);
+}
+
+/** วงแหวนสัดส่วนค่าเดียว (เช่น อัตราเก็บเงิน) */
+export function Ring({ pct, color, caption }: { pct: number | null; color: string; caption: string }) {
+  const r = 52, c = 2 * Math.PI * r, v = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  return (
+    <svg className="db-ring" viewBox="0 0 132 132" role="img" aria-label={`${caption} ${pct == null ? 'ไม่มีข้อมูล' : pct.toFixed(0) + '%'}`}>
+      <circle cx={66} cy={66} r={r} fill="none" stroke="var(--hover)" strokeWidth={13} />
+      {v > 0 && <circle cx={66} cy={66} r={r} fill="none" stroke={color} strokeWidth={13} strokeLinecap="round"
+        strokeDasharray={`${(c * v) / 100} ${c}`} transform="rotate(-90 66 66)" />}
+      <text x={66} y={64} textAnchor="middle" className="db-ring-v">{pct == null ? '–' : `${v.toFixed(0)}%`}</text>
+      <text x={66} y={84} textAnchor="middle" className="db-ring-c">{caption}</text>
+    </svg>);
+}
+
+/** แถบเดียวแบ่งส่วน (เช่น อายุหนี้) พร้อมคำอธิบายสี */
+export function Stack({ items, legend = true, empty = 'ไม่มียอดค้าง' }: { items: Bar[]; legend?: boolean; empty?: string }) {
+  const sum = items.reduce((a, b) => a + Math.max(0, b.value), 0);
+  if (sum <= 0) return <div className="db-stack-empty">{empty}</div>;
+  const on = items.filter(i => i.value > 0);
+  return (
+    <div>
+      <div className="db-stack" role="img" aria-label={on.map(i => `${i.label} ${nf2(i.value)}`).join(', ')}>
+        {on.map(i => <span key={i.label} title={`${i.label}: ${nf2(i.value)} (${((i.value / sum) * 100).toFixed(0)}%)`} style={{ flexGrow: i.value, background: i.color }} />)}</div>
+      {legend && <ul className="db-stack-lg">{on.map(i => <li key={i.label}><i style={{ background: i.color }} /><span>{i.label}</span><b>{nf2(i.value)}</b></li>)}</ul>}
+    </div>);
 }
 
 export interface Bar { label: string; value: number; color?: string; note?: string; href?: string }

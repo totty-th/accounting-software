@@ -4,9 +4,8 @@ import { getDb, today } from '@/lib/db';
 import { money, dateTh, partyName } from '@/lib/format';
 import { periodRange } from '@/lib/period';
 import { Pill } from '@/components/Pill';
-import { Group } from '@/components/Board';
 import { DOC_TYPE } from '@/lib/status';
-import { Columns, HBars, Kpi, monLabel, type Bar } from '@/components/Charts';
+import { Columns, HBars, Spark, Ring, Stack, monLabel, type Bar } from '@/components/Charts';
 
 const PERIODS: [string, string][] = [['month', 'เดือนปัจจุบัน'], ['lastmonth', 'เดือนก่อน'], ['m3', '3 เดือนที่แล้ว'], ['m6', '6 เดือนที่แล้ว'], ['year', 'ปีปัจจุบัน'], ['lastyear', 'ปีก่อน'], ['custom', 'กำหนดเอง']];
 const VIEWS: [string, string][] = [['all', 'ภาพรวม'], ['sales', 'ขาย/รายได้'], ['cost', 'ค่าใช้จ่าย'], ['cash', 'เงินสด/ลูกหนี้/เจ้าหนี้'], ['tax', 'ภาษี/ปิดงวด']];
@@ -128,88 +127,146 @@ export default async function Home({ searchParams }: { searchParams: { p?: strin
   const ICON = { bad: '✖ ต้องแก้', warn: '▲ ติดตาม', ok: '✔ ปกติ' } as const;
   const margin = rev > 0 ? (profit / rev) * 100 : null;
 
+  // ---------- ส่วนแสดงผล ----------
+  const Big = ({ v }: { v: number }) => { const [i, d] = money(v).split('.'); return <>{i}<small>.{d}</small></>; };
+  const Delta = ({ cur: c, prev: q, good = 'up' }: { cur: number; prev: number; good?: 'up' | 'down' }) => {
+    const d = pct(c, q); if (d == null || !isFinite(d)) return <span className="db-delta flat">ไม่มีช่วงก่อนหน้าให้เทียบ</span>;
+    const flat = Math.abs(d) < 0.05, up = d > 0, ok = good === 'up' ? up : !up;
+    return <span className={`db-delta ${flat ? 'flat' : ok ? 'ok' : 'bad'}`}>{flat ? '▬ เท่าเดิม' : `${up ? '▲' : '▼'} ${Math.abs(d).toFixed(1)}%`}<small> เทียบช่วงก่อนหน้า</small></span>;
+  };
+  const profS = revS.map((r, i) => r - expS[i]);
+  const flowMax = Math.max(rev, exp, 1);
+  const net = cashTotal + ar.total - ap.total;
+  const collectPct = N(inv.billed) > 0 ? (N(rc.got) / N(inv.billed)) * 100 : null;
+  const TODO: [string, string, number, string][] = [['ใบแจ้งหนี้รอเก็บเงิน', '/sales?type=INV', N(todo.inv), 'var(--dv-1)'], ['ใบเสร็จรอเก็บเงิน', '/receipts', N(todo.re), 'var(--dv-3)'],
+    ['ค่าใช้จ่ายรอจ่าย', '/expenses', N(todo.ex), 'var(--dv-2)'], ['ใบเสนอราคารออนุมัติ', '/sales?type=QT', N(todo.qt), 'var(--dv-5)']];
+  const AL_ICON = { bad: '!', warn: '▲', ok: '✓' } as const;
+  const AlertList = ({ list }: { list: Alert[] }) => (
+    <ul className="db-alerts">{list.map((a, i) => { const body = <><i aria-hidden>{AL_ICON[a.lv]}</i><span><b>{ICON[a.lv].slice(2)}</b>{a.text}</span>{a.href && <em aria-hidden>→</em>}</>;
+      return <li key={i} className={a.lv}>{a.href ? <Link href={a.href}>{body}</Link> : <div>{body}</div>}</li>; })}</ul>);
+
   return (
     <div className="dash">
-      <div className="top"><div><h1>ภาพรวมบริษัท</h1><p className="sub">{dateTh(from)} – {dateTh(to)} · เทียบกับ {dateTh(pv.pf)} – {dateTh(pv.pt)}</p></div></div>
+      <div className="db-head">
+        <div><h1>ภาพรวมบริษัท</h1><p className="sub">{dateTh(from)} – {dateTh(to)} · เทียบกับ {dateTh(pv.pf)} – {dateTh(pv.pt)}</p></div>
+        <div className="db-seg noprint" role="group" aria-label="ช่วงเวลา">{PERIODS.map(([k, l]) => <Link key={k} className={p === k ? 'on' : ''} href={href({ p: k })}>{l}</Link>)}</div>
+      </div>
+      {p === 'custom' && (
+        <form method="get" className="row-inline noprint" style={{ marginBottom: 12 }}><input type="hidden" name="p" value="custom" />{v !== 'all' && <input type="hidden" name="v" value={v} />}
+          <label className="f">เริ่มต้น<input type="date" name="from" defaultValue={from} required /></label>
+          <label className="f">สิ้นสุด<input type="date" name="to" defaultValue={to} required /></label>
+          <button className="btn" type="submit">แสดงผล</button></form>)}
+      <nav className="db-tabs noprint" aria-label="เลือกหัวข้อ">{VIEWS.map(([k, l]) => <Link key={k} className={v === k ? 'on' : ''} href={href({ v: k })}>{l}</Link>)}</nav>
 
-      <div className="dv-filter noprint">
-        <div className="chips" role="group" aria-label="ช่วงเวลา">{PERIODS.map(([k, l]) => <Link key={k} className={`chip${p === k ? ' on' : ''}`} href={href({ p: k })}>{l}</Link>)}</div>
-        {p === 'custom' && (
-          <form method="get" className="row-inline"><input type="hidden" name="p" value="custom" />{v !== 'all' && <input type="hidden" name="v" value={v} />}
-            <label className="f">เริ่มต้น<input type="date" name="from" defaultValue={from} required /></label>
-            <label className="f">สิ้นสุด<input type="date" name="to" defaultValue={to} required /></label>
-            <button className="btn" type="submit">แสดงผล</button></form>)}
-        <div className="chips" role="group" aria-label="เลือกหัวข้อ">{VIEWS.map(([k, l]) => <Link key={k} className={`chip v${v === k ? ' on' : ''}`} href={href({ v: k })}>{l}</Link>)}</div>
+      {/* ---------- แถวเด่น: ผลประกอบการ + สภาพคล่อง ---------- */}
+      <div className="db-row hero">
+        <section className={`db-hero${profit < 0 ? ' loss' : ''}`}>
+          <div className="db-hero-l">
+            <span className="db-eyebrow">{profit >= 0 ? 'กำไรสุทธิ' : 'ขาดทุนสุทธิ'}</span>
+            <b className="db-hero-v"><Big v={profit} /><em>บาท</em></b>
+            <Delta cur={profit} prev={prevProfit} />
+            {margin != null && <span className="db-hero-m">อัตรากำไร <b>{margin.toFixed(1)}%</b> ของรายได้</span>}
+            <Spark values={profS} color="#ffffff" label="แนวโน้มกำไรรายเดือน" />
+            <span className="db-hero-cap">กำไร(ขาดทุน)รายเดือน {monLabel(months[0])} – {monLabel(months[months.length - 1])}</span>
+          </div>
+          <div className="db-flow" role="img" aria-label={`รายได้ ${money(rev)} หักค่าใช้จ่าย ${money(exp)} เหลือ ${money(profit)}`}>
+            {([['รายได้', rev, 'rev', ''], ['ค่าใช้จ่าย', exp, 'exp', '−'], [profit >= 0 ? 'กำไร' : 'ขาดทุน', Math.abs(profit), profit >= 0 ? 'ok' : 'bad', '=']] as const).map(([l, val, cls, op]) => (
+              <div key={l} className="db-flow-r"><span className="op" aria-hidden>{op}</span>
+                <div><div className="lb"><span>{l}</span><b>{money(cls === 'bad' ? -val : val)}</b></div>
+                  <div className="tk"><div className={cls} style={{ width: `${Math.max(val > 0 ? 2 : 0, (val / flowMax) * 100)}%` }} /></div></div></div>))}
+          </div>
+        </section>
+        <section className="db-card db-liq">
+          <h2>สภาพคล่อง <small>ณ {dateTh(asof)}</small></h2>
+          <Link href="/bank" className="r"><span>เงินสดและเงินฝาก</span><b className={cashTotal < 0 ? 'neg' : ''}>{money(cashTotal)}</b></Link>
+          <Link href="/reports/ar" className="r"><span><i className="op plus">+</i>ลูกหนี้ค้างรับ <small>{ar.n} ใบ</small></span><b>{money(ar.total)}</b></Link>
+          <Link href="/reports/ap" className="r"><span><i className="op minus">−</i>เจ้าหนี้ค้างจ่าย <small>{ap.n} ใบ</small></span><b>{money(ap.total)}</b></Link>
+          <div className="t"><span>คงเหลือสุทธิ<small>ถ้าเก็บและจ่ายหนี้ครบทุกใบ</small></span><b className={net < 0 ? 'neg' : 'pos'}><Big v={net} /></b></div>
+        </section>
       </div>
 
-      <div className="cards">
-        <Kpi label="รายได้" value={money(rev)} delta={pct(rev, N(prev.rev))} accent="var(--dv-1)" sub={`ใบแจ้งหนี้/ขายสด ${inv.n} ใบ`} />
-        <Kpi label="ค่าใช้จ่าย" value={money(exp)} delta={pct(exp, N(prev.exp))} good="down" accent="var(--dv-2)" />
-        <Kpi label="กำไร(ขาดทุน)สุทธิ" value={money(profit)} delta={pct(profit, prevProfit)} accent={profit >= 0 ? 'var(--dv-3)' : 'var(--dv-bad)'} sub={margin == null ? undefined : `อัตรากำไร ${margin.toFixed(1)}%`} />
-        <Kpi label={`เงินสดและเงินฝาก ณ ${dateTh(asof)}`} value={money(cashTotal)} accent="var(--blue)" href="/bank" />
-        <Kpi label="ลูกหนี้ค้างรับ" value={money(ar.total)} accent="var(--orange)" href="/reports/ar" sub={ar.over > 0 ? `เกินกำหนด ${money(ar.over)}` : 'ไม่มียอดเกินกำหนด'} />
-        <Kpi label="เจ้าหนี้ค้างจ่าย" value={money(ap.total)} accent="var(--purple)" href="/reports/ap" sub={ap.over > 0 ? `เกินกำหนด ${money(ap.over)}` : 'ไม่มียอดเกินกำหนด'} />
+      {/* ---------- ตัวเลขหลัก 4 ช่อง ---------- */}
+      <div className="db-row four">
+        <section className="db-card db-tile"><span className="db-eyebrow"><i style={{ background: 'var(--dv-1)' }} />รายได้</span>
+          <b className="v"><Big v={rev} /></b><Delta cur={rev} prev={N(prev.rev)} />
+          <Spark values={revS} color="var(--dv-1)" label="แนวโน้มรายได้รายเดือน" /><span className="cap">ใบแจ้งหนี้/ขายสด {inv.n} ใบ</span></section>
+        <section className="db-card db-tile"><span className="db-eyebrow"><i style={{ background: 'var(--dv-2)' }} />ค่าใช้จ่าย</span>
+          <b className="v"><Big v={exp} /></b><Delta cur={exp} prev={N(prev.exp)} good="down" />
+          <Spark values={expS} color="var(--dv-2)" label="แนวโน้มค่าใช้จ่ายรายเดือน" /><span className="cap">รอจ่าย {money(expPay.unpaid)}</span></section>
+        <Link href="/reports/ar" className="db-card db-tile"><span className="db-eyebrow"><i style={{ background: 'var(--dv-r2)' }} />ลูกหนี้ค้างรับ</span>
+          <b className="v"><Big v={ar.total} /></b>
+          <span className={`db-delta ${ar.over > 0 ? 'bad' : 'ok'}`}>{ar.over > 0 ? `เกินกำหนด ${money(ar.over)}` : 'ไม่มียอดเกินกำหนด'}</span>
+          <Stack items={ar.items} legend={false} empty="" /><span className="cap">{ar.total > 0 ? `เกินกำหนด ${((ar.over / ar.total) * 100).toFixed(0)}% ของยอดค้าง` : 'ไม่มียอดค้างรับ'}</span></Link>
+        <Link href="/reports/ap" className="db-card db-tile"><span className="db-eyebrow"><i style={{ background: 'var(--dv-5)' }} />เจ้าหนี้ค้างจ่าย</span>
+          <b className="v"><Big v={ap.total} /></b>
+          <span className={`db-delta ${ap.over > 0 ? 'bad' : 'ok'}`}>{ap.over > 0 ? `เกินกำหนด ${money(ap.over)}` : 'ไม่มียอดเกินกำหนด'}</span>
+          <Stack items={ap.items} legend={false} empty="" /><span className="cap">{ap.total > 0 ? `เกินกำหนด ${((ap.over / ap.total) * 100).toFixed(0)}% ของยอดค้าง` : 'ไม่มียอดค้างจ่าย'}</span></Link>
       </div>
 
       {v === 'all' && (
-        <section className="dv-panel">
-          <h2>ประเด็นที่ควรติดตาม</h2>
-          <ul className="dv-alerts">{alerts.map((a, i) => <li key={i} className={a.lv}><b>{ICON[a.lv]}</b>{a.href ? <Link href={a.href}>{a.text}</Link> : a.text}</li>)}</ul>
-        </section>)}
+        <div className="db-row two">
+          <section className="db-card"><h2>ประเด็นที่ควรติดตาม <small>{alerts.filter(a => a.lv !== 'ok').length} เรื่อง</small></h2><AlertList list={alerts} /></section>
+          <section className="db-card"><h2>งานค้าง</h2>
+            <div className="db-todo">{TODO.map(([l, h, n, c]) => <Link key={l} href={h} className={n > 0 ? 'has' : ''} style={{ ['--c' as any]: c }}><b>{n}</b><span>{l}</span></Link>)}</div></section>
+        </div>)}
 
       {(show('sales') || show('cost')) && (
-        <section className="dv-panel wide">
-          <h2>รายได้ เทียบ ค่าใช้จ่าย รายเดือน</h2>
-          <Columns labels={months.map(monLabel)} series={[{ key: 'r', name: 'รายได้', color: 'var(--dv-1)', values: revS }, { key: 'e', name: 'ค่าใช้จ่าย', color: 'var(--dv-2)', values: expS }]} />
-          <details className="dv-table"><summary>ดูเป็นตาราง</summary>
-            <table><thead><tr><th>เดือน</th><th className="num">รายได้</th><th className="num">ค่าใช้จ่าย</th><th className="num">กำไร(ขาดทุน)</th></tr></thead>
-              <tbody>{months.map((m, i) => <tr key={m}><td>{monLabel(m)}</td><td className="num">{money(revS[i])}</td><td className="num">{money(expS[i])}</td><td className="num">{money(revS[i] - expS[i])}</td></tr>)}</tbody></table></details>
-        </section>)}
+        <div className={`db-row ${v === 'all' || v === 'sales' ? 'wide' : 'one'}`}>
+          <section className="db-card">
+            <h2>รายได้ ค่าใช้จ่าย และกำไร รายเดือน</h2>
+            <Columns labels={months.map(monLabel)} series={[{ key: 'r', name: 'รายได้', color: 'var(--dv-1)', values: revS }, { key: 'e', name: 'ค่าใช้จ่าย', color: 'var(--dv-2)', values: expS }]}
+              line={{ key: 'p', name: 'กำไร(ขาดทุน)', color: 'var(--dv-3)', values: profS }} />
+            <details className="dv-table"><summary>ดูเป็นตาราง</summary>
+              <table><thead><tr><th>เดือน</th><th className="num">รายได้</th><th className="num">ค่าใช้จ่าย</th><th className="num">กำไร(ขาดทุน)</th></tr></thead>
+                <tbody>{months.map((m, i) => <tr key={m}><td>{monLabel(m)}</td><td className="num">{money(revS[i])}</td><td className="num">{money(expS[i])}</td><td className="num">{money(revS[i] - expS[i])}</td></tr>)}</tbody></table></details>
+          </section>
+          {(v === 'all' || v === 'sales') && (
+            <section className="db-card db-collect"><h2>การเก็บเงิน <small>ในช่วงนี้</small></h2>
+              <Ring pct={collectPct} color="var(--dv-3)" caption="เก็บแล้ว" />
+              <ul className="db-kv">
+                <li><span><i style={{ background: 'var(--dv-1)' }} />ออกใบแจ้งหนี้/ขายสด</span><b>{money(inv.billed)}</b></li>
+                <li><span><i style={{ background: 'var(--dv-3)' }} />เก็บเงินแล้ว</span><b>{money(rc.got)}</b></li>
+                <li><span><i style={{ background: 'var(--dv-4)' }} />ใบเสร็จรอเก็บเงิน (ทั้งหมด)</span><b>{money(rc.pend)}</b></li></ul>
+              <p className="dv-foot"><Link href="/receipts">ไปหน้าใบเสร็จ →</Link></p></section>)}
+        </div>)}
 
-      <div className="dv-grid2">
+      <div className="db-row three">
         {show('sales') && <>
-          <section className="dv-panel"><h2>ยอดขายตามรายการสินค้า/บริการ <small>ก่อน VAT</small></h2><HBars items={fold(topItems, 6)} /></section>
-          <section className="dv-panel"><h2>ลูกค้ารายใหญ่ <small>ก่อน VAT</small></h2><HBars items={topCust.map(r => ({ label: String(r.label), value: N(r.value) }))} color="var(--dv-3)" /></section>
-          <section className="dv-panel"><h2>สรุปการเก็บเงิน</h2>
-            <HBars showPct={false} items={[{ label: 'ออกใบแจ้งหนี้/ขายสดในช่วงนี้', value: N(inv.billed), color: 'var(--dv-1)' }, { label: 'เก็บเงินแล้วในช่วงนี้', value: N(rc.got), color: 'var(--dv-3)' }, { label: 'ใบเสร็จรอเก็บเงิน (ทั้งหมด)', value: N(rc.pend), color: 'var(--dv-4)' }]} />
-            <p className="dv-foot"><Link href="/receipts">ไปหน้าใบเสร็จ →</Link></p></section>
+          <section className="db-card"><h2>สินค้า/บริการขายดี <small>ก่อน VAT</small></h2><HBars items={fold(topItems, 5)} /></section>
+          <section className="db-card"><h2>ลูกค้ารายใหญ่ <small>ก่อน VAT</small></h2><HBars items={topCust.map(r => ({ label: String(r.label), value: N(r.value) }))} color="var(--dv-3)" /></section>
         </>}
         {show('cost') && <>
-          <section className="dv-panel"><h2>ค่าใช้จ่ายตามหมวดหมู่ <small>ก่อน VAT</small></h2><HBars items={fold(cats, 6)} color="var(--dv-2)" /></section>
-          <section className="dv-panel"><h2>ผู้จำหน่ายที่จ่ายมากสุด</h2><HBars items={topVend.map(r => ({ label: String(r.label), value: N(r.value) }))} color="var(--dv-5)" /></section>
-          <section className="dv-panel"><h2>สรุปการจ่ายเงิน</h2>
-            <HBars showPct={false} items={[{ label: 'จ่ายแล้วในช่วงนี้', value: N(expPay.paid), color: 'var(--dv-3)' }, { label: 'ค่าใช้จ่ายรอจ่าย (ทั้งหมด)', value: N(expPay.unpaid), color: 'var(--dv-2)' }]} />
-            <p className="dv-foot"><Link href="/expenses">ไปหน้าค่าใช้จ่าย →</Link></p></section>
+          <section className="db-card"><h2>ค่าใช้จ่ายตามหมวด <small>ก่อน VAT</small></h2><HBars items={fold(cats, 5)} color="var(--dv-2)" /></section>
+          {v === 'cost' && <>
+            <section className="db-card"><h2>ผู้จำหน่ายที่จ่ายมากสุด</h2><HBars items={topVend.map(r => ({ label: String(r.label), value: N(r.value) }))} color="var(--dv-5)" /></section>
+            <section className="db-card"><h2>สรุปการจ่ายเงิน</h2>
+              <HBars showPct={false} items={[{ label: 'จ่ายแล้วในช่วงนี้', value: N(expPay.paid), color: 'var(--dv-3)' }, { label: 'ค่าใช้จ่ายรอจ่าย (ทั้งหมด)', value: N(expPay.unpaid), color: 'var(--dv-2)' }]} />
+              <p className="dv-foot"><Link href="/expenses">ไปหน้าค่าใช้จ่าย →</Link></p></section></>}
         </>}
-        {show('cash') && <>
-          <section className="dv-panel"><h2>เงินสดและเงินฝากแต่ละบัญชี</h2>
+        {v === 'cash' && <>
+          <section className="db-card"><h2>เงินสดและเงินฝากแต่ละบัญชี</h2>
             {cashRows.length === 0 ? <div className="empty sm">ไม่มีข้อมูล</div> : <table className="dv-mini"><tbody>
               {cashRows.map(r => <tr key={r.code}><td>{r.name} <small>{r.code}</small></td><td className={`num${N(r.closing) < 0 ? ' neg' : ''}`}>{money(r.closing)}</td></tr>)}
               <tr className="tot"><td>รวม</td><td className="num">{money(cashTotal)}</td></tr></tbody></table>}</section>
-          <section className="dv-panel"><h2>อายุลูกหนี้ค้างรับ</h2><HBars items={ar.items} showPct={false} empty="ไม่มียอดลูกหนี้ค้าง" /></section>
-          <section className="dv-panel"><h2>อายุเจ้าหนี้ค้างจ่าย</h2><HBars items={ap.items} showPct={false} empty="ไม่มียอดเจ้าหนี้ค้าง" /></section>
-          <section className="dv-panel"><h2>ลูกหนี้ค้างสูงสุด</h2><HBars items={topDebtor.map(r => ({ label: String(r.label), value: N(r.value) }))} color="var(--dv-r2)" empty="ไม่มียอดลูกหนี้ค้าง" /></section>
+          <section className="db-card"><h2>อายุลูกหนี้ค้างรับ</h2><Stack items={ar.items} empty="ไม่มียอดลูกหนี้ค้าง" /></section>
+          <section className="db-card"><h2>อายุเจ้าหนี้ค้างจ่าย</h2><Stack items={ap.items} empty="ไม่มียอดเจ้าหนี้ค้าง" /></section>
+          <section className="db-card"><h2>ลูกหนี้ค้างสูงสุด</h2><HBars items={topDebtor.map(r => ({ label: String(r.label), value: N(r.value) }))} color="var(--dv-r2)" empty="ไม่มียอดลูกหนี้ค้าง" /></section>
         </>}
-        {show('tax') && <>
-          <section className="dv-panel"><h2>สถานะภาษีและการล็อกงวด</h2>
-            <ul className="dv-alerts">{alerts.filter(a => /ภ\.พ\.|หัก ณ|ล็อก/.test(a.text)).map((a, i) => <li key={i} className={a.lv}><b>{ICON[a.lv]}</b>{a.href ? <Link href={a.href}>{a.text}</Link> : a.text}</li>)}</ul></section>
-          <section className="dv-panel"><h2>งานที่ต้องทำ</h2>
-            <table className="dv-mini"><tbody>
-              <tr><td><Link href="/sales?type=INV">ใบแจ้งหนี้รอเก็บเงิน</Link></td><td className="num">{todo.inv}</td></tr>
-              <tr><td><Link href="/receipts">ใบเสร็จรอเก็บเงิน</Link></td><td className="num">{todo.re}</td></tr>
-              <tr><td><Link href="/expenses">ค่าใช้จ่ายรอดำเนินการ/จ่ายเงิน</Link></td><td className="num">{todo.ex}</td></tr>
-              <tr><td><Link href="/sales?type=QT">ใบเสนอราคารออนุมัติ</Link></td><td className="num">{todo.qt}</td></tr></tbody></table></section>
+        {v === 'tax' && <>
+          <section className="db-card"><h2>สถานะภาษีและการล็อกงวด</h2><AlertList list={alerts.filter(a => /ภ\.พ\.|หัก ณ|ล็อก/.test(a.text))} /></section>
+          <section className="db-card"><h2>งานค้าง</h2>
+            <div className="db-todo">{TODO.map(([l, h, n, c]) => <Link key={l} href={h} className={n > 0 ? 'has' : ''} style={{ ['--c' as any]: c }}><b>{n}</b><span>{l}</span></Link>)}</div></section>
         </>}
       </div>
 
       {v === 'all' && (
-        <Group title="เอกสารขายล่าสุด" color="var(--green)" count={recent.length}>
+        <section className="db-card db-recent"><h2>เอกสารขายล่าสุด <small><Link href="/sales">ดูทั้งหมด →</Link></small></h2>
           {recent.length === 0 ? <div className="empty">ยังไม่มีเอกสาร</div> : (
-            <table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>ลูกค้า</th><th>วันที่</th><th className="num">ยอดรวม</th><th>สถานะ</th></tr></thead>
+            <div style={{ overflowX: 'auto' }}><table><thead><tr><th>เลขที่</th><th>ประเภท</th><th>ลูกค้า</th><th>วันที่</th><th className="num">ยอดรวม</th><th>สถานะ</th></tr></thead>
               <tbody>{recent.map(r => (
                 <tr key={r.id}><td className="no"><Link href={`/sales/${r.doc_no}`}>{r.doc_no}</Link></td><td>{DOC_TYPE[r.doc_type]}</td><td>{partyName(r)}</td>
-                  <td>{dateTh(r.doc_date)}</td><td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td></tr>))}</tbody></table>)}
-        </Group>)}
+                  <td>{dateTh(r.doc_date)}</td><td className="num">{money(r.total)}</td><td><Pill s={r.status} /></td></tr>))}</tbody></table></div>)}
+        </section>)}
     </div>
   );
 }
