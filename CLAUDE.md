@@ -12,7 +12,7 @@
 
 ## คำสั่ง
 - เว็บต้องล็อกอิน (M68): ต่อฐานจริง (`DATABASE_URL`) = ล็อกอินด้วยอีเมล+รหัสผ่านรายคน (scrypt) ต้องตั้ง `SESSION_SECRET` ≥32 ตัว · ผู้ดูแลตั้งรหัสเริ่มต้น ผู้ใช้ต้องเปลี่ยนเองครั้งแรก · บัญชีแรกตั้งผ่านลิงก์ `/setup?t=` ใช้ครั้งเดียว · ในเครื่อง (PGlite) บัญชีเดโม admin/owner/account/sale1/sale2/itadmin ที่ยังไม่มีรหัสของตัวเองใช้ `demo1234` ได้ · สิทธิ์แก้ที่ web/lib/permissions.ts
-- **Production อยู่บน VPS + Coolify ตั้งแต่ 22-11-2026** (https://acc.tmplns.tech) ดู docs/deploy-vps.md · migration ใหม่ apply อัตโนมัติตอนคอนเทนเนอร์เปิด (`web/scripts/migrate.mjs`) ไม่ต้อง apply ที่ Supabase แล้ว · Vercel/Supabase เดิมเป็นสำรองย้อนกลับเท่านั้น (Vercel redirect ด้วย `MOVED_TO`)
+- **Production อยู่บน VPS + Coolify ตั้งแต่ 22-11-2026** (https://acc.tmplns.tech) ดู docs/deploy-vps.md · push ขึ้น main แล้ว deploy อัตโนมัติภายใน ~2 นาที · migration ใหม่ apply อัตโนมัติตอนคอนเทนเนอร์เปิด (`web/scripts/migrate.mjs`) ไม่ต้อง apply ที่ Supabase แล้ว · Vercel/Supabase เดิมเป็นสำรองย้อนกลับเท่านั้น (Vercel redirect ด้วย `MOVED_TO`)
 - `npm test` รันเทสต์ (ใช้ PGlite รัน migration จริง ไม่ต้องมี Postgres)
 
 - เว็บ: `cd web && npm install && npm run build && npx next start -p 3000` (หลังเพิ่ม migration ใหม่ให้ลบโฟลเดอร์ `web/.data` เพื่อสร้างฐานตัวอย่างใหม่ · ไม่ตั้ง `DATABASE_URL` = ใช้ PGlite ในเครื่อง พร้อมข้อมูลตัวอย่าง · ตั้ง `DATABASE_URL` = ต่อ Postgres/Supabase จริง)

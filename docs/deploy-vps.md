@@ -12,8 +12,8 @@
 | ไฟล์ตั้งค่าบนเครื่อง | `/root/acc/db.env` (uuid + รหัสฐาน, สิทธิ์ root เท่านั้น) · `/root/acc/dumps/` สำเนาฐาน Supabase ก่อนย้าย |
 
 ## Deploy
-- push ขึ้น `main` แล้วกด **Deploy** ใน Coolify (แอป accounting-web) — ยังไม่ได้ตั้ง deploy อัตโนมัติ
-  - หรือผ่าน API: `POST /api/v1/deploy {"uuid":"<APP_UUID>"}`
+- **อัตโนมัติ:** push ขึ้น `main` แล้วภายใน ~2 นาที cron บน VPS (`/etc/cron.d/accounting-autodeploy` → `/root/acc/autodeploy.sh`) เห็น commit ใหม่และสั่ง Coolify deploy · ประวัติอยู่ที่ `/root/acc/autodeploy.log` · ใช้ API token `claude-migration` ใน `/root/.coolify-token` (ถ้าลบ token นี้ deploy อัตโนมัติจะหยุด)
+  - ปิดชั่วคราว: `rm /etc/cron.d/accounting-autodeploy` · deploy เอง: กด Deploy ใน Coolify หรือ `POST /api/v1/deploy {"uuid":"<APP_UUID>"}`
 - ตอนคอนเทนเนอร์เปิด `web/scripts/migrate.mjs` รันก่อน `next start` เสมอ:
   - ตาราง `app_schema_migrations` เก็บชื่อไฟล์ใน `web/migrations` ที่รันแล้ว (ตอนย้ายบันทึก 0001–0102 เป็น baseline)
   - ไฟล์ใหม่จะถูก apply ทีละไฟล์ในธุรกรรมของตัวเอง ถ้าล้ม คอนเทนเนอร์ไม่เปิด (Coolify คงเวอร์ชันเก่าไว้) ดู log ที่หน้า Deployments
