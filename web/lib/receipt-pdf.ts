@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { DOC_ORANGE } from './doc-title';
+import { DOC_COLOR } from './doc-title';
 import path from 'node:path';
 import { PDFDocument, PDFFont, PDFPage, rgb, degrees } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -24,7 +24,7 @@ export async function buildReceiptPdf(v: ReceiptView, mode: PdfMode = 'original'
   const f = (n: string) => pdf.embedFont(fs.readFileSync(path.join(dir, 'fonts', n)), { subset: true });
   const F = { th: await f('sarabun-thai-400-normal.woff'), la: await f('sarabun-latin-400-normal.woff'),
               thB: await f('sarabun-thai-700-normal.woff'), laB: await f('sarabun-latin-700-normal.woff') };
-  const col = rgb(...DOC_ORANGE), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
+  const col = rgb(...DOC_COLOR), ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.45, 0.45, 0.5);
   const runs = (s: string) => { const out: [string, boolean][] = []; for (const ch of s) {
     const th = isThai(ch) || ch === '฿'; const last = out[out.length - 1];
     if (last && last[1] === th) last[0] += ch; else out.push([ch, th]); } return out; };
